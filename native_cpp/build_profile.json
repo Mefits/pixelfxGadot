@@ -1,5 +1,11 @@
 {
   "enabled_classes": [
-    "RefCounted"
+    "RefCounted",
+    "OS",
+    "FileAccess",
+    "Image",
+    "WorkerThreadPool",
+    "XMLParser",
+    "EditorPlugin"
   ]
 }
