@@ -1,0 +1,4 @@
+# Native reference implementation (experimental)
+Directly derived from locked upstream math.js, color.js, painter.js and lightning/_lib.js. Not a complete native runtime. Implemented: hash/mulberry32, ramp operations, ordered Bayer writes, translucent blending, pixel transform, Bresenham line, radial additive glow, midpoint displacement, bowed bolts, priority ink, stroke and crackle. No per-particle physics, actor mask, full Painter primitives or native texture uploader yet.
+Run node tools/make_native_fixture.mjs after npm run setup; then godot --headless --path godot --script res://tests/native.gd.
+Fixtures compare original JS RNG integer outputs, bolt geometry, and every packed color/light pixel. Exact match is the gate; if float boundary differences appear, inspect the diffs before choosing a tolerance. CPU reference is not a performance-optimized shipping renderer.
