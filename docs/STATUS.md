@@ -29,3 +29,11 @@ Build and tests (both Linux x86-64 and Windows x86-64): https://github.com/Mefit
 - Windows cached-geometry raster-only p95 (320x180): 1/4/8/16 bolts = 0.200/0.675/1.334/3.115 ms. Linux = 0.153/0.435/0.963/1.939 ms.
 - New standalone kernel fixtures (714cc8e) add 32 direct upstream JS cases, including transform, clipping and shared buffers; standalone compile/test passed on both OS. Full subsequent workflow: https://github.com/Mefits/pixelfxGadot/actions/runs/45385382698.
 These are host-runner CPU measurements, not the user's laptop FPS. Particle rendering is the next largest cost; GPU upload, first cast, style switch and visual review remain to be measured in a representative game.
+
+## Ordered C++ Painter batch and complete native Ball Lightning — 2026-11-24
+- C++ batch accepts ordered dot/blend/line/glow/circle/disc commands, preserving particle/debris state and drawing order. All 12 particle kinds and Lights passed original state/pixel fixtures on Linux and Windows (run 45389736267); Bits batch passed Linux in run 45389967911.
+- Windows same-job test, one bolt + steady sparks: p95 14.734 ms GDScript, 2.007 ms C++ bolt only, 1.275 ms C++ bolt + particle batch. Physics remains GDScript. No GPU upload measured.
+- First full native authored effect: Ball Lightning, 120 original frames at 30 FPS, default seed/palette. Both GDScript and C++ buffers match the original exactly on Linux (run 45389967911); p95 5.019 → 0.629 ms. This tests native effect buffers, not a screenshot of every frame or a laptop FPS claim.
+- Regular fallback regression: https://github.com/Mefits/pixelfxGadot/actions/runs/45389967895 passed.
+- Cross-platform build and complete archive: https://github.com/Mefits/pixelfxGadot/actions/runs/45389967911. Previous verified unified archive (bolt-only C++): https://github.com/Mefits/pixelfxGadot/actions/runs/45389604977/artifacts/14918625502.
+- Remaining: full effect lifecycle/API, native authored effects beyond Ball Lightning, actual arbitrary wall collisions, actor masks/rig, full Painter, target-hardware first-cast/multi-instance/GPU timing and visual inspection. The orb trajectory is the original fixed authored loop; dynamic game-specific trajectories require explicit adaptation and validation.
