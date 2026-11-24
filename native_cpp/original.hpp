@@ -21,7 +21,7 @@ class PixelFXOriginal : public RefCounted {
     using Clock=std::chrono::steady_clock;
     Clock::time_point deadline;
     static int interrupted(JSContext*,void* p){return Clock::now()>static_cast<PixelFXOriginal*>(p)->deadline;}
-    void budget(){deadline=Clock::now()+std::chrono::seconds(2);}
+    void budget(int seconds=2){deadline=Clock::now()+std::chrono::seconds(seconds);}
     void close(){
         if(ctx){JS_FreeValue(ctx,api);JS_FreeContext(ctx);}
         if(rt)JS_FreeRuntime(rt);
@@ -41,7 +41,8 @@ class PixelFXOriginal : public RefCounted {
     JSValue jsstr(const String &v){CharString s=v.utf8();return JS_NewStringLen(ctx,s.get_data(),s.length());}
     JSValue integer(int v){return JS_NewInt32(ctx,v);}
     JSValue call(const char* name,std::vector<JSValue> args={}){
-        budget();error=String();
+        // Full-screen procedural fields are expensive to initialize. Create in a loading phase.
+        budget(std::strcmp(name,"create")==0?20:2);error=String();
         JSValue fn=JS_GetPropertyStr(ctx,api,name);
         JSValue result=JS_Call(ctx,fn,api,int(args.size()),args.data());
         JS_FreeValue(ctx,fn);for(auto a:args)JS_FreeValue(ctx,a);
