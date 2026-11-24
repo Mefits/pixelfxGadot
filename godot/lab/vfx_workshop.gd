@@ -403,6 +403,9 @@ func _load_bound() -> void:
     if not binding_bank.has(role):return
     preset=binding_bank[role].duplicate(true)
     selected=0
+    stage.sweep=false
+    for l in preset.layers:
+        if l.type=="trail":stage.moving=true;stage.sweep=true;break
     _refresh()
 
 func _inspector_page(label_text: String) -> VBoxContainer:

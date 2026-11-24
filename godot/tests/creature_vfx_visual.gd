@@ -80,7 +80,7 @@ func _run() -> void:
     scene._seek(.3)
     await process_frame
     await process_frame
-    check(scene.inspector.get_tab_count()==3,"Inspector tabs")
+    check(scene.inspector.get_tab_count()==4,"Inspector tabs")
     check(not scene.field_rows.speed.visible,"Hide irrelevant speed")
     scene._capture_reference()
     scene._toggle_compare()

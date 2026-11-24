@@ -42,7 +42,6 @@ func _tick(left: Dictionary,right: Dictionary) -> void:
         return
     hitstop=0
     sim_steps+=1
-    if custom_vfx!=null:custom_vfx.advance()
     impact_time=maxf(0,impact_time-DT)
     var ax: float=a.pos.x
     var bx: float=b.pos.x
@@ -53,6 +52,7 @@ func _tick(left: Dictionary,right: Dictionary) -> void:
         var m: float=clampf((a.pos.x+b.pos.x)*.5,23.5,296.5)
         a.pos.x=m-d*7.5
         b.pos.x=m+d*7.5
+    if custom_vfx!=null:custom_vfx.advance()
     # Snapshot both event outcomes before damage changes either pose or guard.
     var outcomes: Array=[]
     for e in a.events:_event(a,b,e,outcomes)
