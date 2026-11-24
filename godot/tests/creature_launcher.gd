@@ -10,7 +10,8 @@ func _run() -> void:
     root.add_child(menu)
     await process_frame
     await process_frame
-    check(menu.routes.size()==11 and menu.buttons.size()==11,"All workspaces available")
+    check(menu.routes.size()==7 and menu.buttons.size()==7,"All workspaces available")
+    for key in ["H","E","O","K"]:check(not menu.routes.has(key),"Removed obsolete route "+key)
     for route in menu.routes.values():check(ResourceLoader.exists(route),"Scene exists "+route)
     for button in menu.buttons:check(button.get_global_rect().end.x<=960 and button.get_global_rect().end.y<=485,"Menu button fits")
     check(menu.get_child_count()==1,"No simulation or pool at startup")

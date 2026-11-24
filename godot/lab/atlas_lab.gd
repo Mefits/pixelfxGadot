@@ -53,26 +53,14 @@ func _ready() -> void:
     perf = Label.new()
     perf.position = Vector2(24, 124)
     layer.add_child(perf)
-    for spec in [["Pose Workshop", "res://lab/pose_workshop.tscn"],["Combat Lab","res://lab/combat_lab.tscn"]]:
-        var b:=Button.new()
-        b.text="Анимации" if spec[0]=="Pose Workshop" else "Бой"
-        b.position=Vector2(640 if spec[0]=="Pose Workshop" else 795,52)
-        b.size=Vector2(145,35)
-        layer.add_child(b)
-        var dest: String=spec[1]
-        b.pressed.connect(func():get_tree().change_scene_to_file(dest))
-    var physics_button:=Button.new()
-    physics_button.text="Физика (I)"
-    physics_button.position=Vector2(480,52)
-    physics_button.size=Vector2(150,35)
-    layer.add_child(physics_button)
-    physics_button.pressed.connect(func():get_tree().change_scene_to_file("res://lab/physics_lab.tscn"))
-    var vfx_button:=Button.new()
-    vfx_button.text="Эффекты (Y)"
-    vfx_button.position=Vector2(480,14)
-    vfx_button.size=Vector2(180,30)
-    layer.add_child(vfx_button)
-    vfx_button.pressed.connect(func():get_tree().change_scene_to_file("res://lab/vfx_workshop.tscn"))
+    var tools:=HBoxContainer.new()
+    tools.position=Vector2(350,52)
+    layer.add_child(tools)
+    _button(tools,"Нагрузка",_stress)
+    _button(tools,"Очистить",_clear)
+    _button(tools,"Фон",_background)
+    _button(tools,"Зеркало",func():mirrored=not mirrored)
+    _button(tools,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
     if not paths.is_empty():
         _select(0)
 
@@ -109,32 +97,10 @@ func _unhandled_input(event: InputEvent) -> void:
             queue_redraw()
         elif UI.physical_key(event) == KEY_M:
             mirrored = not mirrored
-        elif UI.physical_key(event) == KEY_Y:
-            get_tree().change_scene_to_file("res://lab/vfx_workshop.tscn")
-        elif UI.physical_key(event) == KEY_I:
-            get_tree().change_scene_to_file("res://lab/physics_lab.tscn")
-        elif UI.physical_key(event) == KEY_U:
-            get_tree().change_scene_to_file("res://lab/pose_workshop.tscn")
-        elif UI.physical_key(event) == KEY_T:
-            get_tree().change_scene_to_file("res://lab/combat_lab.tscn")
-        elif UI.physical_key(event) == KEY_J:
-            get_tree().change_scene_to_file("res://lab/original_catalog.tscn")
-        elif UI.physical_key(event) == KEY_E:
-            get_tree().change_scene_to_file("res://lab/electrified.tscn")
-        elif UI.physical_key(event) == KEY_H:
-            get_tree().change_scene_to_file("res://lab/chain_lightning.tscn")
-        elif UI.physical_key(event) == KEY_K:
-            get_tree().change_scene_to_file("res://lab/custom_effects.tscn")
-        elif UI.physical_key(event) == KEY_O:
-            get_tree().change_scene_to_file("res://lab/ball_lightning.tscn")
-        elif UI.physical_key(event) == KEY_L:
-            get_tree().change_scene_to_file("res://lab/live_lightning.tscn")
         elif UI.physical_key(event) == KEY_C:
-            for p in pool:
-                p.stop()
+            _clear()
         elif UI.physical_key(event) == KEY_SPACE:
-            for i in range(POOL_SIZE):
-                _play(Vector2(60 + (i % 8) * 120, 205 + int(i / 8) * 82))
+            _stress()
 
 func _play(at: Vector2) -> void:
     if not clips.has(selected):
@@ -156,3 +122,20 @@ func _process(delta: float) -> void:
         perf.text = "FPS %d | p95 %.2f | p99 %.2f | макс. %.2f мс | активны %d/%d" % [Engine.get_frames_per_second(), samples[clampi(int(ceil(n * 0.95)) - 1,0,n-1)], samples[clampi(int(ceil(n * 0.99)) - 1,0,n-1)], samples[n-1],active,POOL_SIZE]
         samples.clear()
         clock = 0.0
+
+func _button(parent: Control,label: String,cb: Callable) -> void:
+    var b:=Button.new()
+    b.text=label
+    b.pressed.connect(cb)
+    parent.add_child(b)
+
+func _clear() -> void:
+    for p in pool:p.stop()
+
+func _stress() -> void:
+    for i in range(POOL_SIZE):
+        _play(Vector2(60+(i%8)*120,205+int(i/8)*82))
+
+func _background() -> void:
+    bright=not bright
+    queue_redraw()

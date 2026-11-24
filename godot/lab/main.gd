@@ -1,24 +1,18 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.9"
+const VERSION="0.10"
 const SECTIONS=[
     {"label":"СПЕЦЭФФЕКТЫ","color":"#79b9d4","items":[
         ["Y","Конструктор эффектов","Слои, параметры и свои пресеты.","vfx_workshop"],
         ["J","Каталог PixelFX","Оригинальные эффекты и постановки.","original_catalog"],
-        ["K","Мастерская разломов","Три экспериментальных эффекта.","custom_effects"],
-        ["A","Тест атласов","Готовые кадры и тест нагрузки.","atlas_lab"]
+        ["A","Тест атласов","Готовые кадры и тест нагрузки.","atlas_lab"],
+        ["L","Молния","Процедурный разряд в реальном времени.","live_lightning"]
     ]},
     {"label":"АНИМАЦИЯ И СУЩЕСТВА","color":"#92c6af","items":[
         ["U","Редактор анимаций","Позы скелета и ключевые кадры.","pose_workshop"],
         ["T","Боевая лаборатория","Два бойца и проверка атак.","combat_lab"],
         ["I","Физика и эволюция","Физика, атаки, изменение анатомии.","physics_lab"]
-    ]},
-    {"label":"ТЕСТОВЫЕ СЦЕНЫ","color":"#c3a682","items":[
-        ["L","Молния","Процедурный разряд в реальном времени.","live_lightning"],
-        ["H","Цепная молния","Разряды между целями.","chain_lightning"],
-        ["E","Электризация","Разряды по контуру персонажа.","electrified"],
-        ["O","Шаровая молния","Процедурная энергетическая сфера.","ball_lightning"]
     ]}
 ]
 var routes: Dictionary={}
@@ -38,7 +32,7 @@ func _ready() -> void:
     _label(root,"Выбери рабочее пространство",Vector2(30,92),16,Color("#c4d0db"))
     for i in range(SECTIONS.size()):
         var section: Dictionary=SECTIONS[i]
-        var x: float=28+float(i)*306
+        var x: float=28+float(i)*462
         _label(root,section.label,Vector2(x,130),13,Color(section.color))
         for j in range(section.items.size()):
             var spec: Array=section.items[j]
@@ -46,7 +40,7 @@ func _ready() -> void:
             routes[spec[0]]=path
             var button:=Button.new()
             button.position=Vector2(x,156+j*77)
-            button.size=Vector2(292,68)
+            button.size=Vector2(440,68)
             button.text=""
             button.tooltip_text=spec[2]
             button.add_theme_stylebox_override("normal",_style(Color("#1e2b39"),Color("#34465a")))
@@ -55,12 +49,12 @@ func _ready() -> void:
             root.add_child(button)
             buttons.append(button)
             button.pressed.connect(func():_open(path))
-            var name_label: Label=_label(button,spec[1],Vector2(12,8),16,Color("#e3ebf1"))
+            var name_label: Label=_label(button,spec[1],Vector2(16,8),18,Color("#e3ebf1"))
             name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
-            var key_label: Label=_label(button,spec[0],Vector2(264,9),13,Color(section.color))
+            var key_label: Label=_label(button,spec[0],Vector2(408,9),13,Color(section.color))
             key_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
-            var detail: Label=_label(button,spec[2],Vector2(12,32),12,Color("#a2b5c5"))
-            detail.size=Vector2(262,30)
+            var detail: Label=_label(button,spec[2],Vector2(16,35),14,Color("#a2b5c5"))
+            detail.size=Vector2(402,30)
             detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
             detail.mouse_filter=Control.MOUSE_FILTER_IGNORE
     status=_label(root,"Выбор мышью или клавишей. Esc — вернуться в главное меню.",Vector2(28,501),13,Color("#91a5b9"))
