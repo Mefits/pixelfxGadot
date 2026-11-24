@@ -83,9 +83,16 @@ func _control(dt: float) -> void:
             if absf(input_axis)>.05:direction=signf(input_axis)
             attack.begin(limbs,direction)
         attack_requested=false
+    if not attack.active and not surface.active and grip_index<0 and absf(input_axis)>.05:
+        direction=signf(input_axis)
     var intent: Dictionary=attack.sample(attack.time) if attack.active else {}
     limbs.rear_height_offset=float(intent.get("rear",0))
     limbs.front_height_offset=-sin(float(intent.get("tilt",0)))*float(body.links[0].length)*.7 if attack.active else 0.0
+    if smooth_motion and not attack.active and not surface.active and grip_index<0:
+        var axis: Vector2=body.point("front")-body.point("rear")
+        if axis.x*direction<8:
+            limbs.front_height_offset=5
+            limbs.rear_height_offset=-5
     grip_cooldown=maxf(0,grip_cooldown-dt)
     surface.cooldown=maxf(0,surface.cooldown-dt)
     jump_cooldown=maxf(0,jump_cooldown-dt)
@@ -204,10 +211,18 @@ func _control(dt: float) -> void:
         var trunk: float=body.links[0].length
         var tilt: float=float(intent.tilt)
         goal=Vector2(direction*cos(tilt),sin(tilt))*trunk
-    var correction: Vector2=(goal-(front-rear))*(115 if attack.active else (85 if smooth_motion else 30))
+    var correction: Vector2=(goal-(front-rear))*(115 if attack.active else 30)
     if smooth_motion and not attack.active:
-        correction-=(Vector2(body.nodes[0].v)-Vector2(body.nodes[1].v))*4.0
-    correction=correction.limit_length(1100 if attack.active else (780 if smooth_motion else 360))
+        # Tangential torque remains effective even when the desired direction
+        # is exactly opposite the current trunk. Radial forces cannot turn it.
+        var axis: Vector2=(front-rear).normalized()
+        var tangent:=Vector2(-axis.y,axis.x)
+        var target_angle: float=Vector2(direction*16,-2).angle()
+        var error: float=wrapf(target_angle-axis.angle(),-PI,PI)
+        var relative: Vector2=Vector2(body.nodes[0].v)-Vector2(body.nodes[1].v)
+        var torque: float=clampf(error*950-relative.dot(tangent)*12,-1550,1550)
+        correction=tangent*torque
+    correction=correction.limit_length(1100 if attack.active else (1550 if smooth_motion else 360))
     body.force(0,correction)
     body.force(1,-correction)
     # Soft tail muscles resist folding and damp relative velocity; no rigid animation.

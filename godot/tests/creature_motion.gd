@@ -49,11 +49,13 @@ func _run()->void:
     for i in range(2,landing.body.nodes.size()):landing.body.nodes[i].p.y-=40
     landing.limbs.release_all()
     landing.coyote=0
+    var requested:bool=false
     for i in range(100):
         var p:Vector2=landing.body.point("front")
         var vy:float=landing.body.nodes[0].v.y
-        var request:bool=landing.jump_count==0 and p.y>165 and vy>20 and not landing.grounded
+        var request:bool=not requested and p.y>165 and vy>20 and not landing.grounded
+        if request:requested=true
         landing.advance(1.0/60,0,request)
-    check(landing.jump_count==1,"Buffered landing jump")
+    check(requested and landing.jump_count==1,"Single buffered landing jump")
     print("Motion tests failures: ",failures)
     quit(0 if failures==0 else 1)
