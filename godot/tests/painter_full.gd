@@ -3,6 +3,7 @@ const P=preload("res://addons/pixelfx/native/painter.gd")
 const PAL=preload("res://addons/pixelfx/native/palette.gd")
 
 func _initialize() -> void:
+    create_timer(20.0).timeout.connect(func(): quit(1))
     call_deferred("_run")
 
 func _run() -> void:

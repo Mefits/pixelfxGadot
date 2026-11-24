@@ -4,6 +4,7 @@ const RUN=preload("res://addons/pixelfx/native/runtime.gd")
 const P=preload("res://addons/pixelfx/native/painter.gd")
 
 func _initialize() -> void:
+    create_timer(20.0).timeout.connect(func(): quit(1))
     call_deferred("_run")
 
 func _run() -> void:

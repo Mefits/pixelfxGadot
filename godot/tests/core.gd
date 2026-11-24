@@ -23,6 +23,7 @@ class Probe:
         p.px(1,0,0xffffffff)
 
 func _initialize() -> void:
+    create_timer(12.0).timeout.connect(func(): quit(1))
     call_deferred("_run")
 
 func _compare(a: Variant,b: Variant) -> void:
@@ -40,26 +41,32 @@ func _run() -> void:
     if not d is Dictionary:
         quit(1)
         return
+    print("Core: noise")
     for v in d["values"]:
         var t: float=v[0]
         _compare([t,M.noise(t,31),M.noise2(t,t*.8,31),M.fbm(t,t*.8,31),M.tile_noise(t,t*.8,4,7,31),M.tile_fbm(t,t*.8,4,7,31),M.loop_noise(t,2,31)],v)
+    print("Core: easing")
     for e in d["easings"]:
         var values: Array=[]
         for t in [0,.13,.49,.7,.99,1]:
             values.append(M.easing(e[0],t))
         _compare(values,e[1])
+    print("Core: shapes")
     var rng=R.new(101)
     var bolt: Array=S.bolt(rng,0,0,40,12)
     _compare(bolt,d["bolt"])
     _compare(S.forks(rng,bolt),d["forks"])
+    print("Core: emitters")
     var emissions: Array=[]
     MOTION.cycle(.8,1.2,12,44,func(r): return r.between(.1,.8),func(age: float,life: float,r,i: int): emissions.append([age,life,r.next(),i]))
     _compare(emissions,d["emissions"])
+    print("Core: actors")
     for k in [1,2]:
         var a: Dictionary=A.stock(k)
         _compare(Array(a["mask"]["data"]),d["actors"][k-1]["data"])
         _compare(Array(a["pixels"]),d["actors"][k-1]["pixels"])
         _compare([a["x"],a["y"]],[d["actors"][k-1]["x"],d["actors"][k-1]["y"]])
+    print("Core: runtime")
     var fx=FX.new({"duration":2,"loop":true,"actor":2},func(_o): return Probe.new(),{"x":10,"y":10})
     fx.update(1.0/30)
     var p=PAINTER.new(24,24)
