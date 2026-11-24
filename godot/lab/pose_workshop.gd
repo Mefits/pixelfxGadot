@@ -527,8 +527,8 @@ func _mirror_pose() -> void:
         var dest: String=str(id)
         if dest.ends_with("_near"):dest=dest.trim_suffix("_near")+"_far"
         elif dest.ends_with("_far"):dest=dest.trim_suffix("_far")+"_near"
-        a[dest]=-float(pose.angles[id])
-    pose={"angles":a,"root":[-float(pose.root[0]),pose.root[1]]}
+        a[dest]=-pose.angles[id]
+    pose={"angles":a,"root":[-pose.root[0],pose.root[1]]}
     _edit()
 
 func _zero_joint() -> void:
@@ -547,7 +547,7 @@ func _blank_clip() -> void:
     _remember()
     var c: Dictionary=bank[name_id]
     var d: float=c.duration
-    var neutral: Dictionary=CLIPS.sample(bank.idle,0,false)
+    var neutral: Dictionary=CLIPS.sample(CLIPS.defaults().idle,0,false)
     c.keys=[{"t":0.0,"pose":neutral.duplicate(true)},{"t":d,"pose":neutral.duplicate(true)}]
     c.events=[]
     dirty=true

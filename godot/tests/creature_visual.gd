@@ -71,6 +71,43 @@ func _run() -> void:
     ed._undo()
     check(ed.bank.strike==saved,"Blank clip reversible")
     ed._seek(.2)
+    # Exercise input handlers, not only the editing commands.
+    var marker_press:=InputEventMouseButton.new()
+    marker_press.button_index=MOUSE_BUTTON_LEFT
+    marker_press.pressed=true
+    marker_press.position=Vector2(ed.timeline.at(.2),20)
+    ed.timeline._gui_input(marker_press)
+    var motion:=InputEventMouseMotion.new()
+    motion.position=Vector2(ed.timeline.at(.24),20)
+    motion.button_mask=MOUSE_BUTTON_MASK_LEFT
+    ed.timeline._gui_input(motion)
+    var marker_release:=InputEventMouseButton.new()
+    marker_release.button_index=MOUSE_BUTTON_LEFT
+    marker_release.position=motion.position
+    ed.timeline._gui_input(marker_release)
+    check(is_equal_approx(ed.time,.24),"Timeline drag input")
+    ed._undo()
+    ed._seek(.2)
+    ed.selected="chest"
+    ed._sync()
+    var pivot: Vector2=(ed.rig.point("chest")+ed.preview.origin)*4
+    var old_angle: float=ed.pose.angles.get("chest",0)
+    var rot_press:=InputEventMouseButton.new()
+    rot_press.button_index=MOUSE_BUTTON_RIGHT
+    rot_press.pressed=true
+    rot_press.position=pivot+Vector2(40,0)
+    ed._drag(rot_press)
+    var rot_motion:=InputEventMouseMotion.new()
+    rot_motion.position=pivot+Vector2(0,40)
+    rot_motion.button_mask=MOUSE_BUTTON_MASK_RIGHT
+    ed._drag(rot_motion)
+    var rot_release:=InputEventMouseButton.new()
+    rot_release.button_index=MOUSE_BUTTON_RIGHT
+    rot_release.position=rot_motion.position
+    ed._drag(rot_release)
+    check(is_equal_approx(float(ed.pose.angles.chest),wrapf(old_angle+90,-180,180)),"Mouse joint rotation")
+    ed._undo()
+    ed._seek(.2)
     await process_frame
     check(ed.fighter_select.get_global_rect().end.x<=960,"Fighter chooser inside viewport")
     check(ed.root_y.get_global_rect().end.x<=960,"Root controls inside viewport")
