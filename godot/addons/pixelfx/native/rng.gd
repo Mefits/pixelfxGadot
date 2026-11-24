@@ -42,3 +42,12 @@ func chance(p: float) -> bool:
 
 func sign() -> int:
     return -1 if next() < 0.5 else 1
+
+func integer(a: int,b: int) -> int:
+    return int(floor(between(a,b+1)))
+
+func pick(values: Array) -> Variant:
+    return values[int(floor(next()*values.size()))] if not values.is_empty() else null
+
+func gauss() -> float:
+    return (next()+next()+next()+next()-2.0)*1.732

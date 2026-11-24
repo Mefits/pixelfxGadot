@@ -47,6 +47,7 @@ jobs:
       - run: python native_cpp/build.py
       - run: node tools/make_native_fixture.mjs
       - run: node tools/make_painter_fixture.mjs
+      - run: node tools/make_core_fixture.mjs
       - run: node tools/make_particles_fixture.mjs
       - run: node tools/make_bits_fixture.mjs
       - run: node tools/make_ball_fixture.mjs
@@ -68,6 +69,7 @@ jobs:
       - run: godot --headless --path godot --editor --import
       - run: godot --headless --path godot --script res://tests/native.gd
       - run: godot --headless --path godot --script res://tests/painter_full.gd
+      - run: godot --headless --path godot --script res://tests/core.gd
       - run: godot --headless --path godot --script res://tests/native.gd -- --cpp
       - run: godot --headless --path godot --script res://tests/native_benchmark.gd
       - run: godot --headless --path godot --script res://tests/native_benchmark.gd -- --cpp
@@ -110,6 +112,7 @@ jobs:
       - run: node tools/check_exports.mjs
       - run: node tools/make_native_fixture.mjs
       - run: node tools/make_painter_fixture.mjs
+      - run: node tools/make_core_fixture.mjs
       - run: node tools/make_particles_fixture.mjs
       - run: node tools/make_bits_fixture.mjs
       - run: node tools/make_ball_fixture.mjs
@@ -124,6 +127,7 @@ jobs:
           "$GODOT" --headless --path "$PROJECT" --editor --import
           "$GODOT" --headless --path "$PROJECT" --script res://tests/native.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" --script res://tests/painter_full.gd
+          "$GODOT" --headless --path "$PROJECT" --script res://tests/core.gd
           "$GODOT" --headless --path "$PROJECT" --script res://tests/ball.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" --script res://tests/custom.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" res://lab/custom_effects.tscn --quit-after 120
