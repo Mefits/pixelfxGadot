@@ -29,19 +29,20 @@ var grounded: bool=false
 var jump_count: int=0
 var grip_count: int=0
 
-func _init(at: Vector2,boxes: Array[Rect2],tail: int=5,mass: float=1,with_limbs: bool=true) -> void:
+func _init(at: Vector2,boxes: Array[Rect2],tail: int=5,mass: float=1,with_limbs: bool=true,initial_direction: float=1) -> void:
+    direction=-1.0 if initial_direction<0 else 1.0
     tail_count=clampi(tail,0,12)
     mass_scale=clampf(mass,.5,3)
     body.obstacles.assign(boxes)
     body.add_point("front",at,7,1.4*mass_scale)
-    body.add_point("rear",at+Vector2(-16,2),7,1.8*mass_scale)
+    body.add_point("rear",at+Vector2(-16*direction,2),7,1.8*mass_scale)
     body.connect_points(0,1,sqrt(260.0),.000001)
     var last: int=1
     var p: Vector2=body.nodes[last].p
     for i in range(tail_count):
         var r: float=maxf(2.0,5.0-i*.4)
         var length: float=maxf(5,9-i*.35)
-        p+=Vector2(-length,0)
+        p+=Vector2(-length*direction,0)
         var index: int=body.add_point("tail_%d"%i,p,r,maxf(.12,.5-i*.035)*mass_scale)
         body.connect_points(last,index,length,.000006)
         last=index
@@ -60,7 +61,8 @@ func _control(dt: float) -> void:
     surface.cooldown=maxf(0,surface.cooldown-dt)
     jump_cooldown=maxf(0,jump_cooldown-dt)
     if grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested:
-        surface.try_attach(body,input_axis,climb_axis)
+        if surface.try_attach(body,input_axis,climb_axis):
+            direction=-surface.normal.x
     if surface.validate(body,input_axis,limbs.enabled):
         limbs.step_wall(body,dt,climb_axis,surface.normal,surface.face)
         var top: Dictionary=surface.top_goal(body,climb_axis)
