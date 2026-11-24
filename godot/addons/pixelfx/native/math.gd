@@ -7,7 +7,7 @@ static func rand_hash(ns: Array) -> float:
 static func rng_for(ns: Array):
     return RNG.new(RNG.hash32(ns))
 
-static func wrap(x: float,m: float) -> float:
+static func wrap_period(x: float,m: float) -> float:
     return fmod(fmod(x,m)+m,m)
 
 static func fract(x: float) -> float:
@@ -30,7 +30,7 @@ static func bump(t: float,t0: float,t1: float) -> float:
     return 0.0 if t<=t0 or t>=t1 else sin(PI*seg(t,t0,t1))
 
 static func ping_pong(x: float) -> float:
-    return 1.0-absf(wrap(x,2)-1)
+    return 1.0-absf(wrap_period(x,2)-1)
 
 static func distance(x0: float,y0: float,x1: float,y1: float) -> float:
     return sqrt(pow(x1-x0,2)+pow(y1-y0,2))

@@ -27,7 +27,7 @@ static func cycle(t: float,period: float,count: int,seed: int,life: Variant,fn: 
         var g=M.rng_for([seed,i,911])
         var born: float=g.next()*period
         var length: float=life.call(g) if life is Callable else float(life)
-        var age: float=M.wrap(t-born,period)
+        var age: float=M.wrap_period(t-born,period)
         while age<length:
             fn.call(age,length,M.rng_for([seed,i]),i)
             age+=period

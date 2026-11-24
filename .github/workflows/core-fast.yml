@@ -9,6 +9,9 @@ on:
       - 'godot/tests/sim_helpers.gd'
       - '.github/workflows/core-fast.yml'
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
