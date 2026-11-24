@@ -12,3 +12,7 @@ native_cpp/*.os
 native_cpp/*.obj
 godot/addons/pixelfx/bin/
 godot/addons/pixelfx/pixelfx.gdextension
+
+native_cpp/quickjs-ng/
+native_cpp/quickjs-build/
+tools/.original-entry.mjs

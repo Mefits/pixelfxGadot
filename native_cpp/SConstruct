@@ -5,6 +5,11 @@ if env["platform"] == "windows" and not env.get("use_mingw", False):
 else:
     env.Append(CXXFLAGS=["-ffp-contract=off", "-fno-fast-math"])
 env.Append(CPPPATH=["."])
+qjs_lib = os.environ.get("PIXELFX_QJS_LIB")
+if qjs_lib:
+    env.Append(CPPDEFINES=["PFX_ORIGINAL"], CPPPATH=["quickjs-ng"], LIBS=[File(qjs_lib)])
+    if env["platform"] == "linux":
+        env.Append(LIBS=["dl","pthread","m"])
 suffix = env["SHLIBSUFFIX"]
 platform = env["platform"]
 target = "../godot/addons/pixelfx/bin/" + ("pixelfx.windows.x86_64" if platform == "windows" else "libpixelfx.linux.x86_64")

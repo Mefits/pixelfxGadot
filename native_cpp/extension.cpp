@@ -1,5 +1,8 @@
 // Godot adapter for the independent C++ kernel.
 #include "kernel.hpp"
+#ifdef PFX_ORIGINAL
+#include "original.hpp"
+#endif
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/godot.hpp>
@@ -70,7 +73,13 @@ public:
         Array out;out.append(color);out.append(light);return out;
     }
 };
-void init(ModuleInitializationLevel level){if(level==MODULE_INITIALIZATION_LEVEL_SCENE)GDREGISTER_CLASS(PixelFXRaster);}
+void init(ModuleInitializationLevel level){
+    if(level!=MODULE_INITIALIZATION_LEVEL_SCENE)return;
+    GDREGISTER_CLASS(PixelFXRaster);
+#ifdef PFX_ORIGINAL
+    GDREGISTER_CLASS(PixelFXOriginal);
+#endif
+}
 void uninit(ModuleInitializationLevel){}
 extern "C" GDExtensionBool GDE_EXPORT pixelfx_init(GDExtensionInterfaceGetProcAddress p,GDExtensionClassLibraryPtr l,GDExtensionInitialization *i){
     GDExtensionBinding::InitObject obj(p,l,i);obj.register_initializer(init);obj.register_terminator(uninit);obj.set_minimum_library_initialization_level(MODULE_INITIALIZATION_LEVEL_SCENE);return obj.init();
