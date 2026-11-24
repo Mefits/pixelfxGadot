@@ -22,9 +22,12 @@ func _run()->void:
     print("Combo: hits ",combo_world.hits," best ",combo_world.best_combo," starts ",combo_world.a.attacks_started)
     check(combo_world.best_combo>=2 and combo_world.hits>=2,"Confirmed combo followup")
     var mixed=make_world()
+    var sent_cast: bool=false
     for i in range(130):
-        mixed.step(1.0/60,{"strike":i==0 or i==15,"cast":i==34},{})
-    print("Mixed chain: hits ",mixed.hits," best ",mixed.best_combo," HP ",mixed.b.hp)
+        var cast_now: bool=mixed.best_combo==2 and not sent_cast
+        if cast_now:sent_cast=true
+        mixed.step(1.0/60,{"strike":i==0 or i==15,"cast":cast_now},{})
+    print("Mixed chain: hits ",mixed.hits," best ",mixed.best_combo," HP ",mixed.b.hp," starts ",mixed.a.attacks_started," sent cast ",sent_cast)
     check(mixed.best_combo==3 and mixed.hits==3 and mixed.b.hp==54,"Three-hit mixed combo")
     var frozen=make_world()
     for i in range(40):

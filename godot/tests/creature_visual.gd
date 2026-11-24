@@ -131,7 +131,11 @@ func _run() -> void:
     await capture(dir.path_join("combat-lab.png"))
     arena.training=true
     arena._reset()
-    for i in range(75):arena.world.step(1.0/60,{"strike":i==0 or i==15,"cast":i==34},{})
+    var sent_cast: bool=false
+    for i in range(100):
+        var cast_now: bool=arena.world.best_combo==2 and not sent_cast
+        if cast_now:sent_cast=true
+        arena.world.step(1.0/60,{"strike":i==0 or i==15,"cast":cast_now},{})
     arena.canvas.queue_redraw()
     arena._vfx()
     arena._update_hud()

@@ -88,7 +88,10 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
             if forward and hand.distance_to(chest)<=19 and dst.hp>0:amount=13
         "cast":
             var target: Vector2=hand+Vector2(direction*104,0)
-            if forward and absf(chest.x-hand.x)<=104 and absf(chest.y-hand.y)<=26 and dst.hp>0:
+            # Point-blank targets may be between chest and extended casting hand.
+            # Direction is relative to the caster, not the end of the arm.
+            var cast_forward: bool=(chest.x-float(e.world_chest.x))*direction>=0
+            if cast_forward and absf(chest.x-hand.x)<=104 and absf(chest.y-hand.y)<=26 and dst.hp>0:
                 target=chest
                 amount=20
             flashes.append({"kind":"cast","a":hand,"b":target,"age":0.0,"life":.21})

@@ -130,6 +130,7 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
             var e: Dictionary=marker.duplicate(true)
             rig.evaluate(CLIPS.sample(c,float(marker.t),false))
             e["world_anchor"]=point(marker.anchor)
+            e["world_chest"]=point("chest")
             e["direction"]=facing
             e["attack_time"]=float(marker.t)
             e["chain"]=chain
