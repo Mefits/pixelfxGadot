@@ -9,7 +9,7 @@ Godot 4 toolkit using [original PixelFX](https://github.com/patch-gg/pixelfx), p
 4. Import godot/project.godot and run. Click to cast; Space spawns 32 simultaneous instances; B toggles background, M mirrors, C clears.
 5. For any other effect: node tools/export.mjs lightning/ball-lightning --seed 3 --fps 30
 
-Color and additive light are stored separately in paged atlases. The exported clip has a pivot, timebase, loop, original commit and hashes. Godot does not run JS at play time. Actor-dependent effects may paint the stock actor; these are not dynamic custom-character effects. This is not yet a native procedural runtime. The lab loads selected effects on selection; production code should preload required clips during loading.
+Color and additive light are stored separately in paged atlases. The exported clip has a pivot, timebase, loop, original commit and hashes. The offline player does not run JS at play time. Actor-dependent effects may paint the stock actor; these are not dynamic custom-character effects. Native and original-runtime paths are described separately below. The lab loads selected effects on selection; production code should preload required clips during loading.
 
 Use AGENTS.md and SKILL.md when passing the toolkit to AI. Read CATALOG.md and docs/ROADMAP.md. Code implementation is not proof of visual or performance parity; see docs/STATUS.md.
 
@@ -44,3 +44,10 @@ The first verified complete package is [here](https://github.com/Mefits/pixelfxG
 
 ## Original workshop (development)
 K in the main lab opens Rift Collapse, a new composition using the toolkit (not an upstream effect). 1/2/3 select three art directions; pause/scrub/replay, change seed and backend. See [custom effect authoring](docs/CUSTOM_EFFECTS.md). CI tests replay and backend parity; artistic review pending.
+
+## Перенос оригинала: три режима
+- Готовые двухслойные клипы — дешёвое воспроизведение.
+- Нативные модули — Painter, частицы, физические фрагменты, молнии, эмиттеры, шумы, маски и оригинальные эффекты Ball Lightning, Chain Lightning, Electrified.
+- Встроенный оригинальный JS — полный каталог и оригинальная хореография без Node.js в игре. Новый режим J; H — Chain Lightning, E — Electrified, O — Ball Lightning. Сборка оригинального режима проверяется отдельно.
+
+[Описание и API оригинального рантайма](docs/ORIGINAL_RUNTIME.md) · [Последняя проверенная сборка с полным Painter](https://github.com/Mefits/pixelfxGadot/actions/runs/45393190916/artifacts/14919084321) · [CI оригинального рантайма](https://github.com/Mefits/pixelfxGadot/actions/runs/45394956913).

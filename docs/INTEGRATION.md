@@ -22,3 +22,6 @@ Run original rendering tools, compare equal-scale frames on dark and bright back
 
 ## Pure native authored loop example
 See godot/lab/ball_lightning.gd for a runnable scene. Instantiate effects/ball_lightning.gd once; select the optional backend with enable_acceleration(); set Painter.place to the requested origin; clear the two buffers, call draw(painter,t), then present the surface. Sample at the original FPS for exact authored timing. Set the surface node position/scale to place the entire effect in the world. A custom trajectory needs its own validated effect, not a claim of original parity.
+
+## Original live compatibility path
+See docs/ORIGINAL_RUNTIME.md for the embedded original runtime. It preserves source algorithms and choreography; it is not a replacement for the optimized native path. Check that the complete package includes a tested runtime binary and generated original_bundle.txt.
