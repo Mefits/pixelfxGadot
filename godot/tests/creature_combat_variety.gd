@@ -88,7 +88,55 @@ func _ability_regression()->void:
     direct._event(direct.a,direct.b,e,outcomes)
     check(outcomes.is_empty(),"Ability misses outside reach")
 
+func _electric_regression()->void:
+    var A=preload("res://addons/creature/ability.gd")
+    var FX=preload("res://addons/creature/vfx_runtime.gd")
+    var P=preload("res://addons/pixelfx/composer/preset.gd")
+    var profile: Dictionary=A.electric_demo()
+    check(A.valid(profile),"Electric profile valid")
+    var clip: Dictionary=A.compile(profile)
+    check(not clip.is_empty(),"Electric compiles")
+    if clip.is_empty():return
+    check(clip.keys.size()==8 and clip.events.size()==6,"Stride keys and extra cues")
+    check(is_equal_approx(float(clip.duration),1.42),"Electric duration")
+    var snapshot: Dictionary=profile.duplicate(true)
+    var edited: Dictionary=profile.duplicate(true)
+    edited.phases[1].duration=.7
+    var longer: Dictionary=A.compile(edited)
+    for e in longer.events:
+        if e.kind=="vfx" and e.preset.name=="Дуга плеча":
+            check(is_equal_approx(float(e.preset.layers[0].duration),.7),"Accent retimes with dash")
+        if e.kind=="vfx":check(P.valid(e.preset),"Compiled phase preset valid")
+    check(profile==snapshot,"Compilation preserves source")
+    for side in [1,-1]:
+        var w=W.new(C.defaults())
+        w.custom_vfx=FX.new()
+        w.a.set_ability(profile)
+        w.a.pos.x=160-side*30
+        w.b.pos.x=160+side*30
+        var seen: Dictionary={}
+        var burst: bool=false
+        for i in range(250):
+            w.step(W.DT,{"ability":i==0},{})
+            for item in w.custom_vfx.active:
+                seen[item.anchor]=true
+                if item.preset.name=="Электрический контакт":burst=true
+        check(seen.has("hand_near") and seen.has("elbow_near") and seen.has("shoulder_near"),"Three authored joints")
+        check(w.hits==1 and w.b.hp==70 and burst,"Successful electric contact")
+    var miss=W.new(C.defaults())
+    miss.custom_vfx=FX.new()
+    miss.a.set_ability(profile)
+    miss.a.pos.x=35
+    miss.b.pos.x=280
+    var false_burst: bool=false
+    for i in range(250):
+        miss.step(W.DT,{"ability":i==0},{})
+        for item in miss.custom_vfx.active:
+            if item.preset.name=="Электрический контакт":false_burst=true
+    check(miss.hits==0 and not false_burst,"No impact burst on miss")
+
 func _run()->void:
+    _electric_regression()
     _ability_regression()
     var bank:Dictionary=C.defaults()
     check(C.valid(bank) and bank.size()==12,"Extended bank valid")

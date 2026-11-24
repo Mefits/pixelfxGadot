@@ -3,6 +3,7 @@ const A=preload("res://addons/creature/ability.gd")
 signal applied(profile: Dictionary)
 var source: Dictionary={}
 var fields: Dictionary={}
+var profile_label: Label
 func _ready() -> void:
     title="Настройка способности"
     ok_button_text="Сохранить и сбросить бой"
@@ -10,10 +11,22 @@ func _ready() -> void:
     var body:=VBoxContainer.new()
     add_child(body)
     var hint:=Label.new()
-    hint.text="Импульсный рывок: четыре фазы. Визуальные пресеты и позы остаются в профиле. Длительность эффектов пока не масштабируется автоматически."
+    hint.text="Выбери шаблон и настрой фазы. Электрический прорыв автоматически подстраивает окна эмиссии под длительность фаз; хвосты частиц сохраняются."
     hint.custom_minimum_size.x=360
     hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     body.add_child(hint)
+    profile_label=Label.new()
+    body.add_child(profile_label)
+    var templates:=HBoxContainer.new()
+    body.add_child(templates)
+    var simple:=Button.new()
+    simple.text="Импульсный рывок"
+    templates.add_child(simple)
+    simple.pressed.connect(func():_populate(A.defaults()))
+    var electric:=Button.new()
+    electric.text="Электрический прорыв"
+    templates.add_child(electric)
+    electric.pressed.connect(func():_populate(A.electric_demo()))
     for spec in [["charge","Заряд, с",.05,2,.01],["dash","Рывок, с",.05,2,.01],["contact","Контакт, с",.05,2,.01],["recovery","Восстановление, с",.05,2,.01],["dash_speed","Скорость, px/с",20,260,5],["damage","Урон",1,60,1],["reach","Радиус контакта, px",4,30,1]]:
         var row:=HBoxContainer.new()
         body.add_child(row)
@@ -28,18 +41,15 @@ func _ready() -> void:
         spin.custom_minimum_size.x=100
         row.add_child(spin)
         fields[spec[0]]=spin
-    var reset:=Button.new()
-    reset.text="Исходный шаблон"
-    body.add_child(reset)
-    reset.pressed.connect(func():_populate(A.defaults()))
     confirmed.connect(_apply)
 func _populate(profile: Dictionary) -> void:
     source=profile.duplicate(true)
+    profile_label.text="Шаблон: "+str(source.name)
     for phase in source.phases:fields[phase.id].set_value_no_signal(float(phase.duration))
     for key in ["dash_speed","damage","reach"]:fields[key].set_value_no_signal(float(source[key]))
 func open_for(profile: Dictionary) -> void:
     _populate(profile)
-    popup_centered(Vector2i(390,370))
+    popup_centered(Vector2i(440,400))
 func _apply() -> void:
     var result: Dictionary=source.duplicate(true)
     for phase in result.phases:phase.duration=fields[phase.id].value

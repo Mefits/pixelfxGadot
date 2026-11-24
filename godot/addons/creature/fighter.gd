@@ -140,7 +140,7 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
         velocity.x=move_toward(velocity.x,target,dt*650) if modern else target
     else:
         guard=false
-        velocity.x=move_toward(velocity.x,0,dt*(220 if modern else 150))
+        if state!="ability":velocity.x=move_toward(velocity.x,0,dt*(220 if modern else 150))
     if modern and state in ["strike","cross","heavy","kick","air_strike"] and hitstun<=0:
         var impact: float=float(clip().duration)*.43
         for e in clip().events:
@@ -154,7 +154,10 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
         if phase=="dash" and hitstun<=0:
             # Lock facing at activation; never drive through the target.
             var gap: float=(enemy_x-pos.x)*facing
-            var speed: float=minf(float(ability.dash_speed),maxf(0,gap-16.0)/dt)
+            var desired: float=float(ability.dash_speed)
+            if ability.has("dash_accel"):
+                desired=move_toward(maxf(0,velocity.x*facing),desired,float(ability.dash_accel)*dt)
+            var speed: float=minf(desired,maxf(0,gap-16.0)/dt)
             velocity.x=facing*speed
         else:
             velocity.x=0

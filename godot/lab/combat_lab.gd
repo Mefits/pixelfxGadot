@@ -145,7 +145,7 @@ func _update_hud() -> void:
     hp2.value=world.b.hp
     detail.text="Динамика: %s · %s · посл. серия %d (макс. %d) · блоков %d · F→F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
     var phase: String=ABILITY.phase_at(world.a.ability,world.a.t) if world.a.state=="ability" else ""
-    phase_label.text="E — способность · Q — настройка | "+str({"charge":"Заряд","dash":"Рывок","contact":"Контакт","recovery":"Восстановление","done":"Конец"}.get(phase,"Готова"))
+    phase_label.text="E — "+str(ability_profile.get("name","Способность"))+" · Q — настройка | "+str({"charge":"Заряд","dash":"Рывок","contact":"Контакт","recovery":"Восстановление","done":"Конец"}.get(phase,"Готова"))
     hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["ТРЕНИРОВКА" if training else ("БОТ" if bot else "2 ИГРОКА"),world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:
