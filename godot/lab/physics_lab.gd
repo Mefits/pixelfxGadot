@@ -12,6 +12,7 @@ var debug: bool=true
 var paused: bool=false
 var slow: bool=false
 var tail: int=5
+var legs_on: bool=true
 var mass: float=1
 var jump_latch: bool=false
 var step_ms: float=0
@@ -36,13 +37,13 @@ func _ready() -> void:
     layer.add_child(hud)
     info=Label.new()
     info.position=Vector2(18,505)
-    info.text="A/D move | W/Space jump | E grab ledge | 1/2 tail | 3/4 mass | V debug | P pause | X slow | R reset | Esc"
+    info.text="A/D move | W/Space jump | auto ledge | Q legs | 1/2 tail | 3/4 mass | V debug | P pause | X slow | R reset | Esc"
     info.add_theme_font_size_override("font_size",14)
     layer.add_child(info)
     _reset()
 
 func _reset() -> void:
-    creature=CREATURE.new(Vector2(135,440),boxes,tail,mass)
+    creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
     trail.clear()
     dragging=false
     selected=-1
@@ -59,7 +60,7 @@ func _physics_process(dt: float) -> void:
             var n: Dictionary=creature.body.nodes[selected]
             var delta: Vector2=get_global_mouse_position()-Vector2(n.p)
             creature.body.force(selected,(delta*95-Vector2(n.v)*12).limit_length(1600))
-        creature.advance(dt*(.25 if slow else 1),axis,jump,Input.is_physical_key_pressed(KEY_E))
+        creature.advance(dt*(.25 if slow else 1),axis,jump)
         step_ms=(Time.get_ticks_usec()-start)/1000.0
         track_clock+=dt
         if track_clock>.035:
@@ -70,8 +71,8 @@ func _physics_process(dt: float) -> void:
     queue_redraw()
 
 func _update_hud() -> void:
-    hud.text="Segments %d | mass x%.1f | %s | constraint %.2f px | penetration %.3f | %.2f ms CPU | %s"%[
-        creature.body.nodes.size(),mass,"GROUND" if creature.grounded else "AIR",creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz")]
+    hud.text="Segments %d | feet %d/4 | mass x%.1f | %s | constraint %.2f px | penetration %.3f | %.2f ms CPU | %s"%[
+        creature.body.nodes.size(),creature.limbs.support_count,mass,"GROUND" if creature.grounded else "AIR",creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz")]
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))
@@ -84,6 +85,21 @@ func _draw() -> void:
     if creature==null:return
     var body=creature.body
     if debug and trail.size()>1:draw_polyline(PackedVector2Array(trail),Color("#537b8e"),1)
+    if creature.limbs.enabled:
+        for l in creature.limbs.legs:
+            var hip: Vector2=body.nodes[l.parent].p
+            var knee: Vector2=l.knee
+            var tip: Vector2=l.get("tip",l.foot)
+            var col: Color=Color("#46736e") if l.side<0 else Color("#8cbcab")
+            draw_line(hip,knee,Color("#101923"),5)
+            draw_line(knee,tip,Color("#101923"),5)
+            draw_line(hip,knee,col,3)
+            draw_line(knee,tip,col,3)
+            draw_circle(tip,2.5,col)
+            if debug and l.planted:
+                draw_circle(l.foot,3,Color("#e3c77d"),false,1)
+            if debug and l.swing:
+                draw_line(tip,l.target,Color("#8b8f9f"),1)
     for i in range(body.links.size()-1,-1,-1):
         var l: Dictionary=body.links[i]
         var a: Dictionary=body.nodes[l.a]
@@ -114,6 +130,10 @@ func _unhandled_input(e: InputEvent) -> void:
         match e.keycode:
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_R:_reset()
+            KEY_Q:
+                legs_on=not legs_on
+                creature.limbs.enabled=legs_on
+                creature.limbs.release_all()
             KEY_V:debug=not debug
             KEY_P:paused=not paused
             KEY_X:slow=not slow
