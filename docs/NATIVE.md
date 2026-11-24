@@ -11,3 +11,6 @@ Native surface uploads two persistent textures; the experimental lab composes a 
 
 ## First measured optimization
 Baseline CI (55a24ca) measured p95 23.957 ms for one 160x112 bolt with steady sparks, excluding GPU. PackedInt32Array bulk conversion and inlined clipped additive glow replace per-pixel GDScript conversion/calls. Exact parity tests retained; new stage timings separate shape, ink/glow, particles and conversion. Compare CI before/after, never infer target hardware FPS.
+
+## Soft particles and debris
+All twelve upstream particle kinds now have a reference implementation, including translucent vapour/dust/smoke, fire-to-smoke transitions, burning chunks and on-land callbacks. Added Bits with shard/chunk/drip motion, bounce, spin and rest, and original constant-color Painter shapes. Extended fixtures to check every particle kind and debris. These are code additions until the corresponding CI gates pass; shape callbacks and full Painter API still remain incomplete.

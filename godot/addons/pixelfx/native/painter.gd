@@ -168,3 +168,107 @@ func rgba_bytes(is_light: bool=false) -> PackedByteArray:
     # PackedInt32Array.to_byte_array is an engine-native bulk conversion.
     # No per-pixel GDScript allocation/conversion. Zero light is transparent black.
     return light.to_byte_array() if is_light else color.to_byte_array()
+
+# Constant-color shape subset of upstream Painter; pixel centers, not antialiased geometry.
+func _bounds(x0: float,y0: float,x1: float,y1: float) -> Rect2i:
+    var ax: float=INF
+    var ay: float=INF
+    var bx: float=-INF
+    var by: float=-INF
+    for k in range(4):
+        var x: float=x1 if (k&1)!=0 else x0
+        var y: float=y1 if (k&2)!=0 else y0
+        var sx: float=to_x(x,y)
+        var sy: float=to_y(x,y)
+        ax=minf(ax,sx)
+        ay=minf(ay,sy)
+        bx=maxf(bx,sx)
+        by=maxf(by,sy)
+    var left: int=maxi(ox,int(floor(ax)))
+    var top: int=maxi(oy,int(floor(ay)))
+    var right: int=mini(ox+width-1,int(ceil(bx)))
+    var bottom: int=mini(oy+height-1,int(ceil(by)))
+    return Rect2i(left,top,maxi(0,right-left+1),maxi(0,bottom-top+1))
+
+func from_x(sx: float,sy: float) -> float:
+    return ((sx-tx)*cs+(sy-ty)*sn)*mirror
+
+func from_y(sx: float,sy: float) -> float:
+    return -(sx-tx)*sn+(sy-ty)*cs
+
+func _radial(cx: float,cy: float,rx: float,ry: float,c: int,a: float,soft: bool,inner: float=0.0) -> void:
+    if rx<=0.0 or ry<=0.0:
+        return
+    var box: Rect2i=_bounds(cx-rx,cy-ry,cx+rx,cy+ry)
+    for sy in range(box.position.y,box.end.y):
+        for sx in range(box.position.x,box.end.x):
+            var dx: float=from_x(sx+0.5,sy+0.5)-cx
+            var dy: float=from_y(sx+0.5,sy+0.5)-cy
+            # For circles use original unnormalized comparison; ellipses normalize first.
+            var d2: float=dx*dx+dy*dy if rx==ry else (dx/rx)*(dx/rx)+(dy/ry)*(dy/ry)
+            var limit: float=rx*rx if rx==ry else 1.0
+            if d2>limit or d2<inner*inner:
+                continue
+            if soft:
+                blend_px(sx,sy,c,a)
+            else:
+                put(sx,sy,c,a)
+
+func circle(cx: float,cy: float,r: float,c: int,a: float=1.0) -> void:
+    if r<0.6:
+        dot(cx,cy,c,a)
+    else:
+        _radial(cx,cy,r,r,c,a,false)
+
+func disc(cx: float,cy: float,r: float,c: int,a: float) -> void:
+    if r<0.5:
+        blend(cx,cy,c,a)
+    else:
+        _radial(cx,cy,r,r,c,a,true)
+
+func ellipse(cx: float,cy: float,rx: float,ry: float,c: int,a: float=1.0) -> void:
+    # Upstream normalizes even if radii are equal; preserve that ordering.
+    if rx<=0.0 or ry<=0.0:
+        return
+    var box: Rect2i=_bounds(cx-rx,cy-ry,cx+rx,cy+ry)
+    for sy in range(box.position.y,box.end.y):
+        for sx in range(box.position.x,box.end.x):
+            var dx: float=(from_x(sx+0.5,sy+0.5)-cx)/rx
+            var dy: float=(from_y(sx+0.5,sy+0.5)-cy)/ry
+            if dx*dx+dy*dy<=1.0:
+                put(sx,sy,c,a)
+
+func ring(cx: float,cy: float,r: float,w: float,c: int,a: float=1.0) -> void:
+    _radial(cx,cy,r,r,c,a,false,maxf(0.0,r-w))
+
+func rect(x: float,y: float,w: float,h: float,c: int,a: float=1.0) -> void:
+    if sn==0.0:
+        for yy in range(int(floor(y+0.5)),int(floor(y+h+0.5))):
+            for xx in range(int(floor(x+0.5)),int(floor(x+w+0.5))):
+                put(cell_x(xx,yy),cell_y(xx,yy),c,a)
+        return
+    var box: Rect2i=_bounds(x,y,x+w,y+h)
+    for sy in range(box.position.y,box.end.y):
+        for sx in range(box.position.x,box.end.x):
+            var lx: float=from_x(sx+0.5,sy+0.5)
+            var ly: float=from_y(sx+0.5,sy+0.5)
+            if lx>=x and ly>=y and lx<x+w and ly<y+h:
+                put(sx,sy,c,a)
+
+func beam(x0: float,y0: float,x1: float,y1: float,w: float,c: int,a: float=1.0) -> void:
+    var r: float=w/2.0
+    var dx: float=x1-x0
+    var dy: float=y1-y0
+    var l2: float=dx*dx+dy*dy
+    if l2==0.0:
+        l2=0.000000001
+    var box: Rect2i=_bounds(minf(x0,x1)-r,minf(y0,y1)-r,maxf(x0,x1)+r,maxf(y0,y1)+r)
+    for sy in range(box.position.y,box.end.y):
+        for sx in range(box.position.x,box.end.x):
+            var x: float=from_x(sx+0.5,sy+0.5)
+            var y: float=from_y(sx+0.5,sy+0.5)
+            var u: float=clampf(((x-x0)*dx+(y-y0)*dy)/l2,0.0,1.0)
+            var px0: float=x0+dx*u-x
+            var py0: float=y0+dy*u-y
+            if px0*px0+py0*py0<=r*r:
+                put(sx,sy,c,a)

@@ -3,6 +3,7 @@ const PS=preload("res://addons/pixelfx/native/particles.gd")
 const LIGHTS=preload("res://addons/pixelfx/native/lights.gd")
 const PAINTER=preload("res://addons/pixelfx/native/painter.gd")
 var failures: int=0
+var landed: Array=[]
 
 func _initialize() -> void:
     call_deferred("_run")
@@ -10,12 +11,17 @@ func _initialize() -> void:
 func _ground(_x: float) -> float:
     return 0.0
 
+func _land(x: float,y: float) -> void:
+    landed.append([x,y])
+
 func _run() -> void:
     var d: Variant=JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/particles.json"))
     if not d is Dictionary:
         quit(1)
         return
     var ps=PS.new(int(d["seed"]),_ground,d["sparks"])
+    ps.haze=int(d["col"])
+    ps.on_land=_land
     for s in d["specs"]:
         ps.spawn(int(s[0]),s[1],s[2],s[3],s[4],s[5],int(s[6]),s[7],s[8],int(s[9]))
     var ls=LIGHTS.new()
@@ -28,6 +34,12 @@ func _run() -> void:
             ls.update(1.0/120.0)
             step+=1
         var expected: Array=sample["particles"]
+        var expected_landed: Array=sample["landed"]
+        if landed.size()!=expected_landed.size():
+            failures+=1
+        for i in range(mini(landed.size(),expected_landed.size())):
+            if absf(landed[i][0]-expected_landed[i][0])>0.00000001 or absf(landed[i][1]-expected_landed[i][1])>0.00000001:
+                failures+=1
         if ps.list.size()!=expected.size():
             failures+=1
         for i in range(mini(ps.list.size(),expected.size())):
