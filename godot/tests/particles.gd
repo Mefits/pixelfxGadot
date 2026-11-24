@@ -44,7 +44,7 @@ func _run() -> void:
         ls.draw(p)
         var bad: int=0
         for i in range(p.color.size()):
-            if p.color[i]!=int(sample["color"][i]) or p.light[i]!=int(sample["light"][i]):
+            if (p.color[i]&0xffffffff)!=int(sample["color"][i]) or (p.light[i]&0xffffffff)!=int(sample["light"][i]):
                 bad+=1
         print("Particles step ",step," count ",ps.list.size()," mismatched pixels ",bad)
         failures+=bad

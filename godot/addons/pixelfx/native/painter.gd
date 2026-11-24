@@ -1,14 +1,15 @@
 extends RefCounted
 ## Partial direct port of src/core/painter.js. CPU reference, not yet optimized.
 ## Original MIT: Patch, Hugo Duprez, 2026.
-## Unsigned packed RGBA in 64-bit slots; separate additive RGB.
+## Signed packed int32 slots retain exact RGBA bits; direct native byte conversion.
+## Little-endian target (Windows/Linux x86-64). Empty light has alpha zero and RGB zero.
 const BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5]
 var width: int
 var height: int
 var ox: int
 var oy: int
-var color := PackedInt64Array()
-var light := PackedInt64Array()
+var color := PackedInt32Array()
+var light := PackedInt32Array()
 var tx: float = 0.0
 var ty: float = 0.0
 var mirror: float = 1.0
@@ -63,7 +64,8 @@ func put(sx: int,sy: int,c: int,a: float=1.0) -> void:
         return
     var i: int = _index(sx,sy)
     if i>=0:
-        color[i]=c & 0xffffffff
+        var bits: int = c & 0xffffffff
+        color[i]=bits-0x100000000 if bits>=0x80000000 else bits
 
 func add(sx: int,sy: int,c: int,k: float=1.0) -> void:
     k *= fade*light_k
@@ -76,7 +78,7 @@ func add(sx: int,sy: int,c: int,k: float=1.0) -> void:
     var r: int = int(minf(255,(d&255)+(c&255)*k))
     var g: int = int(minf(255,((d>>8)&255)+((c>>8)&255)*k))
     var b: int = int(minf(255,((d>>16)&255)+((c>>16)&255)*k))
-    light[i]=0xff000000|(b<<16)|(g<<8)|r
+    light[i]=-16777216|(b<<16)|(g<<8)|r
 
 func blend_px(sx: int,sy: int,c: int,a: float) -> void:
     a *= fade
@@ -92,7 +94,8 @@ func blend_px(sx: int,sy: int,c: int,a: float) -> void:
     var r: int = int((c&255)*k+(d&255)*(1.0-k))&255
     var g: int = int(((c>>8)&255)*k+((d>>8)&255)*(1.0-k))&255
     var b: int = int(((c>>16)&255)*k+((d>>16)&255)*(1.0-k))&255
-    color[i]=((int(oa*255)&255)<<24)|(b<<16)|(g<<8)|r
+    var bits: int=((int(oa*255)&255)<<24)|(b<<16)|(g<<8)|r
+    color[i]=bits-0x100000000 if bits>=0x80000000 else bits
 
 func px(x: float,y: float,c: int) -> void:
     put(cell_x(x,y),cell_y(x,y),c)
@@ -131,26 +134,37 @@ func glow(x: float,y: float,r: float,c: int,k: float=0.5) -> void:
         return
     var cx: float = to_x(x,y)
     var cy: float = to_y(x,y)
-    # Clipping invisible iterations does not change the reference pixels.
-    for sy in range(maxi(oy,int(floor(cy-r))),mini(oy+height-1,int(ceil(cy+r)))+1):
-        var dy: float = (sy+0.5-cy)/r
-        for sx in range(maxi(ox,int(floor(cx-r))),mini(ox+width-1,int(ceil(cx+r)))+1):
-            var dx: float = (sx+0.5-cx)/r
-            var d: float = dx*dx+dy*dy
+    var sx0: int = maxi(ox,int(floor(cx-r)))
+    var sx1: int = mini(ox+width-1,int(ceil(cx+r)))
+    var sy0: int = maxi(oy,int(floor(cy-r)))
+    var sy1: int = mini(oy+height-1,int(ceil(cy+r)))
+    var cr: int=c&255
+    var cg: int=(c>>8)&255
+    var cb: int=(c>>16)&255
+    var factor: float=fade*light_k
+    # Inlined add() on already clipped pixels; exact same truncation and threshold.
+    for sy in range(sy0,sy1+1):
+        var dy: float=(sy+0.5-cy)/r
+        var dy2: float=dy*dy
+        var row: int=(sy-oy)*width-ox
+        for sx in range(sx0,sx1+1):
+            var dx: float=(sx+0.5-cx)/r
+            var d: float=dx*dx+dy2
             if d>=1.0:
                 continue
-            var f: float = 1.0-sqrt(d)
-            add(sx,sy,c,f*f*k)
+            var f: float=1.0-sqrt(d)
+            var strength: float=f*f*k
+            strength*=factor
+            if strength<=0.004:
+                continue
+            var i: int=row+sx
+            var prior: int=light[i]
+            var rr: int=int(minf(255,(prior&255)+cr*strength))
+            var gg: int=int(minf(255,((prior>>8)&255)+cg*strength))
+            var bb: int=int(minf(255,((prior>>16)&255)+cb*strength))
+            light[i]=-16777216|(bb<<16)|(gg<<8)|rr
 
 func rgba_bytes(is_light: bool=false) -> PackedByteArray:
-    var out := PackedByteArray()
-    out.resize(width*height*4)
-    var src: PackedInt64Array = light if is_light else color
-    for i in range(src.size()):
-        var c: int = src[i]
-        var j: int = i*4
-        out[j]=c&255
-        out[j+1]=(c>>8)&255
-        out[j+2]=(c>>16)&255
-        out[j+3]=255 if is_light else (c>>24)&255
-    return out
+    # PackedInt32Array.to_byte_array is an engine-native bulk conversion.
+    # No per-pixel GDScript allocation/conversion. Zero light is transparent black.
+    return light.to_byte_array() if is_light else color.to_byte_array()

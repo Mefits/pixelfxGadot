@@ -13,7 +13,7 @@ func _check(v: bool,label: String) -> void:
         failures+=1
         push_error(label)
 
-func _compare(actual: PackedInt64Array,expected: Array,label: String) -> void:
+func _compare(actual: PackedInt32Array,expected: Array,label: String) -> void:
     if actual.size()!=expected.size():
         _check(false,label+" size")
         return
@@ -70,5 +70,10 @@ func _run() -> void:
         lightning.crackle(f,LIGHTNING.bowed(r,3,3,58,10,-9,.22,.4),.9,c,.35,.8)
         _compare(f.color,item["color"],"Bolt color seed "+str(item["seed"]))
         _compare(f.light,item["light"],"Bolt light seed "+str(item["seed"]))
+    var bytes=PAINTER.new(1,1)
+    bytes.put(0,0,0xff643214)
+    bytes.add(0,0,0xff030201,1.0)
+    _check(bytes.rgba_bytes()==PackedByteArray([20,50,100,255]),"color byte order")
+    _check(bytes.rgba_bytes(true)==PackedByteArray([1,2,3,255]),"light byte order")
     print("Native reference failures: ",failures)
     quit(0 if failures==0 else 1)

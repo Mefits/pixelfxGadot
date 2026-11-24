@@ -8,3 +8,6 @@ SPARK, MOTE, STREAK, FLAKE, STAR, EMBER and GRIT with upstream fixed-step physic
 
 ## Live test
 Native surface uploads two persistent textures; the experimental lab composes a bolt between a fixed anchor and mouse at a 30 Hz visual rate, with fixed-step particle physics, 96 particle cap and separate flashes. This is a test of reusable source primitives, not a direct port of a complete authored effect. Do not use CPU reference as a shipping performance baseline until measured.
+
+## First measured optimization
+Baseline CI (55a24ca) measured p95 23.957 ms for one 160x112 bolt with steady sparks, excluding GPU. PackedInt32Array bulk conversion and inlined clipped additive glow replace per-pixel GDScript conversion/calls. Exact parity tests retained; new stage timings separate shape, ink/glow, particles and conversion. Compare CI before/after, never infer target hardware FPS.
