@@ -28,8 +28,12 @@ static func sample(clip: Dictionary,time: float,wrap_loop: bool=true) -> Diction
     var keys: Array=clip.keys
     if keys.size()==1 or t<=float(keys[0].t):
         return keys[0].pose.duplicate(true)
+    if t>=float(keys[-1].t):
+        return keys[-1].pose.duplicate(true)
     for i in range(1,keys.size()):
-        if t<=float(keys[i].t):
+        if is_equal_approx(t,float(keys[i].t)):
+            return keys[i].pose.duplicate(true)
+        if t<float(keys[i].t):
             var a: Dictionary=keys[i-1].pose
             var b: Dictionary=keys[i].pose
             var u: float=clampf((t-float(keys[i-1].t))/maxf(.000001,float(keys[i].t)-float(keys[i-1].t)),0,1)
