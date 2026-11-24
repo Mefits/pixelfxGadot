@@ -66,9 +66,12 @@ func _physics_process(dt: float) -> void:
             track_clock=0
             trail.append(creature.body.center_of_mass())
             if trail.size()>60:trail.pop_front()
+    _update_hud()
+    queue_redraw()
+
+func _update_hud() -> void:
     hud.text="Segments %d | mass x%.1f | %s | constraint %.2f px | penetration %.3f | %.2f ms CPU | %s"%[
         creature.body.nodes.size(),mass,"GROUND" if creature.grounded else "AIR",creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz")]
-    queue_redraw()
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))

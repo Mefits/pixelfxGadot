@@ -2,14 +2,16 @@ extends SceneTree
 const B=preload("res://addons/creature/physical_body.gd")
 const C=preload("res://addons/creature/physical_creature.gd")
 var failures: int=0
-func _initialize() -> void:call_deferred("_run")
+func _initialize() -> void:
+    create_timer(20.0).timeout.connect(func(): quit(1))
+    call_deferred("_run")
 func check(ok: bool,msg: String) -> void:
     if not ok:failures+=1;push_error(msg)
 func _run() -> void:
     var floor_box:=Rect2(-1000,200,2000,80)
     var boxes: Array[Rect2]=[floor_box,Rect2(160,174,35,26)]
     var body=B.new()
-    body.obstacles=[floor_box]
+    body.obstacles.append(floor_box)
     body.add_point("a",Vector2(0,50),7,1)
     body.add_point("b",Vector2(16,50),7,2)
     body.connect_points(0,1,16)

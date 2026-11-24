@@ -101,7 +101,7 @@ func _contact(n: Dictionary,box: Rect2) -> void:
     var dist: float=diff.length()
     var normal:=Vector2.ZERO
     var push: float=0
-    if box.has_point(p):
+    if p.x>=box.position.x and p.x<=box.end.x and p.y>=box.position.y and p.y<=box.end.y:
         var distances: Array[float]=[p.x-box.position.x,box.end.x-p.x,p.y-box.position.y,box.end.y-p.y]
         var side: int=distances.find(distances.min())
         normal=[Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN][side]

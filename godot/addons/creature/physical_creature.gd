@@ -23,7 +23,7 @@ var grip_count: int=0
 func _init(at: Vector2,boxes: Array[Rect2],tail: int=5,mass: float=1) -> void:
     tail_count=clampi(tail,0,12)
     mass_scale=clampf(mass,.5,3)
-    body.obstacles=boxes.duplicate()
+    body.obstacles.assign(boxes)
     body.add_point("front",at,7,1.4*mass_scale)
     body.add_point("rear",at+Vector2(-16,2),7,1.8*mass_scale)
     body.connect_points(0,1,sqrt(260.0),.000001)
@@ -83,9 +83,7 @@ func _control(dt: float) -> void:
     correction=correction.limit_length(360)
     body.force(0,correction)
     body.force(1,-correction)
-    # Raise the leading segment when pressing into a low wall while grounded.
-    if grounded and absf(input_axis)>.1 and body.nodes[0].wall:
-        body.force(0,Vector2(0,-750))
+    # No automatic wall climbing. Explicit grip is the only ledge pull.
 
 func _find_grip() -> void:
     var best: float=grip_radius
