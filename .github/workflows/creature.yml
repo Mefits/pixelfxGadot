@@ -6,6 +6,12 @@ on:
       - '.github/workflows/creature.yml'
       - 'docs/CI_CHECKPOINT.md'
   workflow_dispatch:
+    inputs:
+      sdk_acceptance:
+        description: 'Run deferred experimental SDK black-box acceptance'
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -32,7 +38,7 @@ jobs:
           cp -a godot/lab/*.gd /tmp/complete/godot/lab/
           cp -a godot/lab/*.tscn /tmp/complete/godot/lab/
           cp godot/tests/creature*.gd /tmp/complete/godot/tests/
-          cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md docs/VFX_WORKSHOP.md docs/TOOLKIT_RU.md /tmp/complete/docs/
+          cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md docs/VFX_WORKSHOP.md docs/TOOLKIT_RU.md docs/SDK_DEFERRED.md /tmp/complete/docs/
           cp SKILL.md AGENTS.md PORTABLE.md /tmp/complete/
           printf '%s\n' "$GITHUB_SHA" > /tmp/complete/CREATURE_REVISION.txt
           python3 tools/build_creature_runtime.py --project /tmp/complete/godot --example portable_example --licenses /tmp/complete
@@ -106,6 +112,7 @@ jobs:
           rm -rf /tmp/complete/godot/.godot
           find /tmp/complete/godot -name '*.import' -delete
       - name: Full SDK black-box acceptance via public commands
+        if: github.event_name == 'workflow_dispatch' && inputs.sdk_acceptance == true
         shell: bash
         run: |
           set -euo pipefail
@@ -118,7 +125,7 @@ jobs:
           rm -rf /tmp/complete/godot/.godot /tmp/sdk-acceptance/clean_project/.godot
           find /tmp/complete/godot -name '*.import' -delete
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.sdk_acceptance == true
         with:
           name: Creature-SDK-Acceptance-Evidence
           path: /tmp/sdk-acceptance/

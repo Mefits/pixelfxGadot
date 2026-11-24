@@ -21,3 +21,6 @@ Canonical JSON Schema 2020-12; engine-aware diagnostic validator, compatibility 
 
 ## v0.35 — single consolidated SDK checkpoint
 v0.31 numeric enum mismatch fixed without separate CI. Validate all 37 templates with both validators; test CLI creation, patch, diagnostics, deterministic physical simulation and contact, real Godot frame capture, GIF/contact sheets, and standalone export with paired anatomy. Run complete existing suite and five isolated examples. Independent agent and visual acceptance remain manual; automated black-box reference records explicit status. Do not trigger extra runs on routine commits.
+
+## v0.37 editor UX checkpoint
+Run one UI checkpoint with full regression and visual captures, shortcut and data preservation cases, clean portable exports and 37 canonical fixtures. SDK black-box acceptance intentionally deferred per docs/SDK_DEFERRED.md; opt-in workflow dispatch only. Do not label SDK validated. Package complete Godot project and actual screenshots after successful required tests.
