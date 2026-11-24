@@ -1,0 +1,55 @@
+name: N foundation
+on:
+  push:
+    branches: [project/N]
+    paths:
+      - '.github/workflows/n.yml'
+      - 'docs/CHECKPOINT.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Godot 4.4.1
+        run: |
+          curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          ln -s /tmp/godot/Godot_v4.4.1-stable_linux.x86_64 /tmp/godot/godot
+          echo /tmp/godot >> "$GITHUB_PATH"
+      - name: Import and regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --editor --import 2>&1 | tee /tmp/n-import.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-import.log
+          timeout 30s godot --headless --script res://tests/locomotion.gd 2>&1 | tee /tmp/n-tests.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-tests.log
+          timeout 30s xvfb-run -a godot --resolution 960x540 --script res://tests/visual.gd 2>&1 | tee /tmp/n-visual.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-visual.log
+          test -f reports/stance.png
+          test -f reports/running.png
+          test -f reports/jump.png
+          rm -rf .godot
+          find . -name '*.import' -delete
+          printf '%s\n' "$GITHUB_SHA" > REVISION.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: N-Test-Logs
+          path: /tmp/n-*.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: N-0.01-Godot
+          path: |
+            project.godot
+            game/
+            tests/
+            docs/
+            README.md
+            AGENTS.md
+            REVISION.txt
+            reports/

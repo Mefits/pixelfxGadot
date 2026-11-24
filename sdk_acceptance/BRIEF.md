@@ -1,5 +1,0 @@
-# Blind SDK acceptance brief
-
-For a fresh agent with no development history: using only the verified SDK, create a six-legged mutant with two five-segment tentacles, four tail segments, mass 1.4 and a physical grab. Do not change engine source. Deliver creature and ability JSON, validation/compatibility reports, an actual simulated contact and target pull, a rendered animation and contact sheet, and an exported project that opens in clean Godot. Use the SDK documentation and CLI. Explain limitations and what you actually observed. Do not call success if ability starts but fails to grab.
-
-Acceptance: canonical schema valid, compatibility valid, finite physical simulation, penetration <0.1 px, six legs and two branches, actual grab and target movement >2 px; 45 frames at 15 fps with multiple unique frames, real captures; independent exported project starts with paired custom anatomy. Review silhouette/timing separately. Automated harness is a reproducible reference, not independent AI or human approval. Give only this brief and the verified SDK to a new agent for independent acceptance.

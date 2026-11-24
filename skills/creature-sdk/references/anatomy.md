@@ -1,4 +1,0 @@
-# Physical anatomy and abilities
-
-Use list creature, list ability, show creature_tentacled. Clone then patch payload. 0–8 legs in even counts, 0–12 tail segments, 0–4 tentacles with 2–6 segments. Use type=biped only with two legs; crawler is a shared motor without peristalsis. Physical ability templates carry engine=physical. Grab requires tentacles and reach is clamped by segment length; claw needs non-biped support limbs; leap needs enabled limbs; grow requires tail capacity. One ability active at a time. Target dictionary p/r/hp/id is the host contract, not a rigid-body opponent. Do not promise multiple simultaneous grabs or full creature-vs-creature physics.
-Run compat, then simulate CREATURE ABILITY 600. Check hits and target_moved for grab, target_hp for projectile, tail_delta for growth. A successful start alone is insufficient. Use render ABILITY OUT_DIR 15 45 CREATURE for paired actual physics.

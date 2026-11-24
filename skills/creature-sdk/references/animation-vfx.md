@@ -1,3 +1,0 @@
-# Humanoid animation and VFX
-
-Use list animation or list vfx, inspect show. Clone the closest preset; preserve required layer fields. Animation keys use seconds, root pixels and joint angles in degrees. VFX curve times are normalized 0..1, strictly increasing, channel values absolute. Four-phase humanoid ability uses charge/dash/contact/recovery, phase-specific markers and optional effect_ref. Physical ability profiles do not accept humanoid phase fields. For new VFX choose existing layer types and deterministic seed; use native algorithms rather than unrelated visual approximations. Render actual PNG frames and inspect color/light, silhouette, timing, contact-only vs miss, tail duration and clipping; no performance claim from offline render.
