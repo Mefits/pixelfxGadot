@@ -1,5 +1,6 @@
 extends SceneTree
 const PS=preload("res://addons/pixelfx/native/particles.gd")
+const BATCH=preload("res://addons/pixelfx/native/batch.gd")
 const LIGHTS=preload("res://addons/pixelfx/native/lights.gd")
 const PAINTER=preload("res://addons/pixelfx/native/painter.gd")
 var failures: int=0
@@ -17,6 +18,12 @@ func _land(x: float,y: float) -> void:
 func _run() -> void:
     var d: Variant=JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/particles.json"))
     if not d is Dictionary:
+        quit(1)
+        return
+    var batch=BATCH.new()
+    var cpp: bool=OS.get_cmdline_user_args().has("--cpp")
+    if cpp and not batch.enable_acceleration():
+        push_error("C++ batch missing")
         quit(1)
         return
     var ps=PS.new(int(d["seed"]),_ground,d["sparks"])
@@ -51,14 +58,19 @@ func _run() -> void:
                     failures+=1
         var p=PAINTER.new(128,96)
         p.place(64,72)
-        ps.draw(p,"back")
-        ps.draw(p,"front")
-        ls.draw(p)
+        var draw=batch.begin(p)
+        ps.draw(draw,"back")
+        ps.draw(draw,"front")
+        ls.draw(draw)
+        batch.finish()
         var bad: int=0
         for i in range(p.color.size()):
             if (p.color[i]&0xffffffff)!=int(sample["color"][i]) or (p.light[i]&0xffffffff)!=int(sample["light"][i]):
                 bad+=1
         print("Particles step ",step," count ",ps.list.size()," mismatched pixels ",bad)
         failures+=bad
+    if cpp and (batch.accelerated_calls!=d["samples"].size() or batch.rejected_calls!=0):
+        failures+=1
+    print("Particle batch calls: ",batch.accelerated_calls," rejected: ",batch.rejected_calls)
     print("Particle parity failures: ",failures)
     quit(0 if failures==0 else 1)

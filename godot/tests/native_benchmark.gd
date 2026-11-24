@@ -3,6 +3,7 @@ const RNG=preload("res://addons/pixelfx/native/rng.gd")
 const PAL=preload("res://addons/pixelfx/native/palette.gd")
 const PAINTER=preload("res://addons/pixelfx/native/painter.gd")
 const LIGHTNING=preload("res://addons/pixelfx/native/lightning.gd")
+const BATCH=preload("res://addons/pixelfx/native/batch.gd")
 const PS=preload("res://addons/pixelfx/native/particles.gd")
 
 func _initialize() -> void:
@@ -17,7 +18,13 @@ func _run() -> void:
         push_error("C++ accelerator missing")
         quit(1)
         return
-    print("Benchmark backend: ","C++" if cpp else "GDScript")
+    var batch=BATCH.new()
+    var batch_enabled: bool=OS.get_cmdline_user_args().has("--batch")
+    if batch_enabled and not batch.enable_acceleration():
+        push_error("C++ batch missing")
+        quit(1)
+        return
+    print("Benchmark backend: ","C++" if cpp else "GDScript","; particle batch: ",batch_enabled)
     var c: Array=PAL.fit(LIGHTNING.VOLT,8)
     var rng=RNG.new(301)
     var ps=PS.new(312)
@@ -36,7 +43,8 @@ func _run() -> void:
         for j in range(4):
             ps.spawn(PS.SPARK,30,-10,rng.between(-100,100),rng.between(-140,80),0.35)
         ps.advance(1.0/30.0)
-        ps.draw(p)
+        ps.draw(batch.begin(p))
+        batch.finish()
         var sparks_end: int=Time.get_ticks_usec()
         # Include CPU buffer-to-RGBA conversion, not GPU upload.
         var _color: PackedByteArray=p.rgba_bytes()
@@ -55,4 +63,5 @@ func _run() -> void:
         times.sort()
         print("Native stage ",row[0]," p95=",times[113]," ms")
     print("C++ calls: ",l.accelerated_calls," rejected: ",l.rejected_calls)
-    quit(1 if cpp and (l.accelerated_calls!=140 or l.rejected_calls!=0) else 0)
+    print("Particle batch calls: ",batch.accelerated_calls," rejected: ",batch.rejected_calls)
+    quit(1 if (cpp and (l.accelerated_calls!=140 or l.rejected_calls!=0)) or (batch_enabled and (batch.accelerated_calls!=140 or batch.rejected_calls!=0)) else 0)

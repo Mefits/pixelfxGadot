@@ -18,3 +18,6 @@ Build and tests (both Linux x86-64 and Windows x86-64): https://github.com/Mefit
 These are host-runner CPU measurements, not the user's laptop FPS. Particle rendering is the next largest cost; GPU upload, first cast, style switch and visual review remain to be measured in a representative game.
 
 Use lightning.enable_acceleration(true) to select the tested optional backend. It exposes accelerated_calls and rejected_calls for validation. The lab chooses C++ automatically when installed; A switches. No accelerated particle rendering yet.
+
+## Ordered Painter batch (development)
+Batch.gd records the unchanged particle, debris and light draw calls in order; a single C++ call handles dot/blend/line/glow/circle/disc. Physics, color logic and ordering stay in the reference implementation. Use var draw=batch.begin(painter); particles.draw(draw); lights.draw(draw); batch.finish(). Do not alter painter transform/fade or draw directly to painter while recording. Unsupported binaries return the original Painter; rejected batches replay the exact commands. Test counts ensure benchmarks actually use C++. Verification pending.

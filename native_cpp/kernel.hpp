@@ -17,14 +17,41 @@ struct Frame {
     static constexpr int bayer[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
     double to_x(double x,double y) const {return tx+x*mirror*cs-y*sn;}
     double to_y(double x,double y) const {return ty+x*mirror*sn+y*cs;}
-    void put(double x,double y,uint32_t c,double a) {
-        if(!c || a<=0) return;
-        int sx=int(std::floor(to_x(std::floor(x)+.5,std::floor(y)+.5)));
-        int sy=int(std::floor(to_y(std::floor(x)+.5,std::floor(y)+.5)));
+    int cell_x(double x,double y) const {return int(std::floor(to_x(std::floor(x)+.5,std::floor(y)+.5)));}
+    int cell_y(double x,double y) const {return int(std::floor(to_y(std::floor(x)+.5,std::floor(y)+.5)));}
+    void put(double x,double y,uint32_t c,double a) { if(a>0)put_screen(cell_x(x,y),cell_y(x,y),c,a); }
+    void put_screen(int sx,int sy,uint32_t c,double a) {
+        if(!c) return;
         a*=fade;
         if(a<1 && a<=(bayer[((sy&3)<<2)|(sx&3)]+.5)/16.) return;
         int ix=sx-ox,iy=sy-oy;
         if(ix>=0&&iy>=0&&ix<w&&iy<h) color[iy*w+ix]=c;
+    }
+    void blend_screen(int sx,int sy,uint32_t c,double a){
+        a*=fade;
+        int ix=sx-ox,iy=sy-oy;
+        if(!c||a<=.004||ix<0||iy<0||ix>=w||iy>=h)return;
+        auto &d=color[iy*w+ix];
+        double da=double((d>>24)&255)/255.,oa=a+da*(1-a),k=a/oa;
+        auto ch=[&](int shift){return uint32_t(int64_t(double((c>>shift)&255)*k+double((d>>shift)&255)*(1-k)))&255;};
+        d=((uint32_t(int64_t(oa*255))&255)<<24)|(ch(16)<<16)|(ch(8)<<8)|ch(0);
+    }
+    void line(double x,double y,double bx,double by,uint32_t c,double a){
+        int sx=cell_x(x,y),sy=cell_y(x,y),ex=cell_x(bx,by),ey=cell_y(bx,by);
+        int dx=std::abs(ex-sx),dy=-std::abs(ey-sy),stepx=sx<ex?1:-1,stepy=sy<ey?1:-1,err=dx+dy;
+        while(true){put_screen(sx,sy,c,a);if(sx==ex&&sy==ey)break;int e2=2*err;if(e2>=dy){err+=dy;sx+=stepx;}if(e2<=dx){err+=dx;sy+=stepy;}}
+    }
+    void circle(double x,double y,double r,uint32_t c,double a,bool soft){
+        if(r<(soft?.5:.6)){if(soft)blend_screen(cell_x(x,y),cell_y(x,y),c,a);else put(x,y,c,a);return;}
+        double ax=INFINITY,ay=INFINITY,bx=-INFINITY,by=-INFINITY;
+        for(int j=0;j<4;++j){double lx=x+(j&1?r:-r),ly=y+(j&2?r:-r);double sx=to_x(lx,ly),sy=to_y(lx,ly);ax=std::min(ax,sx);ay=std::min(ay,sy);bx=std::max(bx,sx);by=std::max(by,sy);}
+        int x0=std::max(ox,int(std::floor(ax))),x1=std::min(ox+w-1,int(std::ceil(bx))),y0=std::max(oy,int(std::floor(ay))),y1=std::min(oy+h-1,int(std::ceil(by)));
+        for(int sy=y0;sy<=y1;++sy)for(int sx=x0;sx<=x1;++sx){
+            double px=sx+.5,py=sy+.5;
+            double dx=((px-tx)*cs+(py-ty)*sn)*mirror-x,dy=-(px-tx)*sn+(py-ty)*cs-y;
+            if(dx*dx+dy*dy>r*r)continue;
+            if(soft)blend_screen(sx,sy,c,a);else put_screen(sx,sy,c,a);
+        }
     }
     void glow(double x,double y,double r,uint32_t c,double k) {
         if(r<1||k<=.004) return;

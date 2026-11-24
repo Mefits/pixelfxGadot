@@ -6,6 +6,7 @@ const LIGHTNING=preload("res://addons/pixelfx/native/lightning.gd")
 const RNG=preload("res://addons/pixelfx/native/rng.gd")
 const PAL=preload("res://addons/pixelfx/native/palette.gd")
 const PS=preload("res://addons/pixelfx/native/particles.gd")
+const BATCH=preload("res://addons/pixelfx/native/batch.gd")
 const LIGHTS=preload("res://addons/pixelfx/native/lights.gd")
 const ORIGIN:=Vector2(160,124)
 const SIZE:=Vector2i(320,180)
@@ -16,6 +17,7 @@ var surface
 var lightning
 var particles
 var lights
+var batch
 var rng
 var colors: Array
 var paths: Array=[]
@@ -47,6 +49,8 @@ func _ready() -> void:
     particles=PS.new(712,_ground,["#ffffff","#c8f8ff","#7ff3ff","#1ab8e6"])
     particles.capacity=96
     lights=LIGHTS.new()
+    batch=BATCH.new()
+    batch.enable_acceleration()
     colors=PAL.fit(LIGHTNING.VOLT,8)
     rng=RNG.new(77)
     demo=OS.get_cmdline_user_args().has("--demo-native")
@@ -82,7 +86,10 @@ func _unhandled_input(event: InputEvent) -> void:
         match event.keycode:
             KEY_1: crackle=false
             KEY_2: crackle=true
-            KEY_A: lightning.enable_acceleration(lightning.accelerator==null)
+            KEY_A:
+                var enabled: bool=lightning.accelerator==null
+                lightning.enable_acceleration(enabled)
+                batch.enable_acceleration(enabled)
             KEY_B: bright=not bright
             KEY_ESCAPE: get_tree().change_scene_to_file("res://lab/main.tscn")
         queue_redraw()
@@ -130,11 +137,14 @@ func _process(delta: float) -> void:
                 lightning.crackle(p,paths,0.95,colors,0.5)
             else:
                 lightning.stroke(p,paths,0.85+0.15*sin(t*23.0),colors,0.8)
-            p.glow(START.x,START.y,15,colors[4],0.6)
-            p.glow(target.x,target.y,18,colors[5],0.65)
-            PS.sparkle(p,target.x,target.y,2.0+absf(sin(t*37.0))*2.0,colors[6],colors[4],0.6)
-        particles.draw(p)
-        lights.draw(p)
+        var draw=batch.begin(p)
+        if active:
+            draw.glow(START.x,START.y,15,colors[4],0.6)
+            draw.glow(target.x,target.y,18,colors[5],0.65)
+            PS.sparkle(draw,target.x,target.y,2.0+absf(sin(t*37.0))*2.0,colors[6],colors[4],0.6)
+        particles.draw(draw)
+        lights.draw(draw)
+        batch.finish()
         surface.present()
         sample_times.append((Time.get_ticks_usec()-start_us)/1000.0)
         was_drawn=needs
