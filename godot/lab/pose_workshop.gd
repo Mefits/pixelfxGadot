@@ -3,6 +3,9 @@ const UI=preload("res://lab/ui_ru.gd")
 const RIG=preload("res://addons/creature/rig.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const VFX=preload("res://addons/pixelfx/composer/preset.gd")
+const FX_PREVIEW=preload("res://addons/creature/vfx_preview.gd")
+const FX_SURFACE=preload("res://addons/pixelfx/native/surface.gd")
+const QUICK=preload("res://lab/vfx_quick_dialog.gd")
 const PREVIEW=preload("res://lab/creature_preview.gd")
 var rig=RIG.humanoid()
 var bank: Dictionary=CLIPS.fighter_bank(0)
@@ -16,6 +19,11 @@ var playing: bool=false
 var dirty: bool=false
 var syncing: bool=false
 var preview
+var fx_preview=FX_PREVIEW.new()
+var fx_surface
+var fx_visible: CheckButton
+var quick_dialog
+var quick_marker: Dictionary={}
 var picture: TextureRect
 var clip_select: OptionButton
 var joint_select: OptionButton
@@ -95,6 +103,10 @@ func _ready() -> void:
     preview=PREVIEW.new()
     preview.rig=rig
     view.add_child(preview)
+    fx_surface=FX_SURFACE.new()
+    view.add_child(fx_surface)
+    fx_surface.configure(144,108)
+    fx_preview.renderer.enable_acceleration()
     picture=TextureRect.new()
     picture.position=Vector2(16,44)
     picture.size=Vector2(576,432)
@@ -216,6 +228,15 @@ func _ready() -> void:
     side.add_child(keys)
     keys.item_selected.connect(func(i:int): _seek(float(bank[name_id].keys[i].t)))
     _label(side,"3. События атаки и эффектов")
+    var preview_row:=HBoxContainer.new()
+    side.add_child(preview_row)
+    fx_visible=CheckButton.new()
+    fx_visible.text="Показать VFX"
+    fx_visible.button_pressed=true
+    preview_row.add_child(fx_visible)
+    fx_visible.toggled.connect(func(_v:bool):_draw_vfx())
+    _button(preview_row,"− кадр",func():_seek(time-1.0/rate.value))
+    _button(preview_row,"+ кадр",func():_seek(time+1.0/rate.value))
     var erow:=HBoxContainer.new()
     side.add_child(erow)
     event_kind=OptionButton.new()
@@ -238,6 +259,10 @@ func _ready() -> void:
     _button(vfx_actions,"Заменить",_replace_vfx_event)
     _button(vfx_actions,"Обновить список",_refresh_vfx_library)
     _refresh_vfx_library()
+    _button(side,"Быстрая настройка выбранного VFX",_quick_open)
+    quick_dialog=QUICK.new()
+    add_child(quick_dialog)
+    quick_dialog.applied.connect(_quick_apply)
     var save:=HBoxContainer.new()
     save.position=Vector2(604,9)
     save.theme=compact
@@ -306,6 +331,7 @@ func _sync() -> void:
         if not prior.is_empty():preview.ghost_poses.append({"pose":prior,"color":Color("#52778b")})
         if not next.is_empty():preview.ghost_poses.append({"pose":next,"color":Color("#8b6d50")})
     preview.queue_redraw()
+    _draw_vfx()
     syncing=true
     timeline.max_value=float(bank[name_id].duration)
     timeline.clip=bank[name_id]
@@ -320,6 +346,40 @@ func _sync() -> void:
     clock_label.text="%.3f / %.2f с"%[time,bank[name_id].duration]
     syncing=false
     _update_history()
+
+func _draw_vfx() -> void:
+    if fx_surface==null or fx_visible==null:return
+    fx_surface.visible=fx_visible.button_pressed
+    if not fx_surface.visible:return
+    var sample_time: float=time
+    if playing:sample_time=minf(float(bank[name_id].duration),floor(time*rate.value+.00001)/rate.value)
+    fx_preview.draw(fx_surface.painter,bank[name_id],sample_time,preview.origin,preview.origin+Vector2(40,-26))
+    fx_surface.present()
+
+func _quick_open() -> void:
+    var rows: PackedInt32Array=event_list.get_selected_items()
+    if rows.is_empty():
+        status.text="Выбери фиолетовый VFX-маркер."
+        return
+    var event: Dictionary=bank[name_id].events[rows[0]]
+    if event.kind!="vfx":
+        status.text="Быстрая настройка доступна для VFX-маркеров."
+        return
+    playing=false
+    quick_marker=event
+    quick_dialog.open_for(event.preset)
+
+func _quick_apply(value: Dictionary) -> void:
+    var index: int=bank[name_id].events.find(quick_marker)
+    if index<0 or not VFX.valid(value):return
+    _remember()
+    quick_marker.preset=value
+    dirty=true
+    _refresh_lists()
+    event_list.select(index)
+    _draw_vfx()
+    status.text="Эффект настроен. Ctrl+Z — отменить."
+    quick_marker={}
 
 func _edit() -> void:
     playing=false
@@ -495,6 +555,7 @@ func _refresh_lists() -> void:
         if e.kind=="vfx":event_list.set_item_custom_fg_color(event_list.item_count-1,Color("#c5a1ff"))
     timeline.clip=bank[name_id]
     timeline.queue_redraw()
+    _draw_vfx()
     _update_history()
 
 func _path() -> String:

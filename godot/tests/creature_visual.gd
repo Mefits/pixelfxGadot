@@ -112,6 +112,26 @@ func _run() -> void:
     check(ed.fighter_select.get_global_rect().end.x<=960,"Fighter chooser inside viewport")
     check(ed.root_y.get_global_rect().end.x<=960,"Root controls inside viewport")
     await capture(dir.path_join("pose-workshop.png"))
+    ed._seek(.05)
+    ed.selected="hand_near"
+    ed.vfx_select.select(5)
+    ed._add_vfx_event()
+    ed._seek(.18)
+    check(ed.fx_preview.active==1,"Pose preview active")
+    check(ed.fx_surface.painter.color.count(0)<ed.fx_surface.painter.color.size(),"Pose preview pixels")
+    var old_effect: Dictionary=ed.bank.strike.events.filter(func(e):return e.kind=="vfx")[0].preset.duplicate(true)
+    for i in range(ed.bank.strike.events.size()):
+        if ed.bank.strike.events[i].kind=="vfx":ed.event_list.select(i);break
+    ed._quick_open()
+    ed.quick_dialog.fields.size.value=1.5
+    ed.quick_dialog._apply()
+    ed.quick_dialog.hide()
+    check(ed.bank.strike.events.filter(func(e):return e.kind=="vfx")[0].preset!=old_effect,"Quick marker edit")
+    ed._undo()
+    check(ed.bank.strike.events.filter(func(e):return e.kind=="vfx")[0].preset==old_effect,"Quick marker undo")
+    await capture(dir.path_join("pose-vfx-preview.png"))
+    ed.fx_visible.button_pressed=false
+    check(not ed.fx_surface.visible,"Preview hide")
     ed.dirty=false
     root.remove_child(ed)
     ed.queue_free()

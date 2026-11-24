@@ -6,6 +6,8 @@ const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
 const STAGE=preload("res://lab/vfx_stage.gd")
 const TIMELINE=preload("res://lab/vfx_timeline.gd")
 const GRAPH=preload("res://lab/vfx_curve_editor.gd")
+const QUICK=preload("res://lab/vfx_quick_dialog.gd")
+var quick_dialog
 const BINDINGS=preload("res://addons/creature/vfx_bindings.gd")
 var binding_bank: Dictionary={}
 var binding_role: OptionButton
@@ -167,6 +169,10 @@ func _ready() -> void:
     compare_button=_button(compare_row,"A / B",_toggle_compare)
     compare_button.disabled=true
     _button(compare_row,"Сброс масштаба",func():timeline.reset_view())
+    _button(compare_row,"Быстрая настройка",_quick_open)
+    quick_dialog=QUICK.new()
+    add_child(quick_dialog)
+    quick_dialog.applied.connect(_quick_apply)
     perf=Label.new()
     perf.position=Vector2(194,420)
     perf.add_theme_font_size_override("font_size",10)
@@ -375,6 +381,18 @@ func _ready() -> void:
     renderer.enable_acceleration()
     _library()
     _refresh()
+func _quick_open() -> void:
+    playing=false
+    quick_dialog.open_for(preset)
+
+func _quick_apply(value: Dictionary) -> void:
+    if not P.valid(value):return
+    # Preserve the old effect for A/B comparison before applying.
+    _capture_reference()
+    preset=value
+    _refresh()
+    status.text="Настроено. Исходник сохранён как A."
+
 func _binding_sync() -> void:
     if binding_info==null:return
     var role: String=BINDINGS.ROLES[maxi(0,binding_role.selected)]
