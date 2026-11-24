@@ -15,8 +15,8 @@ static func limb(c:CanvasItem,a:Vector2,b:Vector2,wa:float,wb:float,color:Color)
     var axis:Vector2=(b-a).normalized()
     if axis.length_squared()<.001:return
     var n:=Vector2(-axis.y,axis.x)
-    poly(c,[a-n*(wa+1),a-axis*2,b-axis*0-n*(wb+1),b+axis*2,b+n*(wb+1),a+n*(wa+1)],INK)
-    poly(c,[a-n*wa,a-axis*.5,b-n*wb,b+axis,b+n*wb,a+n*wa],color)
+    poly(c,[a-axis*2,a-n*(wa+1),b-n*(wb+1),b+axis*2,b+n*(wb+1),a+n*(wa+1)],INK)
+    poly(c,[a-axis*.5,a-n*wa,b-n*wb,b+axis,b+n*wb,a+n*wa],color)
     poly(c,[a+n*wa*.35,b+n*wb*.3,b+n*wb,a+n*wa],color.darkened(.20))
 static func band(c:CanvasItem,a:Vector2,b:Vector2,t:float,width:float,color:Color)->void:
     var axis:Vector2=(b-a).normalized()

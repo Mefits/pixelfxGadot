@@ -36,7 +36,7 @@ jobs:
           timeout 30s godot --headless --script res://tests/hybrid.gd 2>&1 | tee /tmp/n-hybrid.log
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-hybrid.log; then exit 1; fi
           timeout 180s xvfb-run -a godot --resolution 960x540 --script res://tests/visual.gd 2>&1 | tee /tmp/n-visual.log
-          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-visual.log; then exit 1; fi
+          if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-visual.log; then exit 1; fi
           test -f reports/stance.png
           test -f reports/running.png
           test -f reports/jump.png
