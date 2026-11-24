@@ -27,3 +27,6 @@ static func at(ramp: Array, t: float) -> int:
 static func mix(a: int, b: int, t: float) -> int:
     var k: float = clampf(t,0.0,1.0)
     return rgb(lerpf(a & 255,b & 255,k),lerpf((a >> 8) & 255,(b >> 8) & 255,k),lerpf((a >> 16) & 255,(b >> 16) & 255,k))
+
+static func scale_color(c: int,k: float) -> int:
+    return rgb(minf(255,(c&255)*k),minf(255,((c>>8)&255)*k),minf(255,((c>>16)&255)*k))
