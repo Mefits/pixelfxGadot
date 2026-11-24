@@ -1,0 +1,35 @@
+extends SceneTree
+const MAIN=preload("res://lab/main.tscn")
+var failures: int=0
+func _initialize() -> void:call_deferred("_run")
+func check(ok: bool,msg: String) -> void:
+    if not ok:failures+=1;push_error(msg)
+func _run() -> void:
+    root.size=Vector2i(960,540)
+    var menu=MAIN.instantiate()
+    root.add_child(menu)
+    await process_frame
+    await process_frame
+    check(menu.routes.size()==11 and menu.buttons.size()==11,"All workspaces available")
+    for route in menu.routes.values():check(ResourceLoader.exists(route),"Scene exists "+route)
+    for button in menu.buttons:check(button.get_global_rect().end.x<=960 and button.get_global_rect().end.y<=485,"Menu button fits")
+    check(menu.get_child_count()==1,"No simulation or pool at startup")
+    var dir: String=ProjectSettings.globalize_path("res://../reports")
+    DirAccess.make_dir_recursive_absolute(dir)
+    await RenderingServer.frame_post_draw
+    check(root.get_texture().get_image().save_png(dir.path_join("launcher.png"))==OK,"Launcher capture")
+    root.remove_child(menu)
+    menu.queue_free()
+    change_scene_to_file("res://lab/main.tscn")
+    await process_frame
+    await process_frame
+    current_scene._open("res://lab/vfx_workshop.tscn")
+    await process_frame
+    await process_frame
+    check(current_scene.scene_file_path=="res://lab/vfx_workshop.tscn","Launch VFX from menu")
+    change_scene_to_file("res://lab/main.tscn")
+    await process_frame
+    await process_frame
+    check(current_scene.scene_file_path=="res://lab/main.tscn","Return to menu")
+    print("Launcher graphical failures: ",failures)
+    quit(0 if failures==0 else 1)
