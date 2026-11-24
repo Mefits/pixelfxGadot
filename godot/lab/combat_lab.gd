@@ -60,7 +60,7 @@ func _ready() -> void:
     add_child(detail)
     var info:=Label.new()
     info.position=Vector2(24,492)
-    info.text="Игрок 1: A/D ходьба, W прыжок, F удар, G магия, S блок\nИгрок 2: стрелки, K удар, L магия | B бот · N динамика · X медленно · C эффекты · M тренировка · R сброс · Tab редактор · Esc"
+    info.text="Игрок 1: A/D ходьба · W прыжок · F удар / в воздухе · H тяжёлый · J ногой · G магия · S блок\nИгрок 2: стрелки · K удар · L магия · O тяжёлый · P ногой | B бот · N динамика · X медл. · C эффекты · M трен. · R сброс · Tab редактор · Esc"
     info.add_theme_font_size_override("font_size",13)
     add_child(info)
     _reset()
@@ -95,16 +95,16 @@ func _pressed(code: Key) -> bool:
 
 func _physics_process(dt: float) -> void:
     if world==null:return
-    var left: Dictionary={"move":float(_pressed(KEY_D))-float(_pressed(KEY_A)),"jump":_pressed(KEY_W),"strike":_pressed(KEY_F),"cast":_pressed(KEY_G),"guard":_pressed(KEY_S)}
-    var right: Dictionary={"move":float(_pressed(KEY_RIGHT))-float(_pressed(KEY_LEFT)),"jump":_pressed(KEY_UP),"strike":_pressed(KEY_K),"cast":_pressed(KEY_L),"guard":_pressed(KEY_DOWN)}
+    var left: Dictionary={"move":float(_pressed(KEY_D))-float(_pressed(KEY_A)),"jump":_pressed(KEY_W),"strike":_pressed(KEY_F),"cast":_pressed(KEY_G),"heavy":_pressed(KEY_H),"kick":_pressed(KEY_J),"guard":_pressed(KEY_S)}
+    var right: Dictionary={"move":float(_pressed(KEY_RIGHT))-float(_pressed(KEY_LEFT)),"jump":_pressed(KEY_UP),"strike":_pressed(KEY_K),"cast":_pressed(KEY_L),"heavy":_pressed(KEY_O),"kick":_pressed(KEY_P),"guard":_pressed(KEY_DOWN)}
     if training:right={}
     elif bot:
         ai_clock+=dt
         var dist: float=world.a.pos.x-world.b.pos.x
         if ai_clock>.85:
             ai_clock=0
-            ai_action=(ai_action+1)%4
-        right={"move":signf(dist) if absf(dist)>31 else 0.0,"strike":absf(dist)<35 and ai_action==0,"cast":absf(dist)<95 and ai_action==1,"guard":ai_action==2 and absf(dist)<70}
+            ai_action=(ai_action+1)%6
+        right={"move":signf(dist) if absf(dist)>31 else 0.0,"strike":absf(dist)<35 and ai_action==0,"cast":absf(dist)<95 and ai_action==1,"guard":ai_action==2 and absf(dist)<70,"heavy":absf(dist)<36 and ai_action==4,"kick":absf(dist)<35 and ai_action==5}
     world.step(dt*(.35 if slow else 1),left,right)
     hp1.value=world.a.hp
     hp2.value=world.b.hp
@@ -119,7 +119,7 @@ func _physics_process(dt: float) -> void:
 func _update_hud() -> void:
     hp1.value=world.a.hp
     hp2.value=world.b.hp
-    detail.text="Динамика: %s · %s · посл. серия %d (макс. %d) · блоков %d · F→F / F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
+    detail.text="Динамика: %s · %s · посл. серия %d (макс. %d) · блоков %d · F→F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
     hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["ТРЕНИРОВКА" if training else ("БОТ" if bot else "2 ИГРОКА"),world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:

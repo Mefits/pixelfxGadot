@@ -66,7 +66,7 @@ func _tick(left: Dictionary,right: Dictionary) -> void:
         if h.blocked:blocks+=1
         else:impacts+=1
         if modern:
-            hitstop=maxf(hitstop,.035 if h.blocked else (.085 if h.amount>=20 else .058))
+            hitstop=maxf(hitstop,.035 if h.blocked else (.108 if h.amount>=25 else (.085 if h.amount>=20 else .058)))
             impact_time=.18
             last_impact=h.p
             flashes.append({"kind":"block" if h.blocked else "impact","a":h.p,"b":h.p,"age":0.0,"life":.16,"direction":h.direction})
@@ -85,7 +85,8 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
             flashes.append({"kind":"charge","a":hand,"b":hand,"age":0.0,"life":.3,"owner":src,"anchor":e.anchor})
         "strike":
             flashes.append({"kind":"strike","a":hand,"b":hand+Vector2(direction*9,-3),"age":0.0,"life":.15})
-            if forward and hand.distance_to(chest)<=19 and dst.hp>0:amount=13
+            if forward and hand.distance_to(chest)<=19 and dst.hp>0:
+                amount=25 if e.attack_kind=="heavy" else (17 if e.attack_kind=="kick" else (15 if e.attack_kind=="air_strike" else 13))
         "cast":
             var target: Vector2=hand+Vector2(direction*104,0)
             # Point-blank targets may be between chest and extended casting hand.
