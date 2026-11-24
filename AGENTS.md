@@ -6,3 +6,5 @@ Read README.md, docs/ROADMAP.md and original/pixelfx/skills/pixelfx/SKILL.md fir
 - For new effects make a separate working copy, perform at least three render/inspect/refine rounds. Show equal-scale original versus result; run upstream check.mjs. Do not fake Godot capture.
 - Preload clips/materials, pool playback, avoid file loads during combat; measure first cast, repeat, switch and simultaneous instances; record p95/p99/max frame time and environment. No measured FPS claim without real evidence.
 - Keep MIT notices. Update status/tests for every implementation. Keep toolkit independent of individual games.
+
+- Optional compiled bolt raster is verified on Windows/Linux Godot 4.4.1. Use enable_acceleration(true) for live lightning; keep GDScript fallback and strict fixture tests. Do not silently substitute the fallback in performance claims. See docs/STATUS.md. Optimize particle drawing and end-to-end frame timing next, not geometry or palette quality.

@@ -11,9 +11,21 @@ Portable package: https://github.com/Mefits/pixelfxGadot/actions/runs/4538292070
 - Bits: three kinds (shard, chunk, drip), six times, zero failures in state and pixels.
 - Live interactive lab: automated scene smoke passed. Full visual quality judgment and representative hardware test still needed.
 ## Performance (Linux GitHub-hosted runner, headless CPU)
-Benchmark: 160x112, one seeded bolt + steady sparks, 120 measured frames, excluding GPU upload. Original GDScript port p95 23.957 ms (55a24ca); first optimized p95 17.874 ms (73d9a8d); current p95 18.251 ms, p50 15.089, p99 18.586, max 23.022. Current stage p95: shape/clear 0.591 ms, ink/glow 16.120 ms, particles 1.561 ms, conversion 0.011 ms. Values are not target laptop FPS. Exact native reference is still too slow for multiple concurrent complex effects; use cached original clips where dynamic endpoints are unnecessary.
+Benchmark: 160x112, one seeded bolt + steady sparks, 120 measured frames, excluding GPU upload. Original GDScript port p95 23.957 ms (55a24ca); first optimized p95 17.874 ms (73d9a8d); current p95 18.251 ms, p50 15.089, p99 18.586, max 23.022. Current stage p95: shape/clear 0.591 ms, ink/glow 16.120 ms, particles 1.561 ms, conversion 0.011 ms. Values are not target laptop FPS. The GDScript reference remains slow; the optional compiled bolt kernel is measured below. Use original offline clips when dynamic endpoints are unnecessary.
 ## Remaining
 - Port remaining Painter primitives, callbacks, sprite/mask/text, native effect lifecycle, actor rig and moves, Blazes and other helpers; complete authored native effects.
-- Accelerate ink/glow while preserving golden fixtures. Next priority: optional compiled GDExtension kernel (C++), with GDScript reference as fallback; benchmark before choosing default. No compiled kernel exists yet.
+- Accelerate ink/glow while preserving golden fixtures. Next priority: optional compiled GDExtension kernel (C++), with GDScript reference as fallback; benchmark before choosing default. The compiled bolt kernel is implemented and verified below.
 - Add actual multi-instance GPU stress test, first-cast warmup, in-game collision adaptation and human visual review.
 - Combined front/back in offline atlas; stock actor pixels in actor-dependent clips; per-clip multi-effect blend order may differ from original shared frame. These are known limitations, not parity claims.
+
+## Compiled raster — verified 2026-11-24
+C++ stroke/crackle preserves the original priority ink, dither, additive light and double-precision coordinate transforms. GDScript geometry/particles are unchanged. It remains optional; no binary is necessary for offline clips or reference mode.
+Build and tests (both Linux x86-64 and Windows x86-64): https://github.com/Mefits/pixelfxGadot/actions/runs/45385289890 (implementation 87585dd).
+- Original JS fixtures: 3 seeded bolts, exact color and light buffers; 6 successful C++ calls, no rejection on each OS.
+- Extra layered comparison versus tested GDScript reference: 32/32 cases, 64 accelerated calls, no rejection on each OS.
+- Same-job benchmark, 160x112, 120 measured frames, one bolt plus steady sparks, no GPU upload:
+  - Linux: GDScript p95 13.940 ms, C++ 1.800 ms; ink/glow 12.265 → 0.229 ms.
+  - Windows: GDScript p95 14.832 ms, C++ 2.021 ms; ink/glow 13.147 → 0.314 ms.
+- Windows cached-geometry raster-only p95 (320x180): 1/4/8/16 bolts = 0.200/0.675/1.334/3.115 ms. Linux = 0.153/0.435/0.963/1.939 ms.
+- New standalone kernel fixtures (714cc8e) add 32 direct upstream JS cases, including transform, clipping and shared buffers; standalone compile/test passed on both OS. Full subsequent workflow: https://github.com/Mefits/pixelfxGadot/actions/runs/45385382698.
+These are host-runner CPU measurements, not the user's laptop FPS. Particle rendering is the next largest cost; GPU upload, first cast, style switch and visual review remain to be measured in a representative game.

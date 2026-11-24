@@ -29,4 +29,9 @@ Use addons/pixelfx/clip_bank.gd to prepare required manifests before combat and 
 Все семь оригинальных экспортов, нативные тесты молний, 12 видов частиц и три типа физических фрагментов прошли подготовленные проверки. Нативный CPU-рендерер ещё требует ускорения; не считать лабораторию готовым высокопроизводительным VFX-движком.
 
 ## Optional C++ accelerator (development)
-Build instructions: [native_cpp/README.md](native_cpp/README.md). The live lightning lab automatically selects the extension if installed; press A to switch to GDScript and compare. The existing package still works without compiled binaries. Cross-platform build, strict parity and timing are tracked by the Optional C++ raster workflow; no speed claim until it passes.
+Build instructions: [native_cpp/README.md](native_cpp/README.md). The live lightning lab automatically selects the extension if installed; press A to switch to GDScript and compare. The existing package still works without compiled binaries. Cross-platform build, strict parity and timing are tracked by the Optional C++ raster workflow; Linux and Windows verification passed; see the measured results in docs/STATUS.md.
+
+### Downloads and installation (Godot 4.4.1, x86-64)
+1. [Portable toolkit](https://github.com/Mefits/pixelfxGadot/actions/runs/45385382460/artifacts/14916235866).
+2. [Windows accelerator](https://github.com/Mefits/pixelfxGadot/actions/runs/45385289890/artifacts/14916126309) or [Linux accelerator](https://github.com/Mefits/pixelfxGadot/actions/runs/45385289890/artifacts/14916185762).
+3. Extract the toolkit; close Godot. Copy the accelerator archive contents (pixelfx.gdextension and bin/ with the corresponding DLL/SO) into godot/addons/pixelfx/. Open godot/project.godot, run, press L for the native lab, hold LMB, A toggles backend. HUD reports C++ or GDScript. To remove the extension, close Godot and remove the descriptor and bin/; GDScript remains usable. No compiler needed when using tested binary. GitHub login may be required for artifacts; artifacts expire according to repository settings.
