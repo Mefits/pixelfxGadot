@@ -62,6 +62,13 @@ var rotation_pivot:=Vector2.ZERO
 var confirm: ConfirmationDialog
 var pending_action: Callable
 var mode_label: Label
+var advanced_mode:bool=false
+var advanced_controls:Array[Control]=[]
+var mode_button:Button
+var play_button:Button
+var delete_button:Button
+var delete_lane:int=0
+var shortcut_hint:Label
 
 func _button(parent: Control,label: String,fn: Callable) -> Button:
     var b:=Button.new()
@@ -95,7 +102,7 @@ func _ready() -> void:
     add_child(bg)
     var title:=Label.new()
     title.position=Vector2(16,9)
-    title.text="РЕДАКТОР АНИМАЦИЙ / позы и ключи"
+    title.text="РЕДАКТОР АНИМАЦИЙ"
     title.add_theme_font_size_override("font_size",21)
     add_child(title)
     var view:=SubViewport.new()
@@ -110,8 +117,8 @@ func _ready() -> void:
     fx_surface.configure(144,108)
     fx_preview.renderer.enable_acceleration()
     picture=TextureRect.new()
-    picture.position=Vector2(16,44)
-    picture.size=Vector2(576,432)
+    picture.position=Vector2(40,44)
+    picture.size=Vector2(528,396)
     picture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
     picture.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
     picture.texture=view.get_texture()
@@ -149,6 +156,7 @@ func _ready() -> void:
     _button(choose_fighter,"Копия",func():copied_pose=pose.duplicate(true))
     _button(choose_fighter,"Вставить",func():
         if not copied_pose.is_empty():pose=copied_pose.duplicate(true);_edit())
+    advanced_controls.append(choose_fighter)
     _label(side,"1. Анимация и длительность")
     var timings:=HBoxContainer.new()
     side.add_child(timings)
@@ -157,6 +165,8 @@ func _ready() -> void:
     _label(timings,"Кадр/с")
     rate=_spin(timings,1,60,1,func(_v:float):pass)
     rate.value=30
+    advanced_controls.append(rate)
+    advanced_controls.append(timings.get_child(2))
     var toggles:=HBoxContainer.new()
     side.add_child(toggles)
     ease=CheckButton.new()
@@ -196,7 +206,7 @@ func _ready() -> void:
     var mirror:=_button(pose_actions,"Зеркало",_mirror_pose)
     mirror.tooltip_text="Поменять ближние и дальние конечности и отразить углы"
     _button(pose_actions,"Угол 0",_zero_joint)
-    _button(pose_actions,"Чистый клип",_ask_blank)
+    advanced_controls.append(_button(pose_actions,"Чистый клип",_ask_blank))
     mode_label=_label(side,"ЛКМ: перемещение · ПКМ: вращение выбранного сустава")
     mode_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     var aids:=HBoxContainer.new()
@@ -212,13 +222,19 @@ func _ready() -> void:
     aids.add_child(ghost)
     ghost.toggled.connect(func(_v:bool):_sync())
     var actions:=HBoxContainer.new()
-    side.add_child(actions)
+    actions.position=Vector2(16,443)
+    actions.size=Vector2(576,32)
+    actions.theme=compact
+    add_child(actions)
     var store:=_button(actions,"Записать ключ",_key)
-    store.tooltip_text="Сохраняет текущую позу в выбранный момент времени"
-    _button(actions,"Удалить",_delete_key)
-    _button(actions,"Пуск/пауза",_play)
+    UI.action_button(store,"Записать ключ (K)",true)
+    delete_button=_button(actions,"Удалить (Del)",_delete_selected)
+    UI.action_button(delete_button,"Удалить выбранный ключ или событие")
+    play_button=_button(actions,"Пуск (Space)",_play)
+    UI.action_button(play_button,"Пуск / пауза (Space)",true)
+    UI.action_button(_button(actions,"Сначала",func():_seek(0)),"В начало (Home)")
     var nav:=HBoxContainer.new()
-    side.add_child(nav)
+    actions.add_child(nav)
     _button(nav,"◀ Ключ",func():_adjacent(-1))
     _button(nav,"Ключ ▶",func():_adjacent(1))
     history_button=_button(nav,"↶",_undo)
@@ -228,7 +244,12 @@ func _ready() -> void:
     keys=ItemList.new()
     keys.custom_minimum_size.y=48
     side.add_child(keys)
-    keys.item_selected.connect(func(i:int): _seek(float(bank[name_id].keys[i].t)))
+    keys.item_selected.connect(func(i:int):
+        delete_lane=0
+        event_list.deselect_all()
+        _seek(float(bank[name_id].keys[i].t))
+        _update_transport())
+    var advanced_start:int=side.get_child_count()
     _label(side,"3. События атаки и эффектов")
     var preview_row:=HBoxContainer.new()
     side.add_child(preview_row)
@@ -262,6 +283,7 @@ func _ready() -> void:
     _button(vfx_actions,"Обновить список",_refresh_vfx_library)
     _refresh_vfx_library()
     _button(side,"Быстрая настройка выбранного VFX",_quick_open)
+    for i in range(advanced_start,side.get_child_count()):advanced_controls.append(side.get_child(i))
     quick_dialog=QUICK.new()
     add_child(quick_dialog)
     quick_dialog.applied.connect(_quick_apply)
@@ -269,10 +291,14 @@ func _ready() -> void:
     save.position=Vector2(604,9)
     save.theme=compact
     add_child(save)
-    _button(save,"Сохранить",_save)
-    _button(save,"Загрузить",_ask_load)
-    _button(save,"Сброс клипа",_ask_default)
-    _button(save,"Выход",func():_go("res://lab/main.tscn"))
+    UI.action_button(_button(save,"Сохранить",_save),"Сохранить (Ctrl+S)",true)
+    UI.action_button(_button(save,"Загрузить",_ask_load),"Загрузить сохранённое")
+    advanced_controls.append(_button(save,"Сброс",_ask_default))
+    UI.action_button(_button(save,"Меню",func():_go("res://lab/main.tscn")),"Главное меню (Esc)")
+    mode_button=_button(self,"Простой ▾",_toggle_mode)
+    mode_button.position=Vector2(388,8)
+    mode_button.size=Vector2(196,30)
+    UI.action_button(mode_button,"Показать или скрыть технические параметры")
     timeline=preload("res://lab/pose_timeline.gd").new()
     timeline.position=Vector2(18,478)
     timeline.size=Vector2(922,40)
@@ -282,8 +308,14 @@ func _ready() -> void:
         if not syncing: _seek(v))
     timeline.marker_moved.connect(_move_marker)
     timeline.marker_selected.connect(func(lane:int,i:int):
-        if lane==0:keys.select(i)
-        else:event_list.select(i))
+        delete_lane=lane
+        if lane==0:
+            keys.select(i)
+            event_list.deselect_all()
+        else:
+            keys.deselect_all()
+            event_list.select(i)
+        _update_transport())
     clock_label=Label.new()
     clock_label.position=Vector2(18,520)
     add_child(clock_label)
@@ -310,6 +342,8 @@ func _ready() -> void:
         fighter_select.disabled=true
         status.text="Шаблон библиотеки: отдельная копия, не банк бойца."
     _choose(name_id)
+    advanced_mode=UI.advanced("animation")
+    _apply_mode()
 
 func _choose(n: String) -> void:
     name_id=n
@@ -356,6 +390,7 @@ func _sync() -> void:
     clock_label.text="%.3f / %.2f с"%[time,bank[name_id].duration]
     syncing=false
     _update_history()
+    _update_transport()
 
 func _draw_vfx() -> void:
     if fx_surface==null or fx_visible==null:return
@@ -406,13 +441,13 @@ func _drag(e: InputEvent) -> void:
             return
         playing=false
         rotation_pivot=rig.point(selected)
-        var mouse: Vector2=e.position/4-preview.origin-rotation_pivot
+        var mouse: Vector2=e.position/(picture.size.x/144.0)-preview.origin-rotation_pivot
         rotating=mouse.length()>1
         rotation_mouse=mouse.angle()
         rotation_start=float(pose.angles.get(selected,0))
         return
     if e is InputEventMouseMotion and rotating:
-        var mouse: Vector2=e.position/4-preview.origin-rotation_pivot
+        var mouse: Vector2=e.position/(picture.size.x/144.0)-preview.origin-rotation_pivot
         if mouse.length()>1:
             pose.angles[selected]=wrapf(rotation_start+rad_to_deg(wrapf(mouse.angle()-rotation_mouse,-PI,PI)),-180,180)
             _edit()
@@ -423,7 +458,7 @@ func _drag(e: InputEvent) -> void:
             dragging=false
             return
         playing=false
-        var target: Vector2=e.position/4-preview.origin
+        var target: Vector2=e.position/(picture.size.x/144.0)-preview.origin
         var nearest: float=5.5
         var picked: String=""
         for j in rig.joints:
@@ -437,7 +472,7 @@ func _drag(e: InputEvent) -> void:
             drag_offset=rig.point(selected)-target
             _sync()
     elif e is InputEventMouseMotion and dragging:
-        var target: Vector2=e.position/4-preview.origin+drag_offset
+        var target: Vector2=e.position/(picture.size.x/144.0)-preview.origin+drag_offset
         if selected=="hips":
             var delta: Vector2=target-rig.point("hips")
             pose.root[0]=clampf(float(pose.root[0])+delta.x,-40,40)
@@ -493,6 +528,8 @@ func _refresh_vfx_library() -> void:
     if not vfx_choices.is_empty():vfx_select.select(0)
 
 func _event_selected(index: int) -> void:
+    delete_lane=1
+    keys.deselect_all()
     var events: Array=bank[name_id].events
     if index<0 or index>=events.size():return
     var e: Dictionary=events[index]
@@ -612,12 +649,32 @@ func _play() -> void:
     if playing and time>=float(bank[name_id].duration):time=0
     _sync()
 
-func _unhandled_input(e: InputEvent) -> void:
-    if e is InputEventKey and e.pressed and not e.echo:
-        if UI.physical_key(e)==KEY_ESCAPE:_go("res://lab/main.tscn")
-        elif UI.physical_key(e)==KEY_SPACE:_play()
-        elif e.ctrl_pressed and UI.physical_key(e)==KEY_Z:_undo()
-        elif e.ctrl_pressed and UI.physical_key(e)==KEY_Y:_redo()
+func _input(e:InputEvent)->void:
+    if not UI.editor_shortcut(self,e):return
+    var key:Key=UI.physical_key(e)
+    if e.ctrl_pressed:
+        match key:
+            KEY_S:_save()
+            KEY_Z:
+                if e.shift_pressed:_redo()
+                else:_undo()
+            KEY_Y:_redo()
+            KEY_C:copied_pose=pose.duplicate(true)
+            KEY_V:
+                if not copied_pose.is_empty():pose=copied_pose.duplicate(true);_edit()
+            _ :return
+    else:
+        match key:
+            KEY_ESCAPE:_go("res://lab/main.tscn")
+            KEY_SPACE:_play()
+            KEY_DELETE:_delete_selected()
+            KEY_HOME:_seek(0)
+            KEY_K:_key()
+            KEY_LEFT:_seek(time-1.0/rate.value)
+            KEY_RIGHT:_seek(time+1.0/rate.value)
+            _ :return
+    get_viewport().set_input_as_handled()
+
 
 func _process(dt: float) -> void:
     if not playing:return
@@ -682,7 +739,11 @@ func _move_marker(lane: int,index: int,t: float) -> void:
     dirty=true
     _seek(t)
     _refresh_lists()
-    if lane==1:event_list.select(arr.find(item))
+    delete_lane=lane
+    if lane==1:
+        keys.deselect_all()
+        event_list.select(arr.find(item))
+    _update_transport()
     status.text="Маркер перемещён: %.3f с"%t
 
 func _mirror_pose() -> void:
@@ -738,3 +799,30 @@ func _ask_load() -> void:
         bank=CLIPS.fighter_bank(fighter_index)
         _choose(name_id)
         dirty=false)
+
+func _delete_selected()->void:
+    if delete_lane==1:
+        if event_list.get_selected_items().is_empty():return
+        _delete_event()
+        status.text="Событие удалено. Ctrl+Z — отменить."
+    else:
+        if keys.get_selected_items().is_empty():return
+        if bank[name_id].keys.size()<=1:
+            status.text="Последний ключ удалить нельзя."
+            return
+        _delete_key()
+        status.text="Ключ удалён. Ctrl+Z — отменить."
+    _update_transport()
+func _update_transport()->void:
+    if play_button!=null:play_button.text="Пауза (Space)" if playing else "Пуск (Space)"
+    if delete_button!=null and keys!=null and event_list!=null:
+        delete_button.disabled=event_list.get_selected_items().is_empty() if delete_lane==1 else (keys.get_selected_items().is_empty() or bank[name_id].keys.size()<=1)
+func _toggle_mode()->void:
+    advanced_mode=not advanced_mode
+    UI.set_advanced("animation",advanced_mode)
+    _apply_mode()
+func _apply_mode()->void:
+    for control in advanced_controls:control.visible=advanced_mode
+    mode_button.text="Расширенный ▾" if advanced_mode else "Простой ▾"
+    status.text="Все параметры и события доступны" if advanced_mode else "Простой: поза, ключи, время. События и VFX — в расширенном."
+    _update_transport()

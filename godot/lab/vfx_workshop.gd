@@ -64,6 +64,14 @@ var loop: bool=true
 var dirty: bool=true
 var syncing: bool=false
 var clock: float=0
+var advanced_mode:bool=false
+var mode_button:Button
+var delete_button:Button
+var undo_button:Button
+var redo_button:Button
+var history:Array[Dictionary]=[]
+var redo_history:Array[Dictionary]=[]
+var advanced_buttons:Array[Control]=[]
 
 func _label(parent: Control,value: String) -> Label:
     var l:=Label.new()
@@ -92,10 +100,14 @@ func _ready() -> void:
     bg.mouse_filter=Control.MOUSE_FILTER_IGNORE
     add_child(bg)
     var title:=Label.new()
-    title.text="КОНСТРУКТОР ЭФФЕКТОВ / PixelFX"
+    title.text="КОНСТРУКТОР ЭФФЕКТОВ"
     title.position=Vector2(12,8)
     title.add_theme_font_size_override("font_size",22)
     add_child(title)
+    mode_button=_button(self,"Простой ▾",_toggle_mode)
+    mode_button.position=Vector2(686,6)
+    mode_button.size=Vector2(262,32)
+    UI.action_button(mode_button,"Показать форму, кривые и боевые привязки")
     var left:=VBoxContainer.new()
     left.position=Vector2(12,44)
     left.size=Vector2(172,475)
@@ -108,10 +120,13 @@ func _ready() -> void:
     name_edit=LineEdit.new()
     name_edit.placeholder_text="Имя эффекта"
     left.add_child(name_edit)
-    name_edit.text_changed.connect(func(v:String):preset.name=v)
+    name_edit.text_changed.connect(func(v:String):
+        if v!=preset.name:
+            _remember()
+            preset.name=v)
     var io:=HBoxContainer.new()
     left.add_child(io)
-    _button(io,"Сохранить",_save)
+    UI.action_button(_button(io,"Сохранить",_save),"Ctrl+S",true)
     _button(io,"Загрузить",_load)
     library=OptionButton.new()
     library.fit_to_longest_item=false
@@ -119,7 +134,7 @@ func _ready() -> void:
     left.add_child(library)
     _label(left,"СЛОИ (порядок)")
     list=ItemList.new()
-    list.custom_minimum_size=Vector2(166,185)
+    list.custom_minimum_size=Vector2(166,144)
     left.add_child(list)
     list.item_selected.connect(func(i:int):selected=i;_sync_fields())
     kind=_option(left,P.TYPES,func(_i:int):pass)
@@ -129,12 +144,19 @@ func _ready() -> void:
     left.add_child(addrow)
     _button(addrow,"+ Слой",_add_layer)
     _button(addrow,"Копия",_copy_layer)
-    _button(addrow,"−",_delete_layer)
+    delete_button=_button(addrow,"Del",_delete_selected)
+    UI.action_button(delete_button,"Удалить выбранный слой (Delete). Последний слой защищён.")
     var order:=HBoxContainer.new()
     left.add_child(order)
     _button(order,"↑",func():_move_layer(-1))
     _button(order,"↓",func():_move_layer(1))
     _button(order,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
+    var history_row:=HBoxContainer.new()
+    left.add_child(history_row)
+    undo_button=_button(history_row,"↶ Отмена",_undo)
+    redo_button=_button(history_row,"↷ Повтор",_redo)
+    undo_button.tooltip_text="Ctrl+Z"
+    redo_button.tooltip_text="Ctrl+Y / Ctrl+Shift+Z"
     status=_label(left,"")
     status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     var viewport:=SubViewport.new()
@@ -157,21 +179,23 @@ func _ready() -> void:
     controls.position=Vector2(194,366)
     add_child(controls)
     play_button=_button(controls,"Пауза",_toggle_play)
+    UI.action_button(play_button,"Пуск / пауза (Space)",true)
     _button(controls,"Сначала",func():time=0;playing=true;dirty=true)
     _button(controls,"Цикл",func():loop=not loop;status.text="Цикл: "+str(loop))
     _button(controls,"Движение",func():stage.moving=not stage.moving;dirty=true)
     _button(controls,"Фон",func():stage.bright=not stage.bright;dirty=true)
-    var variant:=_button(controls,"Вариант",func():preset.seed=int(preset.seed)+1;dirty=true)
+    var variant:=_button(controls,"Вариант",func():_remember();preset.seed=int(preset.seed)+1;dirty=true)
     variant.tooltip_text="Новая случайная конфигурация при тех же параметрах"
-    _button(controls,"C++",func():renderer.enable_acceleration(not renderer.accelerated);dirty=true)
+    advanced_buttons.append(_button(controls,"C++",func():renderer.enable_acceleration(not renderer.accelerated);dirty=true))
     var compare_row:=HBoxContainer.new()
     compare_row.position=Vector2(194,394)
     add_child(compare_row)
-    _button(compare_row,"Запомнить A",_capture_reference)
+    advanced_buttons.append(_button(compare_row,"Запомнить A",_capture_reference))
     compare_button=_button(compare_row,"A / B",_toggle_compare)
     compare_button.disabled=true
-    _button(compare_row,"Сброс масштаба",func():timeline.reset_view())
-    _button(compare_row,"Быстрая настройка",_quick_open)
+    advanced_buttons.append(compare_button)
+    advanced_buttons.append(_button(compare_row,"Сброс масштаба",func():timeline.reset_view()))
+    UI.action_button(_button(compare_row,"Быстрая настройка эффекта",_quick_open),"Размер, сила, длительность и цвет",true)
     quick_dialog=QUICK.new()
     add_child(quick_dialog)
     quick_dialog.applied.connect(_quick_apply)
@@ -392,12 +416,15 @@ func _ready() -> void:
             if l.type=="trail":stage.moving=true;stage.sweep=true;break
         status.text="Библиотека: сохранение в отдельную копию."
     _refresh()
+    advanced_mode=UI.advanced("vfx")
+    _apply_mode()
 func _quick_open() -> void:
     playing=false
     quick_dialog.open_for(preset)
 
 func _quick_apply(value: Dictionary) -> void:
     if not P.valid(value):return
+    _remember()
     # Preserve the old effect for A/B comparison before applying.
     _capture_reference()
     preset=value
@@ -430,6 +457,7 @@ func _unbind_current() -> void:
 func _load_bound() -> void:
     var role: String=BINDINGS.ROLES[maxi(0,binding_role.selected)]
     if not binding_bank.has(role):return
+    _remember()
     preset=binding_bank[role].duplicate(true)
     selected=0
     stage.sweep=false
@@ -494,6 +522,7 @@ func _effect_duration() -> float:
     return maxf(P.duration(preset),P.duration(reference)) if compare_labels!=null and compare_labels.visible else P.duration(preset)
 
 func _select_demo(i: int) -> void:
+    _remember()
     preset=P.demo(i)
     preset.name=UI.label(preset.name)
     selected=0
@@ -516,6 +545,8 @@ func _seek(v: float) -> void:
     dirty=true
 func _change(key: String,v: Variant) -> void:
     if syncing:return
+    if preset.layers[selected][key]==v:return
+    _remember()
     preset.layers[selected][key]=v
     if key=="type":
         var l: Dictionary=preset.layers[selected]
@@ -548,6 +579,7 @@ func _refresh() -> void:
     list.select(selected)
     name_edit.text=preset.name
     _sync_fields()
+    _update_history_buttons()
 func _sync_fields() -> void:
     syncing=true
     var l: Dictionary=preset.layers[selected]
@@ -593,6 +625,7 @@ func _trail_change(key: String,value: Variant) -> void:
     if syncing:return
     var l: Dictionary=preset.layers[selected]
     if l.type!="trail":return
+    _remember()
     l.trail[key]=value
     _sync_trail()
     _sync_visibility()
@@ -623,6 +656,7 @@ func _organic_change(key: String,value: Variant) -> void:
     if syncing:return
     var l: Dictionary=preset.layers[selected]
     if not l.type in P.ORGANIC_TYPES:return
+    _remember()
     l.organic[key]=value
     dirty=true
 
@@ -654,6 +688,7 @@ func _field_change(key: String,value: Variant) -> void:
     if syncing:return
     var l: Dictionary=preset.layers[selected]
     if not l.type in P.FIELD_TYPES:return
+    _remember()
     l.field[key]=value
     dirty=true
 
@@ -687,6 +722,7 @@ func _toggle_emitter(enabled: bool) -> void:
     if syncing:return
     var l: Dictionary=preset.layers[selected]
     if not l.type in P.PARTICLE_TYPES:return
+    _remember()
     if enabled:
         l.emitter=P.emitter_defaults()
         l.emitter.life=float(l.duration) if float(l.duration)<=3.0 else 3.0
@@ -700,6 +736,7 @@ func _emitter_change(key: String,value: Variant) -> void:
     if syncing:return
     var l: Dictionary=preset.layers[selected]
     if not P.is_stream(l):return
+    _remember()
     l.emitter[key]=value
     _emitter_summary()
     dirty=true
@@ -728,6 +765,7 @@ func _sync_visibility() -> void:
     if not particle and curve_channel==2:curve_channel=0
     curve_selector.set_item_disabled(2,not particle)
     curve_selector.select(curve_channel)
+    _simple_fields()
 
 func _sync_curve() -> void:
     if graph==null:return
@@ -765,6 +803,7 @@ func _update_curve_cursor() -> void:
 func _toggle_curve() -> void:
     var l: Dictionary=preset.layers[selected]
     var channel: String=P.CHANNELS[curve_channel]
+    _remember()
     if P.has_curve(l,channel):
         l.curves.erase(channel)
         if l.curves.is_empty():l.erase("curves")
@@ -778,27 +817,32 @@ func _curve_changed(points: Array) -> void:
     var l: Dictionary=preset.layers[selected]
     var channel: String=P.CHANNELS[curve_channel]
     if P.has_curve(l,channel) and P.valid_points(channel,points):
+        _remember()
         l.curves[channel]=points.duplicate(true)
         _update_curve_controls()
         dirty=true
 
 func _add_layer() -> void:
     if preset.layers.size()>=P.MAX_LAYERS:return
+    _remember()
     preset.layers.append(P.layer(P.TYPES[kind.selected]))
     selected=preset.layers.size()-1
     _refresh()
 func _copy_layer() -> void:
     if preset.layers.size()>=P.MAX_LAYERS:return
+    _remember()
     preset.layers.insert(selected+1,preset.layers[selected].duplicate(true))
     selected+=1
     _refresh()
 func _delete_layer() -> void:
     if preset.layers.size()<=1:return
+    _remember()
     preset.layers.remove_at(selected)
     _refresh()
 func _move_layer(delta: int) -> void:
     var other: int=selected+delta
     if other<0 or other>=preset.layers.size():return
+    _remember()
     var l: Dictionary=preset.layers[selected]
     preset.layers[selected]=preset.layers[other]
     preset.layers[other]=l
@@ -824,6 +868,7 @@ func _load() -> void:
     if library.selected<0:return
     var value: Dictionary=P.load_preset(P.FOLDER.path_join(library.get_item_text(library.selected)))
     if value.is_empty():status.text="Неверный файл";return
+    _remember()
     preset=value
     selected=0
     stage.sweep=false
@@ -872,5 +917,82 @@ func _process(dt: float) -> void:
         timeline.tooltip_text="ЛКМ — время и слой. Колесо — масштаб. СКМ — сдвиг. "+perf.text
         dirty=false
     play_button.text="Пауза" if playing else "Пуск"
-func _unhandled_input(e: InputEvent) -> void:
-    if e is InputEventKey and e.pressed and not e.echo and UI.physical_key(e)==KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
+func _input(e:InputEvent)->void:
+    if not UI.editor_shortcut(self,e):return
+    var key:Key=UI.physical_key(e)
+    if e.ctrl_pressed:
+        match key:
+            KEY_S:_save()
+            KEY_Z:
+                if e.shift_pressed:_redo()
+                else:_undo()
+            KEY_Y:_redo()
+            KEY_D:_copy_layer()
+            _ :return
+    else:
+        match key:
+            KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
+            KEY_SPACE:_toggle_play()
+            KEY_DELETE:_delete_selected()
+            KEY_HOME:_seek(0)
+            KEY_LEFT:_seek(time-1.0/30)
+            KEY_RIGHT:_seek(time+1.0/30)
+            _ :return
+    get_viewport().set_input_as_handled()
+
+
+func _remember()->void:
+    if syncing:return
+    history.append({"preset":preset.duplicate(true),"selected":selected})
+    if history.size()>64:history.pop_front()
+    redo_history.clear()
+    _update_history_buttons()
+func _update_history_buttons()->void:
+    if undo_button!=null:undo_button.disabled=history.is_empty()
+    if redo_button!=null:redo_button.disabled=redo_history.is_empty()
+    if delete_button!=null:delete_button.disabled=preset.layers.size()<=1
+func _restore_snapshot(snapshot:Dictionary)->void:
+    preset=snapshot.preset.duplicate(true)
+    selected=int(snapshot.selected)
+    _refresh()
+    _update_history_buttons()
+func _undo()->void:
+    if history.is_empty():return
+    redo_history.append({"preset":preset.duplicate(true),"selected":selected})
+    _restore_snapshot(history.pop_back())
+    status.text="Изменение отменено"
+func _redo()->void:
+    if redo_history.is_empty():return
+    history.append({"preset":preset.duplicate(true),"selected":selected})
+    _restore_snapshot(redo_history.pop_back())
+    status.text="Изменение повторено"
+func _delete_selected()->void:
+    if inspector.current_tab==2 and graph.has_focus():
+        if not graph.delete_chosen():status.text="Выбери внутреннюю точку кривой."
+        return
+    if preset.layers.size()<=1:
+        status.text="Последний слой удалить нельзя."
+        return
+    _delete_layer()
+    status.text="Слой удалён. Ctrl+Z — отменить."
+    _update_history_buttons()
+func _toggle_mode()->void:
+    advanced_mode=not advanced_mode
+    UI.set_advanced("vfx",advanced_mode)
+    _apply_mode()
+func _simple_fields()->void:
+    if mode_button==null:return
+    for key in ["curve","x","y","end_size","end_alpha","follow"]:
+        field_rows[key].visible=advanced_mode and (key!="follow" or preset.layers[selected].type!="trail")
+    if not advanced_mode:
+        for key in ["collision","count","spread","angle","gravity","speed","end_speed"]:field_rows[key].hide()
+func _apply_mode()->void:
+    if not advanced_mode:
+        inspector.current_tab=0
+        if compare_picture!=null and compare_picture.visible:_toggle_compare()
+    for i in range(1,inspector.get_tab_count()):inspector.set_tab_hidden(i,not advanced_mode)
+    for b in advanced_buttons:b.visible=advanced_mode
+    mode_button.text="Расширенный ▾" if advanced_mode else "Простой ▾"
+    _sync_visibility()
+    _update_history_buttons()
+    status.text="Все параметры доступны" if advanced_mode else "Простой: цвет, размер, время, свечение. Остальное — в расширенном."
