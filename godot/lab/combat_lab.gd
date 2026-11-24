@@ -8,6 +8,8 @@ const L=preload("res://addons/pixelfx/native/lightning.gd")
 const BATCH=preload("res://addons/pixelfx/native/batch.gd")
 const PAL=preload("res://addons/pixelfx/native/palette.gd")
 const RNG=preload("res://addons/pixelfx/native/rng.gd")
+const FX=preload("res://addons/creature/vfx_runtime.gd")
+const BINDINGS=preload("res://addons/creature/vfx_bindings.gd")
 var world
 var canvas
 var surface
@@ -83,6 +85,8 @@ func _bar(at: Vector2) -> ProgressBar:
 
 func _reset() -> void:
     world=COMBAT.new(CLIPS.fighter_bank(0),CLIPS.fighter_bank(1))
+    world.custom_vfx=FX.new(BINDINGS.load_bank())
+    world.custom_vfx.renderer.enable_acceleration(cpp)
     canvas.world=world
     world.modern=modern
     if training:
@@ -131,6 +135,7 @@ func _vfx() -> void:
         return
     var d=batch.begin(p)
     for f in world.flashes:
+        if f.get("custom",false):continue
         var k: float=1-f.age/f.life
         if f.kind=="charge":
             var a: Vector2=f.owner.point(f.anchor)
@@ -154,12 +159,14 @@ func _vfx() -> void:
             d.glow(p0.x,p0.y,12,color,.6*k)
     batch.finish()
     for f in world.flashes:
+        if f.get("custom",false):continue
         if f.kind=="cast":
             var a: Vector2=f.a
             var b: Vector2=f.b
             var k: float=1-f.age/f.life
             var r=RNG.new(int(f.age*30)+121)
             bolt.stroke(p,L.zigzag(r,a.x,a.y,b.x,b.y,.24,.5),k,palette,.65)
+    world.custom_vfx.draw(p,146.0)
     surface.present()
     vfx_ms=(Time.get_ticks_usec()-start)/1000.0
 

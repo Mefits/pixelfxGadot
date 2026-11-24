@@ -25,10 +25,10 @@ func enable_acceleration(on: bool=true) -> bool:
 func origin(name: String,t: float,anchors: Dictionary,provider: Callable) -> Vector2:
     if provider.is_valid():return provider.call(name,t)
     return anchors.get(name,anchors.get("origin",Vector2.ZERO))
-func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_y: float=INF,provider: Callable=Callable()) -> void:
+func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_y: float=INF,provider: Callable=Callable(),clear: bool=true,placement: Vector2=Vector2.ZERO,flip: bool=false) -> void:
     var stamp: int=Time.get_ticks_usec()
-    painter.clear()
-    painter.place(0,0)
+    if clear:painter.clear()
+    painter.place(placement.x,placement.y,flip)
     painter.fade=1.0
     painter.light_k=1.0
     active_layers=0

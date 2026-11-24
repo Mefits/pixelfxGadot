@@ -6,6 +6,10 @@ const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
 const STAGE=preload("res://lab/vfx_stage.gd")
 const TIMELINE=preload("res://lab/vfx_timeline.gd")
 const GRAPH=preload("res://lab/vfx_curve_editor.gd")
+const BINDINGS=preload("res://addons/creature/vfx_bindings.gd")
+var binding_bank: Dictionary={}
+var binding_role: OptionButton
+var binding_info: Label
 var preset: Dictionary=P.demo()
 var renderer=R.new()
 var stage
@@ -187,6 +191,21 @@ func _ready() -> void:
     var right: VBoxContainer=_inspector_page("Слой")
     var shape_page: VBoxContainer=_inspector_page("Форма")
     var curve_page: VBoxContainer=_inspector_page("Кривые")
+    var combat_page: VBoxContainer=_inspector_page("Бой")
+    _label(combat_page,"ЭФФЕКТ ДЛЯ СОБЫТИЯ")
+    binding_bank=BINDINGS.load_bank()
+    binding_role=_option(combat_page,["Заряд","Магия","Удар","Удар другой рукой","Тяжёлый удар","Удар ногой","Удар в воздухе","Попадание","Блок"],func(_i:int):_binding_sync())
+    binding_role.fit_to_longest_item=false
+    binding_role.clip_text=true
+    _button(combat_page,"Назначить текущий",_bind_current)
+    _button(combat_page,"Вернуть стандартный",_unbind_current)
+    _button(combat_page,"Открыть привязанный",_load_bound)
+    _button(combat_page,"В боевую лабораторию",func():get_tree().change_scene_to_file("res://lab/combat_lab.tscn"))
+    binding_info=_label(combat_page,"")
+    binding_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    var binding_hint: Label=_label(combat_page,"Назначение хранит копию эффекта. Редактируй и назначай заново. В бою «Рука» означает конечность из маркера анимации, в том числе ногу; «Цель» — точка события.")
+    binding_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    _binding_sync()
     _label(right,"ПАРАМЕТРЫ СЛОЯ")
     for spec in [["type","Тип",P.TYPES],["anchor","Привязка",P.ANCHORS],["curve","Кривая",P.CURVES]]:
         var row:=HBoxContainer.new()
@@ -356,6 +375,36 @@ func _ready() -> void:
     renderer.enable_acceleration()
     _library()
     _refresh()
+func _binding_sync() -> void:
+    if binding_info==null:return
+    var role: String=BINDINGS.ROLES[maxi(0,binding_role.selected)]
+    binding_info.text="Назначен: "+str(binding_bank[role].name) if binding_bank.has(role) else "Стандартный эффект."
+
+func _bind_current() -> void:
+    var role: String=BINDINGS.ROLES[maxi(0,binding_role.selected)]
+    var next: Dictionary=binding_bank.duplicate(true)
+    next[role]=preset.duplicate(true)
+    if BINDINGS.save_bank(next):
+        binding_bank=next
+        _binding_sync()
+    else:binding_info.text="Не удалось сохранить назначение."
+
+func _unbind_current() -> void:
+    var role: String=BINDINGS.ROLES[maxi(0,binding_role.selected)]
+    var next: Dictionary=binding_bank.duplicate(true)
+    next.erase(role)
+    if BINDINGS.save_bank(next):
+        binding_bank=next
+        _binding_sync()
+    else:binding_info.text="Не удалось сохранить назначение."
+
+func _load_bound() -> void:
+    var role: String=BINDINGS.ROLES[maxi(0,binding_role.selected)]
+    if not binding_bank.has(role):return
+    preset=binding_bank[role].duplicate(true)
+    selected=0
+    _refresh()
+
 func _inspector_page(label_text: String) -> VBoxContainer:
     var scroll:=ScrollContainer.new()
     scroll.name=label_text
