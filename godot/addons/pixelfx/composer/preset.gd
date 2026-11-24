@@ -57,7 +57,7 @@ static func valid(p: Variant) -> bool:
 static func duration(p: Dictionary) -> float:
     var d: float=.05
     for l in p.layers:
-        if l.enabled:d=maxf(d,float(l.start)+float(l.duration))
+        d=maxf(d,float(l.start)+float(l.duration))
     return d
 static func curve(u: float,kind: String) -> float:
     u=clampf(u,0,1)

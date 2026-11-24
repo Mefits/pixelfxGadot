@@ -25,7 +25,22 @@ func _run() -> void:
         check(renderer.active_layers==0 and paint.color.count(0)==paint.color.size() and paint.light.count(0)==paint.light.size(),"Effect expires")
     var p: Dictionary=P.demo()
     check(P.save_preset(p,"user://test_composed_fx.json"),"Save")
-    check(P.load_preset("user://test_composed_fx.json")==p,"Roundtrip")
+    var loaded: Dictionary=P.load_preset("user://test_composed_fx.json")
+    check(P.valid(loaded),"Loaded preset valid")
+    if not loaded.is_empty():
+        check(loaded.name==p.name and int(loaded.seed)==int(p.seed) and loaded.layers.size()==p.layers.size(),"Roundtrip metadata")
+        for i in range(p.layers.size()):
+            for key in p.layers[i]:
+                var expected: Variant=p.layers[i][key]
+                var actual: Variant=loaded.layers[i].get(key)
+                if expected is int or expected is float:
+                    check((actual is float or actual is int) and is_equal_approx(float(expected),float(actual)),"Roundtrip numeric "+key)
+                else:check(actual==expected,"Roundtrip field "+key)
+        for t in [.1,.25,.4,.6]:
+            renderer.render(paint,p,t,anchors,128)
+            var original: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+            renderer.render(paint,loaded,t,anchors,128)
+            check(original==paint.rgba_bytes()+paint.rgba_bytes(true),"Roundtrip pixel equality")
     p.layers[0].duration=-1
     check(not P.valid(p),"Reject invalid data")
     var q: Dictionary={"schema":1,"name":"anchor","seed":1,"layers":[P.layer("glow")]}
