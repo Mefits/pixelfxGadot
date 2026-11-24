@@ -79,13 +79,17 @@ static func scan()->Array:
     for i in range(2):
         var path:String=C.SAVE_PATH if i==0 else C.SECOND_PATH
         if not FileAccess.file_exists(path):continue
-        var data:Variant=JSON.parse_string(FileAccess.get_file_as_string(path))
+        var f:=FileAccess.open(path,FileAccess.READ)
+        if f==null or f.get_length()>8*1024*1024:continue
+        var data:Variant=JSON.parse_string(f.get_as_text())
         if not C.valid(data):continue
         var bank:Dictionary=C.complete(data)
         for slot in C.NAMES:out.append(entry("saved_%d_"%i+slot,"animation",UI.label(slot)+" · Боец "+str(i+1),{"slot":slot,"clip":bank[slot]},"saved"))
     if FileAccess.file_exists(A.PATH):
-        var profile:Variant=JSON.parse_string(FileAccess.get_file_as_string(A.PATH))
-        if A.valid(profile):out.append(entry("saved_ability","ability",profile.name,profile,"saved"))
+        var f:=FileAccess.open(A.PATH,FileAccess.READ)
+        if f!=null and f.get_length()<=8*1024*1024:
+            var profile:Variant=JSON.parse_string(f.get_as_text())
+            if A.valid(profile):out.append(entry("saved_ability","ability",profile.name,profile,"saved"))
     return out
 
 static func save_copy(value:Dictionary,replace_id:String="")->Dictionary:

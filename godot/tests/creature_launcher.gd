@@ -42,7 +42,7 @@ func _run() -> void:
         check(saved.id==copy.id and builtin.payload.name!=edited.name,"Only copy updated")
         DirAccess.remove_absolute(path)
     set_meta(CAT.HANDOFF,builtin)
-    check(not CAT.consume(self,"vfx").is_empty() and not get_tree().has_meta(CAT.HANDOFF),"One-shot handoff")
+    check(not CAT.consume(self,"vfx").is_empty() and not has_meta(CAT.HANDOFF),"One-shot handoff")
     var dir: String=ProjectSettings.globalize_path("res://../reports")
     DirAccess.make_dir_recursive_absolute(dir)
     await RenderingServer.frame_post_draw
@@ -64,5 +64,21 @@ func _run() -> void:
     await process_frame
     await process_frame
     check(current_scene.scene_file_path=="res://lab/main.tscn","Return to menu")
+    for kind in CAT.KINDS:
+        var entry:Dictionary={}
+        for candidate in CAT.builtins():
+            if candidate.kind==kind:entry=candidate;break
+        set_meta(CAT.HANDOFF,entry)
+        change_scene_to_file("res://lab/"+CAT.ROUTES[kind]+".tscn")
+        await process_frame
+        await process_frame
+        check(not has_meta(CAT.HANDOFF) and current_scene.catalog_entry.id==entry.id,"Editor receives catalogue template: "+kind)
+        if kind=="animation":check(current_scene.name_id==entry.payload.slot and current_scene.clip_select.disabled,"Isolated animation slot")
+        if kind=="vfx":check(current_scene.preset.name==entry.payload.name,"Selected VFX opened")
+        if kind=="ability":check(current_scene.ability_profile.name==entry.payload.name,"Selected ability opened")
+        if kind=="creature":check(current_scene.creature.tail_count==entry.payload.tail,"Selected creature configuration opened")
+        change_scene_to_file("res://lab/main.tscn")
+        await process_frame
+        await process_frame
     print("Launcher graphical failures: ",failures)
     quit(0 if failures==0 else 1)

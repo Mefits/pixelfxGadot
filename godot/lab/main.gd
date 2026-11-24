@@ -199,6 +199,7 @@ func _copy_entry()->void:
     if e.is_empty():return
     var value:Dictionary=e.duplicate(true)
     value.name=(str(e.name)+" — копия").left(120)
+    if e.kind in ["vfx","ability"]:value.payload.name=value.name
     var saved:Dictionary=CAT.save_copy(value)
     if saved.is_empty():status.text="Не удалось сохранить копию";return
     _reload()
