@@ -271,6 +271,23 @@ func _bindings() -> void:
     check(saw_custom and frozen and w.hits==vanilla.hits and w.b.hp==vanilla.b.hp,"Visual binding does not alter combat")
     print("Binding integration checks complete")
 
+# JSON has one numeric type; compare values recursively rather than Variant identity.
+# Require all keys, ordered arrays and exact nonnumeric values.
+func _json_equal(a: Variant,b: Variant) -> bool:
+    if a is int or a is float:
+        return (b is int or b is float) and absf(float(a)-float(b))<=1e-10*maxf(1.0,absf(float(a)))
+    if a is Dictionary:
+        if not b is Dictionary or a.size()!=b.size():return false
+        for key in a:
+            if not b.has(key) or not _json_equal(a[key],b[key]):return false
+        return true
+    if a is Array:
+        if not b is Array or a.size()!=b.size():return false
+        for i in range(a.size()):
+            if not _json_equal(a[i],b[i]):return false
+        return true
+    return typeof(a)==typeof(b) and a==b
+
 func _marker_integration() -> void:
     var C=preload("res://addons/creature/clips.gd")
     var W=preload("res://addons/creature/combat.gd")
@@ -283,7 +300,21 @@ func _marker_integration() -> void:
     check(C.valid(bank),"Embedded VFX valid")
     check(C.save_bank(bank,"user://test_vfx_markers.json"),"Save clip markers")
     var loaded: Dictionary=C.load_bank("user://test_vfx_markers.json")
-    check(loaded.strike.events.size()==3 and loaded.strike.events[1].preset==p,"Embedded preset survives save")
+    check(_json_equal(bank,loaded),"Whole animation bank survives JSON roundtrip")
+    if loaded.strike.events.size()==3:
+        var renderer=R.new()
+        var paint=PAINT.new(240,160)
+        var anchors: Dictionary={"origin":Vector2(80,80),"hand":Vector2(80,80),"target":Vector2(145,80)}
+        for index in [1,2]:
+            var before: Dictionary=bank.strike.events[index].preset
+            var after: Dictionary=loaded.strike.events[index].preset
+            check(P.valid(after) and _json_equal(before,after),"Embedded preset data survives save")
+            for sample in [.13,.37,.59]:
+                renderer.render(paint,before,sample,anchors,128)
+                var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+                renderer.render(paint,after,sample,anchors,128)
+                check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Embedded preset color/light pixel parity")
+    else:check(false,"Embedded marker count survives save")
     var invalid: Dictionary=bank.duplicate(true)
     invalid.strike.events[1].preset.layers[0].size=-2
     check(not C.valid(invalid),"Reject invalid embedded preset")

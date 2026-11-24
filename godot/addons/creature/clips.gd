@@ -117,7 +117,7 @@ static func save_bank(bank: Dictionary,path: String=SAVE_PATH) -> bool:
     if not valid(bank): return false
     var f=FileAccess.open(path,FileAccess.WRITE)
     if f==null: return false
-    f.store_string(JSON.stringify(bank,"  "))
+    f.store_string(JSON.stringify(bank,"  ",true,true))
     return true
 
 static func load_bank(path: String=SAVE_PATH) -> Dictionary:
