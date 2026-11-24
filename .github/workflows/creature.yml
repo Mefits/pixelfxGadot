@@ -1,0 +1,58 @@
+name: Animation Creature Lab
+on:
+  push:
+    branches: [feature/animation-creature-lab]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: creature-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: PixelFX-Godot-Toolkit-Complete
+          run-id: 45397546384
+          github-token: ${{ github.token }}
+          path: /tmp/complete
+      - name: Overlay new module on verified complete package
+        run: |
+          test -f /tmp/complete/godot/project.godot
+          cp -a godot/addons/creature /tmp/complete/godot/addons/
+          cp -a godot/lab/{pose_workshop,combat_lab,combat_canvas,creature_preview,main}.gd /tmp/complete/godot/lab/
+          cp -a godot/lab/{pose_workshop,combat_lab}.tscn /tmp/complete/godot/lab/
+          cp godot/tests/creature.gd /tmp/complete/godot/tests/
+          cp docs/CREATURE_LAB.md /tmp/complete/docs/
+          cp SKILL.md AGENTS.md PORTABLE.md /tmp/complete/
+          printf '%s\n' "$GITHUB_SHA" > /tmp/complete/CREATURE_REVISION.txt
+      - name: Install Godot
+        run: |
+          curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          ln -s /tmp/godot/Godot_v4.4.1-stable_linux.x86_64 /tmp/godot/godot
+          echo /tmp/godot >> "$GITHUB_PATH"
+      - name: Verify module and scenes
+        shell: bash
+        run: |
+          set -o pipefail
+          cd /tmp/complete/godot
+          godot --headless --editor --import 2>&1 | tee /tmp/import.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log
+          timeout 30s godot --headless --script res://tests/creature.gd 2>&1 | tee /tmp/test.log
+          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/test.log
+          for scene in pose_workshop combat_lab; do
+            godot --headless res://lab/$scene.tscn --quit-after 120 2>&1 | tee /tmp/$scene.log
+            ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/$scene.log
+          done
+          rm -rf .godot
+          find . -name '*.import' -delete
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Animation-Creature-Lab-Complete
+          path: /tmp/complete/

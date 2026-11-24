@@ -52,6 +52,14 @@ func _ready() -> void:
     perf = Label.new()
     perf.position = Vector2(24, 124)
     layer.add_child(perf)
+    for spec in [["Pose Workshop", "res://lab/pose_workshop.tscn"],["Combat Lab","res://lab/combat_lab.tscn"]]:
+        var b:=Button.new()
+        b.text=spec[0]
+        b.position=Vector2(640 if spec[0]=="Pose Workshop" else 795,52)
+        b.size=Vector2(145,35)
+        layer.add_child(b)
+        var dest: String=spec[1]
+        b.pressed.connect(func():get_tree().change_scene_to_file(dest))
     if not paths.is_empty():
         _select(0)
 
@@ -68,7 +76,7 @@ func _select(i: int) -> void:
     var clip = CLIP.read_clip(paths[i])
     if clip != null:
         clips[i] = clip
-        status.text = "Ready | Click: play | Space: stress | L: live | O: orb | K: workshop | H: chain | E: electrified | J: originals | B/M/C"
+        status.text = "Ready | Click: play | Space: stress | L: live | O: orb | K: workshop | H: chain | E: electrified | J: originals | U: poses | T: combat"
     else:
         status.text = "Clip load failed; inspect import and manifest."
 
@@ -86,6 +94,10 @@ func _unhandled_input(event: InputEvent) -> void:
             queue_redraw()
         elif event.keycode == KEY_M:
             mirrored = not mirrored
+        elif event.keycode == KEY_U:
+            get_tree().change_scene_to_file("res://lab/pose_workshop.tscn")
+        elif event.keycode == KEY_T:
+            get_tree().change_scene_to_file("res://lab/combat_lab.tscn")
         elif event.keycode == KEY_J:
             get_tree().change_scene_to_file("res://lab/original_catalog.tscn")
         elif event.keycode == KEY_E:
