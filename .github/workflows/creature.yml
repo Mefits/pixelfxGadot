@@ -48,6 +48,8 @@ jobs:
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/test.log
           timeout 30s godot --headless --script res://tests/creature_physics.gd 2>&1 | tee /tmp/physics.log
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/physics.log
+          timeout 30s godot --headless --script res://tests/creature_hybrid.gd 2>&1 | tee /tmp/hybrid.log
+          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/hybrid.log
           for scene in pose_workshop combat_lab physics_lab; do
             godot --headless res://lab/$scene.tscn --quit-after 120 2>&1 | tee /tmp/$scene.log
             ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/$scene.log

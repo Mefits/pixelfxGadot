@@ -16,6 +16,8 @@ var step_clock: float=0
 var last_dir: float=1
 var surface_normal:=Vector2.UP
 var current_height: float=18
+var override_leg: int=-1
+var rear_height_offset: float=0
 
 func setup(body) -> void:
     legs.clear()
@@ -74,7 +76,12 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         phase=1-phase
     last_dir=direction
     # Refresh world-space contacts and choose a diagonal gait group.
-    for l in legs:
+    for i in range(legs.size()):
+        var l: Dictionary=legs[i]
+        if i==override_leg:
+            l.planted=false
+            l.swing=false
+            continue
         var hip: Vector2=body.nodes[l.parent].p
         var bias: float=(4.0 if l.parent==0 else -4.0)*direction+float(l.side)*2
         var desired: float=hip.x+bias+axis*stride
@@ -117,7 +124,7 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         y/=active.size()
         var height: float=y-float(n.p.y)
         # Compress support posture below low ceilings, without shrinking collision circles.
-        var desired_height: float=rest_height
+        var desired_height: float=rest_height+(rear_height_offset if parent==1 else 0)
         for box in body.obstacles:
             if float(n.p.x)>=box.position.x-7 and float(n.p.x)<=box.end.x+7 and box.end.y<float(n.p.y) and box.end.y>y-40:
                 desired_height=minf(desired_height,maxf(7.5,y-box.end.y-8))
@@ -126,7 +133,9 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         body.force(parent,Vector2(0,ay/float(n.inv)))
 
 func update_geometry(body,dt: float,direction: float) -> void:
-    for l in legs:
+    for i in range(legs.size()):
+        if i==override_leg:continue
+        var l: Dictionary=legs[i]
         var hip: Vector2=body.nodes[l.parent].p
         if not l.planted and not l.swing:
             var tuck:=Vector2(direction*(5 if l.parent==0 else -5)+float(l.side)*2,12)

@@ -41,7 +41,7 @@ func force(i: int,f: Vector2) -> void:
     if i>=0 and i<nodes.size():
         nodes[i].force+=f
 
-func advance(dt: float,before_step: Callable=Callable()) -> void:
+func advance(dt: float,before_step: Callable=Callable(),after_step: Callable=Callable()) -> void:
     if not is_finite(dt) or dt<0:return
     var accepted: float=minf(dt,.1)
     dropped_time+=dt-accepted
@@ -49,6 +49,7 @@ func advance(dt: float,before_step: Callable=Callable()) -> void:
     while accumulator+1e-9>=DT:
         if before_step.is_valid():before_step.call(DT)
         step()
+        if after_step.is_valid():after_step.call(DT)
         accumulator=maxf(0,accumulator-DT)
 
 func step() -> void:

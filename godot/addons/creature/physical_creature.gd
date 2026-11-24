@@ -2,6 +2,9 @@ extends RefCounted
 ## Locomotion controller; physical body is independent of poses and skin.
 const LIMBS=preload("res://addons/creature/limbs.gd")
 var limbs=LIMBS.new()
+const ATTACK=preload("res://addons/creature/hybrid_attack.gd")
+var attack=ATTACK.new()
+var attack_requested: bool=false
 const SURFACE=preload("res://addons/creature/surface_motor.gd")
 var surface=SURFACE.new()
 var climb_axis: float=0
@@ -23,13 +26,13 @@ var grip_radius: float=20
 var acceleration: float=680
 var max_speed: float=94
 var jump_speed: float=146
-var tail_count: int=5
+var tail_count: int=2
 var mass_scale: float=1
 var grounded: bool=false
 var jump_count: int=0
 var grip_count: int=0
 
-func _init(at: Vector2,boxes: Array[Rect2],tail: int=5,mass: float=1,with_limbs: bool=true,initial_direction: float=1) -> void:
+func _init(at: Vector2,boxes: Array[Rect2],tail: int=2,mass: float=1,with_limbs: bool=true,initial_direction: float=1) -> void:
     direction=-1.0 if initial_direction<0 else 1.0
     tail_count=clampi(tail,0,12)
     mass_scale=clampf(mass,.5,3)
@@ -40,27 +43,39 @@ func _init(at: Vector2,boxes: Array[Rect2],tail: int=5,mass: float=1,with_limbs:
     var last: int=1
     var p: Vector2=body.nodes[last].p
     for i in range(tail_count):
-        var r: float=maxf(2.0,5.0-i*.4)
-        var length: float=maxf(5,9-i*.35)
+        var r: float=maxf(2.0,4.0-i*.4)
+        var length: float=maxf(5,7-i*.25)
         p+=Vector2(-length*direction,0)
-        var index: int=body.add_point("tail_%d"%i,p,r,maxf(.12,.5-i*.035)*mass_scale)
+        var index: int=body.add_point("tail_%d"%i,p,r,maxf(.07,.24-i*.018)*mass_scale)
         body.connect_points(last,index,length,.000006)
         last=index
     limbs.enabled=with_limbs
     limbs.setup(body)
 
-func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: float=0) -> void:
+func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: float=0,strike: bool=false) -> void:
     input_axis=clampf(axis,-1,1)
     climb_axis=clampf(climb,-1,1)
     if jump:jump_requested=true
-    body.advance(dt,_control)
+    if strike:attack_requested=true
+    body.advance(dt,_control,_after_step)
     limbs.update_geometry(body,dt,direction)
 
+func _after_step(dt: float) -> void:
+    attack.after_step(body,limbs,dt)
+
 func _control(dt: float) -> void:
+    if attack.active and (not limbs.enabled or surface.active or grip_index>=0):attack.cancel(limbs)
+    if attack_requested:
+        if not surface.active and grip_index<0 and not attack.active:
+            if absf(input_axis)>.05:direction=signf(input_axis)
+            attack.begin(limbs,direction)
+        attack_requested=false
+    var intent: Dictionary=attack.sample(attack.time) if attack.active else {}
+    limbs.rear_height_offset=float(intent.get("rear",0))
     grip_cooldown=maxf(0,grip_cooldown-dt)
     surface.cooldown=maxf(0,surface.cooldown-dt)
     jump_cooldown=maxf(0,jump_cooldown-dt)
-    if grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested:
+    if grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested and not attack.active:
         if surface.try_attach(body,input_axis,climb_axis):
             direction=-surface.normal.x
     if surface.validate(body,input_axis,limbs.enabled):
@@ -96,8 +111,9 @@ func _control(dt: float) -> void:
     limbs.step(body,dt,input_axis,direction,jump_cooldown<=0 and grip_index<0 and not jump_requested)
     grounded=body.nodes[0].ground or body.nodes[1].ground or limbs.support_count>0
     coyote=.09 if grounded else maxf(0,coyote-dt)
-    if absf(input_axis)>.05:direction=signf(input_axis)
-    if grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1:
+    if attack.active:direction=attack.facing
+    elif absf(input_axis)>.05:direction=signf(input_axis)
+    if not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1:
         _find_grip()
     if grip_index>=0:
         grip_age+=dt
@@ -127,7 +143,7 @@ func _control(dt: float) -> void:
         jump_requested=false
     for i in range(2):
         var n: Dictionary=body.nodes[i]
-        var target: float=input_axis*max_speed
+        var target: float=float(intent.get("speed",0))*direction if attack.active else input_axis*max_speed
         var power: float=acceleration*(1.0 if grounded else .48)
         var ax: float=clampf((target-float(n.v.x))*9,-power,power)
         body.force(i,Vector2(ax/float(n.inv),0))
@@ -136,8 +152,12 @@ func _control(dt: float) -> void:
     var front: Vector2=body.nodes[0].p
     var rear: Vector2=body.nodes[1].p
     var goal:=Vector2(direction*16,-2)
+    if attack.active:
+        var trunk: float=body.links[0].length
+        var tilt: float=float(intent.tilt)
+        goal=Vector2(direction*cos(tilt),sin(tilt))*trunk
     var correction: Vector2=(goal-(front-rear))*30
-    correction=correction.limit_length(360)
+    correction=correction.limit_length(520 if attack.active else 360)
     body.force(0,correction)
     body.force(1,-correction)
     # Automatic pull is limited to reachable top corners in the movement direction.

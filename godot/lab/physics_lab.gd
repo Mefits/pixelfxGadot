@@ -11,7 +11,9 @@ var creature
 var debug: bool=true
 var paused: bool=false
 var slow: bool=false
-var tail: int=5
+var tail: int=2
+var attack_latch: bool=false
+var dummy: Dictionary={}
 var legs_on: bool=true
 var walls_on: bool=true
 var course: int=0
@@ -39,7 +41,7 @@ func _ready() -> void:
     layer.add_child(hud)
     info=Label.new()
     info.position=Vector2(18,505)
-    info.text="A/D move | W/Space jump | Up/Down climb | C walls | Q legs | M course | 1/2 tail | 3/4 mass | R reset | Esc"
+    info.text="A/D move | W/Space jump | F claw | Up/Down climb | C walls | Q legs | M course | 1/2 tail | 3/4 mass | R reset"
     info.add_theme_font_size_override("font_size",14)
     layer.add_child(info)
     _reset()
@@ -47,6 +49,8 @@ func _ready() -> void:
 func _reset() -> void:
     creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
     creature.surface.enabled=walls_on
+    dummy={"id":"training","p":Vector2(183,446),"r":10.0,"hp":100}
+    creature.attack.targets.append(dummy)
     trail.clear()
     dragging=false
     selected=-1
@@ -56,6 +60,9 @@ func _physics_process(dt: float) -> void:
     var pressed: bool=Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_SPACE)
     var jump: bool=pressed and not jump_latch
     jump_latch=pressed
+    var attack_pressed: bool=Input.is_physical_key_pressed(KEY_F)
+    var strike: bool=attack_pressed and not attack_latch
+    attack_latch=attack_pressed
     if not paused:
         var axis: float=float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A))
         var start: int=Time.get_ticks_usec()
@@ -64,7 +71,7 @@ func _physics_process(dt: float) -> void:
             var delta: Vector2=get_global_mouse_position()-Vector2(n.p)
             creature.body.force(selected,(delta*95-Vector2(n.v)*12).limit_length(1600))
         var climb: float=float(Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_UP))
-        creature.advance(dt*(.25 if slow else 1),axis,jump,false,climb)
+        creature.advance(dt*(.25 if slow else 1),axis,jump,false,climb,strike)
         step_ms=(Time.get_ticks_usec()-start)/1000.0
         track_clock+=dt
         if track_clock>.035:
@@ -77,6 +84,7 @@ func _physics_process(dt: float) -> void:
 func _update_hud() -> void:
     hud.text="Segments %d | feet %d/4 | mass x%.1f | %s | err %.2f px | pen %.3f | %.2f ms CPU | %s | walls %s"%[
         creature.body.nodes.size(),creature.limbs.support_count,mass,("WALL" if creature.surface.active else ("GROUND" if creature.grounded else "AIR")),creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz"),"ON" if walls_on else "OFF"]
+    hud.text+=" | claw %s | HP %d"%[creature.attack.phase(),dummy.get("hp",100)]
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))
@@ -88,9 +96,18 @@ func _draw() -> void:
         draw_rect(box,Color("#273645"),false,1)
     if creature==null:return
     var body=creature.body
+    if not dummy.is_empty():
+        var dp: Vector2=dummy.p
+        draw_circle(dp,dummy.r,Color("#965c55") if dummy.hp>0 else Color("#414a54"))
+        draw_arc(dp,dummy.r,0,TAU,24,Color("#d19a80"),1)
+        draw_rect(Rect2(dp+Vector2(-12,-15),Vector2(24,3)),Color("#273645"))
+        draw_rect(Rect2(dp+Vector2(-12,-15),Vector2(24*float(dummy.hp)/100,3)),Color("#db9b73"))
     if debug and trail.size()>1:draw_polyline(PackedVector2Array(trail),Color("#537b8e"),1)
     if creature.limbs.enabled:
-        for l in creature.limbs.legs:
+        for i in range(creature.limbs.legs.size()):
+            var l: Dictionary=creature.limbs.legs[i]
+            var attacking: bool=creature.attack.active and i==creature.attack.leg
+            if attacking and not creature.attack.valid_pose:continue
             var hip: Vector2=body.nodes[l.parent].p
             var knee: Vector2=l.knee
             var tip: Vector2=l.get("tip",l.foot)
@@ -100,6 +117,12 @@ func _draw() -> void:
             draw_line(hip,knee,col,3)
             draw_line(knee,tip,col,3)
             draw_circle(tip,2.5,col)
+            if attacking:
+                var claw_axis: Vector2=(tip-knee).normalized()
+                draw_line(tip,tip+claw_axis*3,Color("#d5e7d0"),2)
+                if debug:
+                    draw_arc(creature.attack.desired_tip,3,0,TAU,16,Color("#d7a766"),1)
+                    if creature.attack.blocked:draw_line(tip,creature.attack.desired_tip,Color("#c97f6f"),1)
             if debug and l.planted:
                 draw_circle(l.foot,3,Color("#e3c77d"),false,1)
             if debug and l.swing:
@@ -150,6 +173,9 @@ func _unhandled_input(e: InputEvent) -> void:
                 creature.limbs.enabled=legs_on
                 creature.limbs.release_all()
             KEY_V:debug=not debug
+            KEY_G:
+                dummy.p=get_global_mouse_position()
+                dummy.hp=100
             KEY_P:paused=not paused
             KEY_X:slow=not slow
             KEY_1:tail=maxi(0,tail-1);_reset()
