@@ -37,7 +37,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CPP_RUN" > /tmp/cpp-run.json
           node --input-type=module -e 'import fs from "node:fs";const x=JSON.parse(fs.readFileSync("/tmp/cpp-run.json"));if(x.conclusion!=="success"||x.path!==".github/workflows/cpp.yml"||x.head_branch!=="main")throw Error("Not a successful main C++ run");'
           SHA=$(jq -r .head_sha /tmp/cpp-run.json)
-          git diff --exit-code "$SHA" HEAD -- native_cpp/ godot/addons/pixelfx/native/lightning.gd
+          git diff --exit-code "$SHA" HEAD -- native_cpp/kernel.hpp native_cpp/extension.cpp native_cpp/SConstruct native_cpp/build.py native_cpp/build_profile.json native_cpp/pixelfx.gdextension godot/addons/pixelfx/native/lightning.gd
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
