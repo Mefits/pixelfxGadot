@@ -34,9 +34,9 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
         if not l.enabled or age<0 or age>=float(l.duration):continue
         active_layers+=1
         var u: float=age/float(l.duration)
-        var k: float=P.curve(u,l.curve)
-        var size: float=lerpf(l.size,l.end_size,k)
-        var alpha: float=lerpf(l.alpha,l.end_alpha,k)
+        var size: float=P.value(l,"size",u)
+        var alpha: float=P.value(l,"alpha",u)
+        var glow: float=P.value(l,"glow",u)
         var pos: Vector2=origin(l.anchor,time if l.follow else float(l.start),anchors,provider)+Vector2(l.x,l.y)
         var color: int=PAL.from_hex(l.color)
         var seed0: int=R.hash32([int(preset.seed),i])
@@ -47,30 +47,33 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
             for j in range(mini(4,int(l.count))):
                 var angle: float=deg_to_rad(float(l.angle)+rng.between(-float(l.spread)*.5,float(l.spread)*.5))
                 var end: Vector2=pos+Vector2.from_angle(angle)*size
-                bolt.stroke(painter,L.zigzag(rng,pos.x,pos.y,end.x,end.y,.18,.35),maxf(.03,alpha),palette,.7,{"light":float(l.glow),"a":alpha})
+                bolt.stroke(painter,L.zigzag(rng,pos.x,pos.y,end.x,end.y,.18,.35),maxf(.03,alpha),palette,.7,{"light":glow,"a":alpha})
             continue
         var d=batch.begin(painter)
         match l.type:
             "glow":
-                d.glow(pos.x,pos.y,size,color,float(l.glow)*alpha)
+                d.glow(pos.x,pos.y,size,color,glow*alpha)
                 d.circle(pos.x,pos.y,maxf(.5,size*.13),PAL.mix(color,PAL.from_hex("#ffffff"),.65),alpha)
             "ring":
                 _arc(d,pos,size,0,TAU,color,alpha)
-                if l.glow>0:d.glow(pos.x,pos.y,size+4,color,float(l.glow)*alpha*.4)
+                if glow>0:d.glow(pos.x,pos.y,size+4,color,glow*alpha*.4)
             "slash":
                 var angle: float=deg_to_rad(float(l.angle))+u*.8
                 var sweep: float=deg_to_rad(float(l.spread))
                 _arc(d,pos,size,angle-sweep*.5,sweep,color,alpha)
                 _arc(d,pos,maxf(.5,size-2),angle-sweep*.4,sweep*.8,PAL.mix(color,PAL.from_hex("#ffffff"),.7),alpha)
+                if P.has_curve(l,"glow") and glow>.01:
+                    d.glow(pos.x,pos.y,size,color,glow*alpha*.4)
             "sparks","droplets","smoke":
                 var rng=R.new(seed0)
                 var n: int=int(l.count)
                 particles+=n
+                # Evaluate distance once per layer, rather than once per particle.
+                var travel: float=P.speed_distance(l,u) if P.has_curve(l,"speed") else (float(l.speed)*age+(float(l.end_speed)-float(l.speed))*age*u*.5)
                 for j in range(n):
                     var angle: float=deg_to_rad(float(l.angle)+rng.between(-float(l.spread)*.5,float(l.spread)*.5))
                     var factor: float=rng.between(.45,1.0)
-                    # Integrate the linear speed ramp analytically.
-                    var distance: float=(float(l.speed)*age+(float(l.end_speed)-float(l.speed))*age*u*.5)*factor
+                    var distance: float=travel*factor
                     var q: Vector2=pos+Vector2.from_angle(angle)*distance+Vector2(0,float(l.gravity)*age*age*.5)
                     if l.collision and q.y>floor_y:q.y=floor_y-minf(8.0,(q.y-floor_y)*.3)
                     var rad: float=maxf(.5,size*rng.between(.55,1.0))
@@ -82,7 +85,7 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
                         var v: Vector2=Vector2.from_angle(angle)
                         var end: Vector2=q-v*rad*2
                         d.line(q.x,q.y,end.x,end.y,color,alpha)
-                    if l.glow>.01:d.glow(q.x,q.y,maxf(2,rad*2),color,float(l.glow)*alpha)
+                    if glow>.01:d.glow(q.x,q.y,maxf(2,rad*2),color,glow*alpha)
         batch.finish()
     render_ms=(Time.get_ticks_usec()-stamp)/1000.0
 static func _arc(d,pos: Vector2,radius: float,start: float,sweep: float,c: int,a: float) -> void:

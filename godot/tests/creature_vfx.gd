@@ -6,7 +6,51 @@ var failures: int=0
 func _initialize() -> void:call_deferred("_run")
 func check(ok: bool,msg: String) -> void:
     if not ok:failures+=1;push_error(msg)
+func _curves() -> void:
+    var l: Dictionary=P.layer("sparks")
+    l.duration=2.0
+    l.curves={"size":[[0.0,2.0],[.25,20.0],[1.0,4.0]],"alpha":[[0.0,0.0],[.5,1.0],[1.0,0.0]],"speed":[[0.0,0.0],[.5,100.0],[1.0,0.0]],"glow":[[0.0,0.0],[1.0,1.0]]}
+    var p: Dictionary={"schema":1,"name":"Curves","seed":12,"layers":[l]}
+    check(P.valid(p),"Independent curves valid")
+    check(is_equal_approx(P.value(l,"size",.125),11.0),"Piecewise sample")
+    check(is_equal_approx(P.value(l,"size",1.0),4.0),"Last endpoint")
+    check(is_equal_approx(P.value(l,"alpha",.75),.5),"Independent alpha")
+    check(is_equal_approx(P.value(l,"glow",.4),.4),"Independent glow")
+    check(is_equal_approx(P.speed_distance(l,.25),12.5),"Partial acceleration integral")
+    check(is_equal_approx(P.speed_distance(l,.75),87.5),"Partial deceleration integral")
+    check(is_equal_approx(P.speed_distance(l,1.0),100.0),"Full integral")
+    for invalid in [[[0.0,0.0],[.5,1.0],[.5,0.0],[1.0,1.0]],[[.1,0.0],[1.0,1.0]],[[0.0,0.0],[1.0,2.0]]]:
+        check(not P.valid_points("alpha",invalid),"Reject malformed curve")
+    var broken: Dictionary=p.duplicate(true)
+    broken.layers[0].curves["unknown"]=[[0.0,0.0],[1.0,1.0]]
+    check(not P.valid(broken),"Reject unknown channel")
+    check(P.save_preset(p,"user://test_independent_curves.json"),"Save curves")
+    var loaded: Dictionary=P.load_preset("user://test_independent_curves.json")
+    check(P.valid(loaded),"Load curves")
+    if not loaded.is_empty():
+        check(is_equal_approx(P.speed_distance(loaded.layers[0],.75),87.5),"Roundtrip integral")
+    var paint=PAINT.new(240,160)
+    var renderer=R.new()
+    var anchors: Dictionary={"origin":Vector2(120,80)}
+    renderer.render(paint,p,.7,anchors)
+    var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+    renderer.render(paint,p,1.1,anchors)
+    renderer.render(paint,p,.7,anchors)
+    check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Curved backwards seek deterministic")
+    var legacy: Dictionary={"schema":1,"name":"Legacy","seed":12,"layers":[P.layer("sparks")]}
+    legacy.layers[0].curve="linear"
+    var equivalent: Dictionary=legacy.duplicate(true)
+    var copy: Dictionary=equivalent.layers[0]
+    copy.curves={}
+    for ch in P.CHANNELS:copy.curves[ch]=P.initial_points(copy,ch)
+    for t in [.1,.3,.5]:
+        renderer.render(paint,legacy,t,anchors)
+        var baseline: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,equivalent,t,anchors)
+        check(baseline==paint.rgba_bytes()+paint.rgba_bytes(true),"Legacy linear equivalent pixels")
+
 func _run() -> void:
+    _curves()
     var renderer=R.new()
     var paint=PAINT.new(240,160)
     var anchors={"origin":Vector2(120,80),"hand":Vector2(83,76),"target":Vector2(166,76)}

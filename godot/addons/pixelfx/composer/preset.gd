@@ -4,6 +4,10 @@ const ANCHORS=["origin","hand","target"]
 const FOLDER="user://vfx_presets"
 const CURVES=["linear","ease in","ease out","smooth"]
 const MAX_LAYERS=12
+const CHANNELS=["size","alpha","speed","glow"]
+const RANGES={"size":[.5,80.0],"alpha":[0.0,1.0],"speed":[0.0,200.0],"glow":[0.0,1.0]}
+const MAX_POINTS=16
+const MIN_GAP=.001
 static func layer(kind: String="sparks") -> Dictionary:
     var l={"type":kind,"enabled":true,"anchor":"origin","follow":true,"start":0.0,"duration":.65,"color":"#65caff","size":18.0,"end_size":32.0,"alpha":1.0,"end_alpha":0.0,"speed":65.0,"end_speed":65.0,"count":24,"spread":180.0,"angle":-90.0,"gravity":90.0,"glow":.35,"x":0.0,"y":0.0,"curve":"ease out","collision":false}
     match kind:
@@ -53,6 +57,10 @@ static func valid(p: Variant) -> bool:
         for spec in [["start",0,5],["duration",.05,5],["size",.5,80],["end_size",.5,80],["alpha",0,1],["end_alpha",0,1],["speed",0,200],["end_speed",0,200],["count",1,64],["spread",0,360],["angle",-180,180],["gravity",-200,300],["glow",0,1],["x",-100,100],["y",-100,100]]:
             if not num(l.get(spec[0]),spec[1],spec[2]):return false
         if float(l.start)+float(l.duration)>10:return false
+        if l.has("curves"):
+            if not l.curves is Dictionary:return false
+            for channel in l.curves:
+                if not CHANNELS.has(channel) or not valid_points(channel,l.curves[channel]):return false
     return true
 static func duration(p: Dictionary) -> float:
     var d: float=.05
@@ -66,6 +74,70 @@ static func curve(u: float,kind: String) -> float:
         "ease out":return 1-(1-u)*(1-u)
         "smooth":return u*u*(3-2*u)
     return u
+# Optional independent absolute-value curves, normalized lifetime t in [0,1].
+# Legacy presets remain schema 1 and keep their exact old sampling.
+static func valid_points(channel: String,points: Variant) -> bool:
+    if not RANGES.has(channel) or not points is Array:return false
+    if points.size()<2 or points.size()>MAX_POINTS:return false
+    var bounds: Array=RANGES[channel]
+    var last: float=-1
+    for pt in points:
+        if not pt is Array or pt.size()!=2:return false
+        if not num(pt[0],0,1) or not num(pt[1],bounds[0],bounds[1]):return false
+        if float(pt[0])-last<MIN_GAP-0.00000001:return false
+        last=float(pt[0])
+    return float(points[0][0])==0.0 and float(points[-1][0])==1.0
+
+static func has_curve(l: Dictionary,channel: String) -> bool:
+    return l.has("curves") and l.curves.has(channel)
+
+static func legacy_value(l: Dictionary,channel: String,u: float) -> float:
+    if channel=="glow":return float(l.glow)
+    var k: float=clampf(u,0,1) if channel=="speed" else curve(u,l.curve)
+    return lerpf(float(l[channel]),float(l["end_"+channel]),k)
+
+static func initial_points(l: Dictionary,channel: String) -> Array:
+    var out: Array=[]
+    # Approximate old easing at 1/8 intervals when enabling custom editing.
+    var n: int=1 if channel in ["speed","glow"] or l.curve=="linear" else 8
+    for i in range(n+1):
+        var t: float=float(i)/n
+        out.append([t,legacy_value(l,channel,t)])
+    return out
+
+static func sample_points(points: Array,u: float) -> float:
+    u=clampf(u,0,1)
+    for i in range(1,points.size()):
+        var a: Array=points[i-1]
+        var b: Array=points[i]
+        if u<=float(b[0]):
+            return lerpf(float(a[1]),float(b[1]),(u-float(a[0]))/(float(b[0])-float(a[0])))
+    return float(points[-1][1])
+
+static func value(l: Dictionary,channel: String,u: float) -> float:
+    if has_curve(l,channel):return sample_points(l.curves[channel],u)
+    return legacy_value(l,channel,u)
+
+# Exact trapezoidal integration of the piecewise-linear velocity curve.
+# Stateless and independent of frame rate, including backwards seeking.
+static func speed_distance(l: Dictionary,u: float) -> float:
+    u=clampf(u,0,1)
+    var age: float=u*float(l.duration)
+    if not has_curve(l,"speed"):
+        return float(l.speed)*age+(float(l.end_speed)-float(l.speed))*age*u*.5
+    var points: Array=l.curves.speed
+    var integral: float=0
+    for i in range(1,points.size()):
+        var a: Array=points[i-1]
+        var b: Array=points[i]
+        var left: float=float(a[0])
+        var right: float=minf(u,float(b[0]))
+        if right<=left:break
+        var v: float=lerpf(float(a[1]),float(b[1]),(right-left)/(float(b[0])-left))
+        integral+=(right-left)*(float(a[1])+v)*.5
+        if u<=float(b[0]):break
+    return integral*float(l.duration)
+
 static func filename(name: String) -> String:
     var clean: String=""
     for ch in name:

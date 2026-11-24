@@ -1,10 +1,10 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.15"
+const VERSION="0.16"
 const SECTIONS=[
     {"label":"СПЕЦЭФФЕКТЫ","color":"#79b9d4","items":[
-        ["Y","Конструктор эффектов","Слои, параметры и свои пресеты.","vfx_workshop"],
+        ["Y","Конструктор эффектов","Слои, кривые параметров и свои пресеты.","vfx_workshop"],
         ["J","Каталог PixelFX","Оригинальные эффекты и постановки.","original_catalog"],
         ["A","Тест атласов","Готовые кадры и тест нагрузки.","atlas_lab"],
         ["L","Молния","Процедурный разряд в реальном времени.","live_lightning"]

@@ -5,6 +5,7 @@ const R=preload("res://addons/pixelfx/composer/renderer.gd")
 const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
 const STAGE=preload("res://lab/vfx_stage.gd")
 const TIMELINE=preload("res://lab/vfx_timeline.gd")
+const GRAPH=preload("res://lab/vfx_curve_editor.gd")
 var preset: Dictionary=P.demo()
 var renderer=R.new()
 var stage
@@ -19,6 +20,10 @@ var status: Label
 var perf: Label
 var play_button: Button
 var seek: HSlider
+var graph
+var curve_channel: int=0
+var curve_toggle: Button
+var curve_status: Label
 var selected: int=0
 var time: float=.3
 var playing: bool=true
@@ -152,6 +157,16 @@ func _ready() -> void:
         var key: String=spec[0]
         var options: Array=spec[2]
         fields[key]=_option(row,options,func(i:int):_change(key,options[i]))
+    _label(right,"КРИВЫЕ ПАРАМЕТРОВ")
+    _option(right,["Размер","Прозрачность","Скорость","Свечение"],func(i:int):curve_channel=i;_sync_curve())
+    curve_toggle=_button(right,"Своя кривая",_toggle_curve)
+    graph=GRAPH.new()
+    right.add_child(graph)
+    graph.points_changed.connect(_curve_changed)
+    curve_status=_label(right,"")
+    curve_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    var hint: Label=_label(right,"ЛКМ: добавить / двигать. ПКМ: удалить внутреннюю точку.")
+    hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     for spec in [["enabled","Видимость"],["follow","Следовать за точкой"],["collision","Столкновение с полом"]]:
         var check:=CheckButton.new()
         check.text=spec[1]
@@ -199,7 +214,9 @@ func _change(key: String,v: Variant) -> void:
     if syncing:return
     preset.layers[selected][key]=v
     if key in ["type","enabled"]:_refresh()
-    else:dirty=true
+    else:
+        _sync_curve()
+        dirty=true
 func _refresh() -> void:
     list.clear()
     for i in range(preset.layers.size()):
@@ -221,7 +238,59 @@ func _sync_fields() -> void:
         elif field is ColorPickerButton:field.color=Color(l[key])
         else:field.value=float(l[key])
     syncing=false
+    _sync_curve()
     dirty=true
+
+func _sync_curve() -> void:
+    if graph==null:return
+    var l: Dictionary=preset.layers[selected]
+    var channel: String=P.CHANNELS[curve_channel]
+    var custom: bool=P.has_curve(l,channel)
+    graph.configure(l.curves[channel] if custom else P.initial_points(l,channel),P.RANGES[channel],custom)
+    curve_toggle.text="Вернуть базовую кривую" if custom else "Включить свою кривую"
+    _update_curve_controls()
+    _update_curve_cursor()
+
+func _update_curve_controls() -> void:
+    var l: Dictionary=preset.layers[selected]
+    var channel: String=P.CHANNELS[curve_channel]
+    var custom: bool=P.has_curve(l,channel)
+    for k in ["size","end_size","alpha","end_alpha","speed","end_speed","glow"]:
+        if fields.has(k):
+            var base: String=k.trim_prefix("end_")
+            fields[k].editable=not P.has_curve(l,base)
+            fields[k].tooltip_text="Управляется своей кривой" if not fields[k].editable else ""
+    var message: String="%d/%d точек. Своя кривая."%[graph.points.size(),P.MAX_POINTS] if custom else "Базовые значения. Включи свою кривую для редактирования."
+    if channel=="speed" and l.type not in ["sparks","droplets","smoke"]:
+        message+=" Скорость действует только на частицы."
+    if channel=="alpha":message+=" 1 = непрозрачно."
+    curve_status.text=message
+
+func _update_curve_cursor() -> void:
+    if graph==null:return
+    var l: Dictionary=preset.layers[selected]
+    graph.set_cursor((time-float(l.start))/float(l.duration))
+
+func _toggle_curve() -> void:
+    var l: Dictionary=preset.layers[selected]
+    var channel: String=P.CHANNELS[curve_channel]
+    if P.has_curve(l,channel):
+        l.curves.erase(channel)
+        if l.curves.is_empty():l.erase("curves")
+    else:
+        if not l.has("curves"):l.curves={}
+        l.curves[channel]=P.initial_points(l,channel)
+    _sync_curve()
+    dirty=true
+
+func _curve_changed(points: Array) -> void:
+    var l: Dictionary=preset.layers[selected]
+    var channel: String=P.CHANNELS[curve_channel]
+    if P.has_curve(l,channel) and P.valid_points(channel,points):
+        l.curves[channel]=points.duplicate(true)
+        _update_curve_controls()
+        dirty=true
+
 func _add_layer() -> void:
     if preset.layers.size()>=P.MAX_LAYERS:return
     preset.layers.append(P.layer(P.TYPES[kind.selected]))
@@ -282,6 +351,7 @@ func _process(dt: float) -> void:
         timeline.time=time
         timeline.selected=selected
         timeline.queue_redraw()
+        _update_curve_cursor()
         syncing=true
         seek.max_value=P.duration(preset)
         seek.value=time
