@@ -1,17 +1,9 @@
 extends RefCounted
 ## Authored intentions, not baked world positions. Physical chunks remain authoritative.
 ## claw offsets are normalized by reach; tilt by the current trunk length.
-const DURATION: float=.56
-const ACTIVE_FROM: float=.19
-const ACTIVE_TO: float=.32
-const KEYS=[
-    {"t":0.0,"claw":Vector2(.15,.65),"tilt":-.12,"speed":0.0,"rear":0.0},
-    {"t":.15,"claw":Vector2(-.65,-.45),"tilt":.48,"speed":-20.0,"rear":3.0},
-    {"t":.22,"claw":Vector2(.92,-.30),"tilt":-.40,"speed":175.0,"rear":-2.0},
-    {"t":.30,"claw":Vector2(.96,.20),"tilt":-.25,"speed":155.0,"rear":-1.0},
-    {"t":.42,"claw":Vector2(.30,.65),"tilt":-.12,"speed":0.0,"rear":0.0},
-    {"t":.56,"claw":Vector2(.15,.65),"tilt":-.12,"speed":0.0,"rear":0.0}
-]
+const TRACK=preload("res://addons/creature/motion_track.gd")
+var track: Dictionary=TRACK.defaults()
+var visible_pose: bool=false
 var active: bool=false
 var time: float=0
 var facing: float=1
@@ -48,6 +40,7 @@ func begin(limbs,direction: float) -> bool:
     contacts.clear()
     prev_valid=false
     valid_pose=false
+    visible_pose=false
     blocked=false
     blocked_ticks=0
     peak_support=0
@@ -60,26 +53,24 @@ func begin(limbs,direction: float) -> bool:
 func cancel(limbs) -> void:
     active=false
     valid_pose=false
+    visible_pose=false
     prev_valid=false
     limbs.override_leg=-1
     limbs.rear_height_offset=0
     limbs.front_height_offset=0
 
+func set_track(value: Dictionary) -> bool:
+    if active or not TRACK.valid(value):return false
+    track=value.duplicate(true)
+    return true
+
 func sample(t: float) -> Dictionary:
-    t=clampf(t,0,DURATION)
-    for i in range(1,KEYS.size()):
-        var a: Dictionary=KEYS[i-1]
-        var b: Dictionary=KEYS[i]
-        if t<=float(b.t):
-            var u: float=(t-float(a.t))/(float(b.t)-float(a.t))
-            u=u*u*(3-2*u)
-            return {"claw":Vector2(a.claw).lerp(b.claw,u),"tilt":lerpf(a.tilt,b.tilt,u),"speed":lerpf(a.speed,b.speed,u),"rear":lerpf(a.rear,b.rear,u)}
-    return KEYS[-1]
+    return TRACK.sample(track,t)
 
 func phase() -> String:
     if not active:return "idle"
-    if time<ACTIVE_FROM:return "windup"
-    if time<=ACTIVE_TO:return "strike"
+    if time<float(track.active_from):return "windup"
+    if time<=float(track.active_to):return "strike"
     return "recover"
 
 static func segment_blocked(a: Vector2,b: Vector2,boxes: Array[Rect2],radius: float=0.0) -> bool:
@@ -129,18 +120,30 @@ static func solve(hip: Vector2,goal: Vector2,upper: float,lower: float,bend: flo
 func after_step(body,limbs,dt: float) -> void:
     if not active:return
     var old_time: float=time
-    time=minf(DURATION,time+dt)
+    time=minf(float(track.duration),time+dt)
     var intent: Dictionary=sample(time)
     var hip: Vector2=body.nodes[limbs.legs[leg].parent].p
     var reach: float=limbs.upper+limbs.lower
     desired_tip=hip+Vector2(intent.claw.x*facing,intent.claw.y)*reach
+    # Last part of recovery blends toward the next procedural foothold.
+    var recovery: float=maxf(float(track.active_to),float(track.duration)-.13)
+    if time>recovery:
+        var next: Dictionary=limbs.find_support(hip,hip.x+facing*6,body.obstacles)
+        var goal: Vector2=next.get("foot",hip+Vector2(facing*5,12))
+        var u: float=clampf((time-recovery)/maxf(.001,float(track.duration)-recovery),0,1)
+        desired_tip=desired_tip.lerp(goal,u*u*(3-2*u))
     var result: Dictionary=solve(hip,desired_tip,limbs.upper,limbs.lower,facing,body.obstacles,prev_tip,prev_valid)
     valid_pose=not result.is_empty()
+    # A failed swept path may still have a collision-free folded pose. It
+    # remains visible but cannot deal damage or bridge the blocked sweep.
+    if not valid_pose:
+        result=solve(hip,hip+Vector2(-facing*5,0),limbs.upper,limbs.lower,facing,body.obstacles,Vector2.ZERO,false)
+    visible_pose=not result.is_empty()
     blocked=not valid_pose or Vector2(result.get("tip",hip)).distance_to(desired_tip)>2.5
     if blocked:blocked_ticks+=1
     peak_support=maxi(peak_support,limbs.support_count)
-    if time>=ACTIVE_FROM and time<=ACTIVE_TO and limbs.support_count>0:had_active_support=true
-    if valid_pose:
+    if time>=float(track.active_from) and time<=float(track.active_to) and limbs.support_count>0:had_active_support=true
+    if visible_pose:
         knee=result.knee
         tip=result.tip
         var l: Dictionary=limbs.legs[leg]
@@ -150,7 +153,7 @@ func after_step(body,limbs,dt: float) -> void:
         l.planted=false
         l.swing=false
         # An active window is independent of rendering rate and may hit each target once.
-        if time>=ACTIVE_FROM and old_time<ACTIVE_TO:
+        if valid_pose and time>=float(track.active_from) and old_time<float(track.active_to):
             var start: Vector2=prev_tip if prev_valid else tip
             for target in targets:
                 if int(target.hp)<=0 or hit_ids.has(target.id):continue
@@ -164,7 +167,15 @@ func after_step(body,limbs,dt: float) -> void:
                     hit_count+=1
                     contacts.append({"p":closest,"t":time,"id":target.id})
         prev_tip=tip
-        prev_valid=true
+        prev_valid=valid_pose
     else:
         prev_valid=false
-    if time>=DURATION:cancel(limbs)
+    if time>=float(track.duration):
+        var l: Dictionary=limbs.legs[leg]
+        var next: Dictionary=limbs.find_support(hip,hip.x+facing*6,body.obstacles)
+        if visible_pose and not next.is_empty():
+            l.start=l.foot
+            l.target=next.foot
+            l.swing=true
+            l.age=0.0
+        cancel(limbs)

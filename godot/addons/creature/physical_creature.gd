@@ -189,3 +189,70 @@ func _find_grip() -> void:
         grip_count+=1
         grip_age=0
         limbs.release_all()
+
+var limb_scale: float=1
+var mutations: int=0
+
+func can_mutate() -> bool:
+    return not attack.active and not surface.active and grip_index<0
+
+func change_tail(delta: int) -> bool:
+    if not can_mutate() or delta==0:return false
+    if delta<0:
+        if tail_count<=0:return false
+        var n: Dictionary=body.nodes[-1]
+        body.ids.erase(n.id)
+        body.nodes.pop_back()
+        body.links.pop_back()
+        tail_count-=1
+    else:
+        if tail_count>=12:return false
+        var last: int=body.nodes.size()-1
+        var anchor: Vector2=body.nodes[last].p
+        var radius: float=maxf(2.0,4.0-tail_count*.4)
+        var length: float=maxf(5,7-tail_count*.25)
+        var axis: Vector2=(anchor-Vector2(body.nodes[last-1].p)).normalized()
+        if axis.length_squared()<.001:axis=Vector2(-direction,0)
+        var point:=Vector2.ZERO
+        var found: bool=false
+        for angle in [0.0,-.45,.45,-.9,.9,-1.5,1.5,PI]:
+            var candidate: Vector2=anchor+axis.rotated(angle)*length
+            var clear: bool=true
+            for box in body.obstacles:
+                if candidate.distance_to(candidate.clamp(box.position,box.end))<radius+.05:clear=false;break
+            if clear and not ATTACK.segment_blocked(anchor,candidate,body.obstacles):
+                point=candidate
+                found=true
+                break
+        if not found:return false
+        var index: int=body.add_point("tail_%d"%tail_count,point,radius,maxf(.07,.24-tail_count*.018)*mass_scale)
+        body.nodes[index].v=body.nodes[last].v
+        body.connect_points(last,index,length,.000006)
+        tail_count+=1
+    mutations+=1
+    return true
+
+func change_mass(delta: float) -> bool:
+    if not can_mutate():return false
+    var next: float=clampf(mass_scale+delta,.5,3)
+    if is_equal_approx(next,mass_scale):return false
+    for n in body.nodes:
+        n.inv=float(n.inv)*mass_scale/next
+    mass_scale=next
+    mutations+=1
+    return true
+
+func change_legs(add: bool) -> bool:
+    if not can_mutate():return false
+    var ok: bool=limbs.add_pair(body) if add else limbs.remove_pair()
+    if ok:mutations+=1
+    return ok
+
+func change_reach(delta: float) -> bool:
+    if not can_mutate():return false
+    var next: float=clampf(limb_scale+delta,.75,1.5)
+    if is_equal_approx(next,limb_scale):return false
+    limb_scale=next
+    limbs.scale_reach(next)
+    mutations+=1
+    return true

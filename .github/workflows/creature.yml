@@ -25,7 +25,7 @@ jobs:
         run: |
           test -f /tmp/complete/godot/project.godot
           cp -a godot/addons/creature /tmp/complete/godot/addons/
-          cp -a godot/lab/{pose_workshop,combat_lab,combat_canvas,creature_preview,physics_lab,main}.gd /tmp/complete/godot/lab/
+          cp -a godot/lab/{pose_workshop,combat_lab,combat_canvas,creature_preview,physics_lab,intent_panel,main}.gd /tmp/complete/godot/lab/
           cp -a godot/lab/{pose_workshop,combat_lab,physics_lab}.tscn /tmp/complete/godot/lab/
           cp godot/tests/creature*.gd /tmp/complete/godot/tests/
           cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md /tmp/complete/docs/
@@ -50,6 +50,8 @@ jobs:
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/physics.log
           timeout 30s godot --headless --script res://tests/creature_hybrid.gd 2>&1 | tee /tmp/hybrid.log
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/hybrid.log
+          timeout 30s godot --headless --script res://tests/creature_evolution.gd 2>&1 | tee /tmp/evolution.log
+          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/evolution.log
           for scene in pose_workshop combat_lab physics_lab; do
             godot --headless res://lab/$scene.tscn --quit-after 120 2>&1 | tee /tmp/$scene.log
             ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/$scene.log

@@ -1,5 +1,10 @@
 extends Node2D
 const CREATURE=preload("res://addons/creature/physical_creature.gd")
+const INTENT=preload("res://lab/intent_panel.gd")
+const TRACK=preload("res://addons/creature/motion_track.gd")
+var panel
+var ui_layer: CanvasLayer
+var mutation_label: Label
 const ROOM: Vector2=Vector2(960,540)
 var boxes: Array[Rect2]=[
     Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),
@@ -31,6 +36,7 @@ var selected: int=-1
 func _ready() -> void:
     var layer:=CanvasLayer.new()
     add_child(layer)
+    ui_layer=layer
     var title:=Label.new()
     title.position=Vector2(18,10)
     title.text="PHYSICS LAB / independent physical body"
@@ -41,13 +47,21 @@ func _ready() -> void:
     layer.add_child(hud)
     info=Label.new()
     info.position=Vector2(18,505)
-    info.text="A/D move | W/Space jump | F claw | Up/Down climb | C walls | Q legs | M course | 1/2 tail | 3/4 mass | R reset"
+    info.text="A/D move | W/Space jump | F claw | Arrows climb | H edit attack | M course | G target | R reset | Esc"
     info.add_theme_font_size_override("font_size",14)
     layer.add_child(info)
+    mutation_label=Label.new()
+    mutation_label.position=Vector2(18,482)
+    mutation_label.add_theme_font_size_override("font_size",14)
+    layer.add_child(mutation_label)
     _reset()
 
 func _reset() -> void:
+    if is_instance_valid(panel):panel.queue_free();panel=null
+    tail=2
+    mass=1
     creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
+    creature.attack.set_track(TRACK.load_track())
     creature.surface.enabled=walls_on
     dummy={"id":"training","p":Vector2(183,446),"r":10.0,"hp":100}
     creature.attack.targets.append(dummy)
@@ -71,6 +85,11 @@ func _physics_process(dt: float) -> void:
             var delta: Vector2=get_global_mouse_position()-Vector2(n.p)
             creature.body.force(selected,(delta*95-Vector2(n.v)*12).limit_length(1600))
         var climb: float=float(Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_UP))
+        if is_instance_valid(panel):
+            axis=0
+            jump=false
+            climb=0
+            strike=false
         creature.advance(dt*(.25 if slow else 1),axis,jump,false,climb,strike)
         step_ms=(Time.get_ticks_usec()-start)/1000.0
         track_clock+=dt
@@ -82,9 +101,10 @@ func _physics_process(dt: float) -> void:
     queue_redraw()
 
 func _update_hud() -> void:
-    hud.text="Segments %d | feet %d/4 | mass x%.1f | %s | err %.2f px | pen %.3f | %.2f ms CPU | %s | walls %s"%[
-        creature.body.nodes.size(),creature.limbs.support_count,mass,("WALL" if creature.surface.active else ("GROUND" if creature.grounded else "AIR")),creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz"),"ON" if walls_on else "OFF"]
+    hud.text="Segments %d | feet %d/%d | mass x%.1f | %s | err %.2f px | pen %.3f | %.2f ms CPU | %s | walls %s"%[
+        creature.body.nodes.size(),creature.limbs.support_count,creature.limbs.legs.size(),creature.mass_scale,("WALL" if creature.surface.active else ("GROUND" if creature.grounded else "AIR")),creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz"),"ON" if walls_on else "OFF"]
     hud.text+=" | claw %s | HP %d"%[creature.attack.phase(),dummy.get("hp",100)]
+    mutation_label.text="LIVE: 1/2 tail (%d) | 3/4 mass | 5/6 legs | 7/8 reach (x%.2f) | mutations %d | Q legs C walls V debug X slow"%[creature.tail_count,creature.limb_scale,creature.mutations]
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))
@@ -107,7 +127,7 @@ func _draw() -> void:
         for i in range(creature.limbs.legs.size()):
             var l: Dictionary=creature.limbs.legs[i]
             var attacking: bool=creature.attack.active and i==creature.attack.leg
-            if attacking and not creature.attack.valid_pose:continue
+            if attacking and not creature.attack.visible_pose:continue
             var hip: Vector2=body.nodes[l.parent].p
             var knee: Vector2=l.knee
             var tip: Vector2=l.get("tip",l.foot)
@@ -160,6 +180,12 @@ func _unhandled_input(e: InputEvent) -> void:
         match e.keycode:
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_R:_reset()
+            KEY_H:
+                if is_instance_valid(panel):panel.queue_free();panel=null
+                else:
+                    paused=false
+                    panel=INTENT.new(creature)
+                    ui_layer.add_child(panel)
             KEY_C:
                 walls_on=not walls_on
                 creature.surface.enabled=walls_on
@@ -178,10 +204,14 @@ func _unhandled_input(e: InputEvent) -> void:
                 dummy.hp=100
             KEY_P:paused=not paused
             KEY_X:slow=not slow
-            KEY_1:tail=maxi(0,tail-1);_reset()
-            KEY_2:tail=mini(12,tail+1);_reset()
-            KEY_3:mass=maxf(.5,mass-.25);_reset()
-            KEY_4:mass=minf(3,mass+.25);_reset()
+            KEY_1:creature.change_tail(-1);selected=-1;dragging=false
+            KEY_2:creature.change_tail(1)
+            KEY_3:creature.change_mass(-.25)
+            KEY_4:creature.change_mass(.25)
+            KEY_5:creature.change_legs(false)
+            KEY_6:creature.change_legs(true)
+            KEY_7:creature.change_reach(-.1)
+            KEY_8:creature.change_reach(.1)
     elif e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT:
         dragging=e.pressed
         selected=-1

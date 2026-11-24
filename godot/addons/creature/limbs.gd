@@ -190,3 +190,27 @@ func step_wall(body,dt: float,climb: float,normal: Vector2,face: Rect2) -> void:
             l.swing=true
             l.age=0.0
         if l.planted:support_count+=1
+
+func add_pair(body) -> bool:
+    if legs.size()>=8:return false
+    for parent in range(2):
+        var hip: Vector2=body.nodes[parent].p
+        var side: int=2 if legs.size()<6 else -2
+        legs.append({"parent":parent,"side":side,"group":parent,"foot":hip+Vector2(0,rest_height),"knee":hip,"start":hip,"target":hip,"planted":false,"swing":false,"age":0.0})
+    return true
+
+func remove_pair() -> bool:
+    if legs.size()<=4:return false
+    legs.resize(legs.size()-2)
+    support_count=0
+    for l in legs:
+        if l.planted:support_count+=1
+    return true
+
+func scale_reach(scale: float) -> void:
+    upper=14*scale
+    lower=14*scale
+    max_reach=27*scale
+    rest_height=18*scale
+    stride=12*scale
+    release_all()
