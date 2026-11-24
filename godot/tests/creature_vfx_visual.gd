@@ -66,5 +66,15 @@ func _run() -> void:
     check(is_equal_approx(float(scene.preset.layers[0].organic.length),65.0),"Organic inspector")
     await RenderingServer.frame_post_draw
     check(root.get_texture().get_image().save_png(dir.path_join("vfx-organic.png"))==OK,"Capture organic")
+    for i in range(P.FIELD_TYPES.size()):
+        scene._select_demo(i+7)
+        scene._seek(float(scene.preset.layers[0].duration)*.4)
+        await process_frame
+        await process_frame
+        check(scene.renderer.field_segments>0,"Field demo "+P.FIELD_TYPES[i])
+        scene.field_parameters.thickness.value=4.0
+        check(is_equal_approx(float(scene.preset.layers[0].field.thickness),4.0),"Field inspector")
+        await RenderingServer.frame_post_draw
+        check(root.get_texture().get_image().save_png(dir.path_join("vfx-"+P.FIELD_TYPES[i]+".png"))==OK,"Capture field")
     print("VFX workshop GL failures: ",failures)
     quit(0 if failures==0 else 1)

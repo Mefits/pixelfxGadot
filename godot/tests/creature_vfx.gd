@@ -191,7 +191,39 @@ func _organics() -> void:
     invalid.layers[0].organic.stretch=1.0
     check(not P.valid(invalid),"Reject singular stretch")
 
+func _fields() -> void:
+    var renderer=R.new()
+    var paint=PAINT.new(240,160)
+    var anchors: Dictionary={"origin":Vector2(120,80),"hand":Vector2(80,70),"target":Vector2(170,85)}
+    for i in range(P.FIELD_TYPES.size()):
+        var p: Dictionary=P.demo(i+7)
+        var l: Dictionary=p.layers[0]
+        var kind: String=P.FIELD_TYPES[i]
+        check(P.valid(p) and l.type==kind,"Field preset "+kind)
+        var at: float=float(l.duration)*.4
+        renderer.render(paint,p,at,anchors)
+        check(renderer.field_segments>0 and paint.color.count(0)<paint.color.size(),"Field visible "+kind)
+        var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,p,float(l.duration)*.7,anchors)
+        check(pixels!=paint.rgba_bytes()+paint.rgba_bytes(true),"Field changes "+kind)
+        renderer.render(paint,p,at,anchors)
+        check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Field seek "+kind)
+        check(P.save_preset(p,"user://field_"+kind+".json"),"Field save "+kind)
+        var loaded: Dictionary=P.load_preset("user://field_"+kind+".json")
+        check(P.valid(loaded),"Field load "+kind)
+        if not loaded.is_empty():
+            renderer.render(paint,loaded,at,anchors)
+            check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Field roundtrip "+kind)
+        renderer.render(paint,p,float(l.duration)+.01,anchors)
+        check(renderer.field_segments==0 and paint.color.count(0)==paint.color.size(),"Field expires "+kind)
+        var invalid: Dictionary=p.duplicate(true)
+        invalid.layers[0].field.thickness=13.0
+        check(not P.valid(invalid),"Field rejects invalid width "+kind)
+    var legacy: Dictionary=P.demo()
+    check(P.valid(legacy),"Legacy remains valid")
+
 func _run() -> void:
+    _fields()
     _organics()
     _trails()
     _curves()

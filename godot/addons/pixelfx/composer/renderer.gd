@@ -7,6 +7,7 @@ const L=preload("res://addons/pixelfx/native/lightning.gd")
 const R=preload("res://addons/pixelfx/native/rng.gd")
 const PAL=preload("res://addons/pixelfx/native/palette.gd")
 const O=preload("res://addons/pixelfx/composer/organic.gd")
+const V=preload("res://addons/pixelfx/composer/fields.gd")
 var batch=B.new()
 var bolt=L.new()
 var accelerated: bool=false
@@ -15,6 +16,7 @@ var active_layers: int=0
 var particles: int=0
 var trail_segments: int=0
 var organic_segments: int=0
+var field_segments: int=0
 func enable_acceleration(on: bool=true) -> bool:
     var a: bool=batch.enable_acceleration(on)
     var b: bool=bolt.enable_acceleration(on)
@@ -33,6 +35,7 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
     particles=0
     trail_segments=0
     organic_segments=0
+    field_segments=0
     for i in range(preset.layers.size()):
         var l: Dictionary=preset.layers[i]
         var age: float=time-float(l.start)
@@ -51,6 +54,12 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
         var pos: Vector2=origin(l.anchor,time if l.follow else float(l.start),anchors,provider)+Vector2(l.x,l.y)
         var color: int=PAL.from_hex(l.color)
         var seed0: int=R.hash32([int(preset.seed),i])
+        if l.type in P.FIELD_TYPES:
+            var field_target: Vector2=origin("target",time if l.follow else float(l.start),anchors,provider)
+            var field_batch=batch.begin(painter)
+            field_segments+=V.draw(field_batch,l,pos,field_target,age,size,alpha,glow,color,seed0)
+            batch.finish()
+            continue
         if l.type in P.ORGANIC_TYPES:
             var target: Vector2=origin("target",time if l.follow else float(l.start),anchors,provider)
             var draw_batch=batch.begin(painter)

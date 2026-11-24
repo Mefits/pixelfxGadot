@@ -34,6 +34,9 @@ var trail_fields: Dictionary={}
 var organic_panel: VBoxContainer
 var organic_fields: Dictionary={}
 var organic_hint: Label
+var field_panel: VBoxContainer
+var field_parameters: Dictionary={}
+var field_hint: Label
 var selected: int=0
 var time: float=.3
 var playing: bool=true
@@ -78,7 +81,7 @@ func _ready() -> void:
     left.size=Vector2(172,475)
     add_child(left)
     _label(left,"ПРЕСЕТЫ")
-    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань"],_select_demo)
+    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань","Ударная волна","Энергетический луч","Вихрь","Энергетическая сфера","Разлом"],_select_demo)
     preset.name=UI.label(preset.name)
     name_edit=LineEdit.new()
     name_edit.placeholder_text="Имя эффекта"
@@ -245,6 +248,30 @@ func _ready() -> void:
     aim.toggled.connect(func(v:bool):_organic_change("aim",v))
     organic_hint=_label(organic_panel,"")
     organic_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    field_panel=VBoxContainer.new()
+    right.add_child(field_panel)
+    _label(field_panel,"ФОРМА ЭФФЕКТА")
+    for spec in [["thickness","Толщина, px",.5,12,.5],["length","Длина, px",4,160,1],["aspect","Пропорции",.15,1,.05],["rotation","Вращение, °/с",-720,720,10],["distortion","Искажение",0,1,.05]]:
+        var row:=HBoxContainer.new()
+        field_panel.add_child(row)
+        var label: Label=_label(row,spec[1])
+        label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+        var spin:=SpinBox.new()
+        spin.min_value=spec[2]
+        spin.max_value=spec[3]
+        spin.step=spec[4]
+        spin.custom_minimum_size.x=88
+        row.add_child(spin)
+        var key: String=spec[0]
+        field_parameters[key]=spin
+        spin.value_changed.connect(func(v:float):_field_change(key,v))
+    var field_aim:=CheckButton.new()
+    field_aim.text="Направить к цели"
+    field_panel.add_child(field_aim)
+    field_parameters.aim=field_aim
+    field_aim.toggled.connect(func(v:bool):_field_change("aim",v))
+    field_hint=_label(field_panel,"")
+    field_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _label(right,"КРИВЫЕ ПАРАМЕТРОВ")
     _option(right,["Размер","Прозрачность","Скорость","Свечение"],func(i:int):curve_channel=i;_sync_curve())
     curve_toggle=_button(right,"Своя кривая",_toggle_curve)
@@ -296,6 +323,7 @@ func _select_demo(i: int) -> void:
     else:
         stage.sweep=false
         if i==6:time=.7
+        if i>=7:time=float(preset.layers[0].duration)*.4
     _refresh()
 
 func _toggle_play() -> void:
@@ -318,11 +346,15 @@ func _change(key: String,v: Variant) -> void:
         if v in P.ORGANIC_TYPES:
             if not l.has("organic"):l.organic=P.organic_defaults()
         else:l.erase("organic")
+        if v in P.FIELD_TYPES:
+            if not l.has("field"):l.field=P.field_defaults()
+        else:l.erase("field")
     if key in ["type","enabled"]:_refresh()
     else:
         _sync_emitter()
         _sync_trail()
         _sync_organic()
+        _sync_field()
         _sync_curve()
         dirty=true
 func _refresh() -> void:
@@ -349,6 +381,7 @@ func _sync_fields() -> void:
     _sync_emitter()
     _sync_trail()
     _sync_organic()
+    _sync_field()
     _sync_curve()
     dirty=true
 
@@ -407,6 +440,37 @@ func _organic_change(key: String,value: Variant) -> void:
     var l: Dictionary=preset.layers[selected]
     if not l.type in P.ORGANIC_TYPES:return
     l.organic[key]=value
+    dirty=true
+
+func _sync_field() -> void:
+    if field_panel==null:return
+    var l: Dictionary=preset.layers[selected]
+    var active: bool=l.type in P.FIELD_TYPES
+    field_panel.visible=active
+    if not active:return
+    var previous: bool=syncing
+    syncing=true
+    for key in field_parameters:
+        if key=="aim":field_parameters[key].set_pressed_no_signal(l.field.aim)
+        else:field_parameters[key].set_value_no_signal(float(l.field[key]))
+    field_parameters.length.editable=l.type in ["beam","rift"]
+    field_parameters.aspect.editable=l.type in ["shockwave","vortex","orb"]
+    field_parameters.rotation.editable=l.type!="shockwave"
+    field_parameters.distortion.editable=l.type in ["beam","vortex","rift"]
+    fields.count.editable=l.type in ["shockwave","vortex","orb"]
+    fields.count.tooltip_text="Количество колец или спиралей (до 8)"
+    fields.spread.editable=false
+    fields.gravity.editable=false
+    fields.collision.disabled=true
+    fields.collision.tooltip_text="Визуальная форма без столкновений"
+    field_hint.text={"shockwave":"Размер = радиус; количество = кольца.","beam":"Размер = ширина; длина ограничивает луч.","vortex":"Размер = радиус; количество = спирали.","orb":"Размер = радиус; количество = орбиты.","rift":"Размер = раскрытие; длина = протяжённость."}.get(l.type,"")
+    syncing=previous
+
+func _field_change(key: String,value: Variant) -> void:
+    if syncing:return
+    var l: Dictionary=preset.layers[selected]
+    if not l.type in P.FIELD_TYPES:return
+    l.field[key]=value
     dirty=true
 
 func _sync_emitter() -> void:
@@ -472,7 +536,7 @@ func _update_curve_controls() -> void:
     for k in ["size","end_size","alpha","end_alpha","speed","end_speed","glow"]:
         if fields.has(k):
             var base: String=k.trim_prefix("end_")
-            fields[k].editable=not P.has_curve(l,base) and not ((l.type=="trail" or l.type in P.ORGANIC_TYPES) and base=="speed")
+            fields[k].editable=not P.has_curve(l,base) and not ((l.type=="trail" or l.type in P.ORGANIC_TYPES or l.type in P.FIELD_TYPES) and base=="speed")
             fields[k].tooltip_text="Управляется своей кривой" if not fields[k].editable else ""
     var message: String="%d/%d точек. Своя кривая."%[graph.points.size(),P.MAX_POINTS] if custom else "Базовые значения. Включи свою кривую для редактирования."
     if channel=="speed" and l.type not in ["sparks","droplets","smoke"]:

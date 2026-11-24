@@ -1,9 +1,23 @@
 extends RefCounted
-const TYPES=["lightning","sparks","glow","ring","slash","droplets","smoke","trail","tendril","organic_mass"]
+const TYPES=["lightning","sparks","glow","ring","slash","droplets","smoke","trail","tendril","organic_mass","shockwave","beam","vortex","orb","rift"]
 const ANCHORS=["origin","hand","target"]
 const FOLDER="user://vfx_presets"
 const CURVES=["linear","ease in","ease out","smooth"]
 const MAX_LAYERS=12
+const FIELD_TYPES=["shockwave","beam","vortex","orb","rift"]
+const FIELD_NAMES=["Ударная волна","Энергетический луч","Вихрь","Энергетическая сфера","Разлом"]
+static func field_defaults() -> Dictionary:
+    return {"thickness":3.0,"length":72.0,"aspect":.65,"rotation":90.0,"distortion":.2,"aim":false}
+static func valid_field(f: Variant) -> bool:
+    if not f is Dictionary or not f.get("aim") is bool:return false
+    for spec in [["thickness",.5,12],["length",4,160],["aspect",.15,1],["rotation",-720,720],["distortion",0,1]]:
+        if not num(f.get(spec[0]),spec[1],spec[2]):return false
+    return true
+static func field_demo(index: int) -> Dictionary:
+    var k: String=FIELD_TYPES[index]
+    var l: Dictionary=layer(k)
+    if k=="beam":l.field.aim=true
+    return {"schema":1,"name":FIELD_NAMES[index],"seed":304,"layers":[l]}
 const ORGANIC_TYPES=["tendril","organic_mass"]
 const MAX_ORGANIC_ARMS=8
 const MAX_ORGANIC_SEGMENTS=48
@@ -130,11 +144,32 @@ static func layer(kind: String="sparks") -> Dictionary:
         l.glow=0.0
         l.angle=0.0
         l.spread=90.0
+    if kind in FIELD_TYPES:
+        l.field=field_defaults()
+        l.duration=1.6
+        l.anchor="origin"
+        l.size=22.0
+        l.end_size=40.0
+        l.angle=0.0
+        l.count=4
+        l.spread=360.0
+        l.alpha=1.0
+        l.end_alpha=0.0
+        l.glow=.55
+        match kind:
+            "shockwave":l.size=3.0;l.end_size=65.0;l.duration=.65;l.count=3;l.field.aspect=.75
+            "beam":l.anchor="hand";l.size=3.0;l.end_size=2.0;l.field.length=80.0;l.field.aim=true
+            "vortex":l.count=5;l.field.rotation=180.0;l.field.aspect=.8
+            "orb":l.size=15.0;l.end_size=22.0;l.field.aspect=1.0;l.count=3
+            "rift":l.size=4.0;l.end_size=18.0;l.field.length=56.0;l.angle=-90.0;l.color="#b88cff"
+        if kind!="shockwave":
+            l.curves={"alpha":[[0.0,0.0],[.12,1.0],[.78,1.0],[1.0,0.0]]}
     return l
 static func demo(which: int=0) -> Dictionary:
     if which==4:return stream_demo()
     if which==5:return trail_demo()
     if which==6:return organic_demo()
+    if which>=7 and which<12:return field_demo(which-7)
     var layers: Array=[]
     var names=["Electric burst","Acid impact","Claw slash","Fire burst"]
     match which:
@@ -179,6 +214,9 @@ static func valid(p: Variant) -> bool:
         if l.type in ORGANIC_TYPES:
             if not valid_organic(l.get("organic")):return false
         elif l.has("organic"):return false
+        if l.type in FIELD_TYPES:
+            if not valid_field(l.get("field")):return false
+        elif l.has("field"):return false
         if l.has("curves"):
             if not l.curves is Dictionary:return false
             for channel in l.curves:
