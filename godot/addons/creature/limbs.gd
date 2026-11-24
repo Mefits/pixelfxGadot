@@ -18,6 +18,7 @@ var surface_normal:=Vector2.UP
 var current_height: float=18
 var override_leg: int=-1
 var rear_height_offset: float=0
+var front_height_offset: float=0
 
 func setup(body) -> void:
     legs.clear()
@@ -124,7 +125,7 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         y/=active.size()
         var height: float=y-float(n.p.y)
         # Compress support posture below low ceilings, without shrinking collision circles.
-        var desired_height: float=rest_height+(rear_height_offset if parent==1 else 0)
+        var desired_height: float=rest_height+(rear_height_offset if parent==1 else front_height_offset)
         for box in body.obstacles:
             if float(n.p.x)>=box.position.x-7 and float(n.p.x)<=box.end.x+7 and box.end.y<float(n.p.y) and box.end.y>y-40:
                 desired_height=minf(desired_height,maxf(7.5,y-box.end.y-8))

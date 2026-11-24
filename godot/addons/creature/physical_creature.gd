@@ -72,6 +72,7 @@ func _control(dt: float) -> void:
         attack_requested=false
     var intent: Dictionary=attack.sample(attack.time) if attack.active else {}
     limbs.rear_height_offset=float(intent.get("rear",0))
+    limbs.front_height_offset=-sin(float(intent.get("tilt",0)))*float(body.links[0].length)*.7 if attack.active else 0.0
     grip_cooldown=maxf(0,grip_cooldown-dt)
     surface.cooldown=maxf(0,surface.cooldown-dt)
     jump_cooldown=maxf(0,jump_cooldown-dt)
@@ -144,7 +145,7 @@ func _control(dt: float) -> void:
     for i in range(2):
         var n: Dictionary=body.nodes[i]
         var target: float=float(intent.get("speed",0))*direction if attack.active else input_axis*max_speed
-        var power: float=acceleration*(1.0 if grounded else .48)
+        var power: float=acceleration*(1.6 if attack.active else 1.0)*(1.0 if grounded else .48)
         var ax: float=clampf((target-float(n.v.x))*9,-power,power)
         body.force(i,Vector2(ax/float(n.inv),0))
     # A limited muscular orientation force steers the front/rear axis.
@@ -156,8 +157,8 @@ func _control(dt: float) -> void:
         var trunk: float=body.links[0].length
         var tilt: float=float(intent.tilt)
         goal=Vector2(direction*cos(tilt),sin(tilt))*trunk
-    var correction: Vector2=(goal-(front-rear))*30
-    correction=correction.limit_length(520 if attack.active else 360)
+    var correction: Vector2=(goal-(front-rear))*(115 if attack.active else 30)
+    correction=correction.limit_length(1100 if attack.active else 360)
     body.force(0,correction)
     body.force(1,-correction)
     # Automatic pull is limited to reachable top corners in the movement direction.

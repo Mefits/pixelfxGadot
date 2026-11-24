@@ -18,6 +18,7 @@ func _run() -> void:
     var max_tilt: float=-INF
     var max_x: float=start.x
     var valid: int=0
+    var nearest: float=INF
     for i in range(42):
         c.advance(1.0/60,0,false,false,0,i==0)
         var front: Vector2=c.body.point("front")
@@ -28,11 +29,12 @@ func _run() -> void:
         max_x=maxf(max_x,front.x)
         if c.attack.active and c.attack.valid_pose:
             valid+=1
+            if c.attack.phase()=="strike":nearest=minf(nearest,c.attack.tip.distance_to(target.p))
             check(absf(front.distance_to(c.attack.knee)-c.limbs.upper)<.03,"Attack upper IK length")
             check(absf(c.attack.knee.distance_to(c.attack.tip)-c.limbs.lower)<.03,"Attack lower IK length")
             check(not A.segment_blocked(front,c.attack.knee,floor_boxes,.5) and not A.segment_blocked(c.attack.knee,c.attack.tip,floor_boxes,.5),"Attack chain clear")
             check(not c.limbs.legs[c.attack.leg].planted,"Attack limb not planted")
-    print("Hybrid attack: travel ",max_x-start.x," tilt range ",max_tilt-min_tilt," valid frames ",valid," hits ",c.attack.hit_count," peak support ",c.attack.peak_support)
+    print("Hybrid attack: travel ",max_x-start.x," tilt range ",max_tilt-min_tilt," valid frames ",valid," hits ",c.attack.hit_count," peak support ",c.attack.peak_support," nearest active tip ",nearest)
     check(c.attack.count==1 and not c.attack.active and c.limbs.override_leg==-1,"Attack completes and returns ownership")
     check(max_tilt-min_tilt>3 and max_x-start.x>8,"Physical trunk actually animates")
     check(target.hp==80 and c.attack.hit_count==1,"Single hit per target per attack")

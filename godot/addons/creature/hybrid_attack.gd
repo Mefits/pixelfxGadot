@@ -6,9 +6,9 @@ const ACTIVE_FROM: float=.19
 const ACTIVE_TO: float=.32
 const KEYS=[
     {"t":0.0,"claw":Vector2(.15,.65),"tilt":-.12,"speed":0.0,"rear":0.0},
-    {"t":.15,"claw":Vector2(-.65,-.45),"tilt":.48,"speed":-24.0,"rear":-3.0},
-    {"t":.22,"claw":Vector2(.88,-.38),"tilt":-.48,"speed":145.0,"rear":1.0},
-    {"t":.30,"claw":Vector2(.83,.35),"tilt":-.25,"speed":105.0,"rear":0.0},
+    {"t":.15,"claw":Vector2(-.65,-.45),"tilt":.48,"speed":-20.0,"rear":3.0},
+    {"t":.22,"claw":Vector2(.92,-.30),"tilt":-.40,"speed":175.0,"rear":-2.0},
+    {"t":.30,"claw":Vector2(.96,.20),"tilt":-.25,"speed":155.0,"rear":-1.0},
     {"t":.42,"claw":Vector2(.30,.65),"tilt":-.12,"speed":0.0,"rear":0.0},
     {"t":.56,"claw":Vector2(.15,.65),"tilt":-.12,"speed":0.0,"rear":0.0}
 ]
@@ -63,6 +63,7 @@ func cancel(limbs) -> void:
     prev_valid=false
     limbs.override_leg=-1
     limbs.rear_height_offset=0
+    limbs.front_height_offset=0
 
 func sample(t: float) -> Dictionary:
     t=clampf(t,0,DURATION)
