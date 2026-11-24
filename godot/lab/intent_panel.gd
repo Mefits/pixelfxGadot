@@ -26,9 +26,14 @@ func _ready() -> void:
     style.content_margin_top=8
     style.content_margin_bottom=8
     add_theme_stylebox_override("panel",style)
+    var scroll:=ScrollContainer.new()
+    scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+    scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
+    add_child(scroll)
     var col:=VBoxContainer.new()
-    col.add_theme_constant_override("separation",3)
-    add_child(col)
+    col.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    col.add_theme_constant_override("separation",2)
+    scroll.add_child(col)
     var title:=Label.new()
     title.text="CLAW / MOTION INTENT"
     col.add_child(title)
@@ -46,7 +51,7 @@ func _ready() -> void:
         spin.min_value=spec[2]
         spin.max_value=spec[3]
         spin.step=spec[4]
-        spin.custom_minimum_size.x=100
+        spin.custom_minimum_size.x=86
         row.add_child(spin)
         fields[spec[0]]=spin
         var key: String=spec[0]

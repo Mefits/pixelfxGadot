@@ -30,6 +30,7 @@ func _run() -> void:
     lab.ui_layer.add_child(ed)
     await process_frame
     await process_frame
+    print("Intent panel bounds ",ed.get_global_rect())
     check(ed.get_global_rect().end.x<=960 and ed.get_global_rect().end.y<=482,"Editor fits screen")
     ed.chosen=2
     ed._refresh()
