@@ -1,6 +1,8 @@
 extends Node2D
 const WORLD=preload("res://game/world.gd")
 const M=preload("res://game/motor.gd")
+const SKIN=preload("res://game/fighter_skin.gd")
+var artistic:bool=true
 var world=WORLD.new()
 var paused:bool=false
 var debug:bool=false
@@ -14,6 +16,7 @@ func _ready()->void:
     toolbar=HBoxContainer.new()
     toolbar.position=Vector2(24,16)
     toolbar.theme=theme0
+    theme0.default_font_size=13
     toolbar.add_theme_constant_override("separation",8)
     add_child(toolbar)
     pause_button=_button("Пауза [Space]",_pause)
@@ -21,7 +24,8 @@ func _ready()->void:
     _button("Скелет [F1]",func():debug=not debug;queue_redraw())
     _button("Игрок 2 [F2]",_toggle_second)
     _button("Hitstop [F3]",_toggle_hitstop)
-    _button("Физика [F4]",_toggle_hybrid)
+    _button("Гибрид [F4]",_toggle_hybrid)
+    _button("Облик [F5]",_toggle_skin)
     _button("Дистанция [T]",_close_reset)
     hud=Label.new()
     hud.position=Vector2(24,490)
@@ -55,6 +59,10 @@ func _close_reset()->void:
     world.rig_a.sample(world.a)
     world.rig_b.sample(world.b)
     queue_redraw()
+func _toggle_skin()->void:
+    artistic=not artistic
+    queue_redraw()
+    _hud()
 func _toggle_hybrid()->void:
     world.hybrid_enabled=not world.hybrid_enabled
     _hud()
@@ -73,6 +81,7 @@ func _unhandled_key_input(e:InputEvent)->void:
         KEY_F2:_toggle_second()
         KEY_F3:_toggle_hitstop()
         KEY_F4:_toggle_hybrid()
+        KEY_F5:_toggle_skin()
         KEY_T:_close_reset()
 func _held(key:Key)->bool:return Input.is_physical_key_pressed(key)
 func _physics_process(dt:float)->void:
@@ -83,7 +92,7 @@ func _physics_process(dt:float)->void:
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег · F — быстрый · H — тяжёлый   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl · K/L")+"\nN  /  0.05  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · попаданий "+str(world.hits)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег · F — быстрый · H — тяжёлый   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl · K/L")+"\nN  /  0.06  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · попаданий "+str(world.hits)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)
@@ -104,19 +113,22 @@ func _fighter(m,r,c:Color)->void:
     draw_set_transform(Vector2(m.pos.x,M.FLOOR+3),0,Vector2(1,.19))
     draw_circle(Vector2.ZERO,25,Color(0,0,0,.24))
     draw_set_transform(Vector2.ZERO)
-    _limbs(p,"far",c.darkened(.38),m.facing)
-    var hips:Vector2=p.hips
-    var chest:Vector2=p.chest
-    var normal:Vector2=(chest-hips).normalized().orthogonal()
-    draw_colored_polygon(PackedVector2Array([chest-normal*11,chest+normal*11,hips+normal*8,hips-normal*8]),Color("#182331"))
-    draw_colored_polygon(PackedVector2Array([chest-normal*9,chest+normal*9,hips+normal*6,hips-normal*6]),c.darkened(.07))
-    draw_line(hips-normal*7,hips+normal*7,Color("#29323b"),5,true)
-    _limbs(p,"near",c,m.facing)
-    _segment(chest,p.head,9,c.darkened(.2))
-    draw_circle(p.head,13,Color("#17202b"))
-    draw_circle(p.head,11,c.lightened(.34))
-    var eye:Vector2=p.head+Vector2(5*m.facing,-2)
-    draw_line(eye,eye+Vector2(4*m.facing,0),Color("#202633"),2)
+    if artistic:
+        SKIN.draw(self,p,m.facing,c)
+    else:
+        _limbs(p,"far",c.darkened(.38),m.facing)
+        var hips:Vector2=p.hips
+        var chest:Vector2=p.chest
+        var normal:Vector2=(chest-hips).normalized().orthogonal()
+        draw_colored_polygon(PackedVector2Array([chest-normal*11,chest+normal*11,hips+normal*8,hips-normal*8]),Color("#182331"))
+        draw_colored_polygon(PackedVector2Array([chest-normal*9,chest+normal*9,hips+normal*6,hips-normal*6]),c.darkened(.07))
+        draw_line(hips-normal*7,hips+normal*7,Color("#29323b"),5,true)
+        _limbs(p,"near",c,m.facing)
+        _segment(chest,p.head,9,c.darkened(.2))
+        draw_circle(p.head,13,Color("#17202b"))
+        draw_circle(p.head,11,c.lightened(.34))
+        var eye:Vector2=p.head+Vector2(5*m.facing,-2)
+        draw_line(eye,eye+Vector2(4*m.facing,0),Color("#202633"),2)
     if debug:
         for key in p:draw_circle(p[key],2.6,Color("#f3d38a"))
         if m.grounded:

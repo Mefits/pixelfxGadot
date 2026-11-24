@@ -45,7 +45,9 @@ func _run()->void:
     check(peaks.y>peaks.x*1.6 and peaks.y>peaks.w*2,"Strength and contact height affect torque")
     check(peak_head_tick>peak_chest_tick and peaks.z>head_at_chest_peak,"Head lags torso")
     check(strong.angles.length()<.03 and strong.speeds.length()<.2,"Settles without runaway")
+    check(not W.new().hybrid_enabled,"Authored response is default")
     var w=close_world()
+    w.hybrid_enabled=true
     var baseline=close_world()
     baseline.hybrid_enabled=false
     var support:Array[Vector2]=w.a.feet.duplicate()

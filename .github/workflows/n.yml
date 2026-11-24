@@ -46,7 +46,7 @@ jobs:
           test "$(find reports/back -name '*.png' | wc -l)" -eq 32
           test "$(find reports/leap -name '*.png' | wc -l)" -eq 30
           test "$(find reports/jab -name '*.png' | wc -l)" -eq 34
-          for kind in heavy_hybrid heavy_authored jab_hybrid; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 44; done
+          for kind in heavy_hybrid heavy_authored jab_hybrid jab_authored heavy_mannequin; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 44; done
           rm -rf .godot
           find . -name '*.import' -delete
           printf '%s\n' "$GITHUB_SHA" > REVISION.txt
@@ -57,7 +57,7 @@ jobs:
           path: /tmp/n-*.log
       - uses: actions/upload-artifact@v4
         with:
-          name: N-0.05-Godot
+          name: N-0.06-Godot
           path: |
             project.godot
             game/

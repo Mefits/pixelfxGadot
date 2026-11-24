@@ -18,3 +18,6 @@ Jab milestone: all locomotion regressions, one hit, held-key protection, mirrore
 Heavy rear-hand attack, contact-derived torque, bounded angular spring dynamics with delayed channels, hitstop freeze and A/B reset. Verify old locomotion/jab, hybrid strength/lever/lag/settle, heavy miss/contact/trade, symmetry, bone lengths and actual capture comparisons.
 
 Correct float32 clamp comparison: reset angular velocity only when a hard angular limit is exceeded, not on rounding. Keep original tests unchanged.
+
+## 0.06
+Freeze hybrid implementation, authored reaction default, draw-only original provisional skin. Retain all tests; explicitly enable hybrid in regression; verify toggling art preserves world state. Capture authored jab, authored heavy and same heavy with mannequin for comparison.

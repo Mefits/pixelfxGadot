@@ -38,6 +38,10 @@ func impact_sequence(scene,name:String,hybrid:bool,heavy:bool)->void:
         scene.queue_redraw()
         await capture(name+"/frame_%03d"%frame)
     if scene.world.hits!=1:push_error("Impact capture missed: "+name);quit(1)
+func check_skin(scene,state:Dictionary,tick0:int)->void:
+    if scene.world.ticks!=tick0 or scene.world.rig_a.points!=state:
+        push_error("Skin altered simulation")
+        quit(1)
 func _run()->void:
     root.size=Vector2i(960,540)
     DirAccess.make_dir_recursive_absolute("res://reports")
@@ -81,6 +85,16 @@ func _run()->void:
     await impact_sequence(scene,"heavy_hybrid",true,true)
     await impact_sequence(scene,"heavy_authored",false,true)
     await impact_sequence(scene,"jab_hybrid",true,false)
+    await impact_sequence(scene,"jab_authored",false,false)
+    scene.artistic=false
+    await impact_sequence(scene,"heavy_mannequin",false,true)
+    scene.artistic=true
+    var state:Dictionary=scene.world.rig_a.points.duplicate(true)
+    var tick0:int=scene.world.ticks
+    scene._toggle_skin()
+    check_skin(scene,state,tick0)
+    scene._toggle_skin()
+    check_skin(scene,state,tick0)
     scene._pause()
     if not scene.paused:quit(1);return
     scene._reset()
