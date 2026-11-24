@@ -13,6 +13,8 @@ var paused: bool=false
 var slow: bool=false
 var tail: int=5
 var legs_on: bool=true
+var walls_on: bool=true
+var course: int=0
 var mass: float=1
 var jump_latch: bool=false
 var step_ms: float=0
@@ -37,13 +39,14 @@ func _ready() -> void:
     layer.add_child(hud)
     info=Label.new()
     info.position=Vector2(18,505)
-    info.text="A/D move | W/Space jump | auto ledge | Q legs | 1/2 tail | 3/4 mass | V debug | P pause | X slow | R reset | Esc"
+    info.text="A/D move | W/Space jump | Up/Down climb | C wall mode | Q legs | M course | 1/2 tail | 3/4 mass | R reset | Esc"
     info.add_theme_font_size_override("font_size",14)
     layer.add_child(info)
     _reset()
 
 func _reset() -> void:
     creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
+    creature.surface.enabled=walls_on
     trail.clear()
     dragging=false
     selected=-1
@@ -60,7 +63,8 @@ func _physics_process(dt: float) -> void:
             var n: Dictionary=creature.body.nodes[selected]
             var delta: Vector2=get_global_mouse_position()-Vector2(n.p)
             creature.body.force(selected,(delta*95-Vector2(n.v)*12).limit_length(1600))
-        creature.advance(dt*(.25 if slow else 1),axis,jump)
+        var climb: float=float(Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_UP))
+        creature.advance(dt*(.25 if slow else 1),axis,jump,false,climb)
         step_ms=(Time.get_ticks_usec()-start)/1000.0
         track_clock+=dt
         if track_clock>.035:
@@ -72,7 +76,7 @@ func _physics_process(dt: float) -> void:
 
 func _update_hud() -> void:
     hud.text="Segments %d | feet %d/4 | mass x%.1f | %s | constraint %.2f px | penetration %.3f | %.2f ms CPU | %s"%[
-        creature.body.nodes.size(),creature.limbs.support_count,mass,"GROUND" if creature.grounded else "AIR",creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz")]
+        creature.body.nodes.size(),creature.limbs.support_count,mass,("WALL" if creature.surface.active else ("GROUND" if creature.grounded else "AIR")),creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz")]
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))
@@ -121,6 +125,9 @@ func _draw() -> void:
         var center: Vector2=body.center_of_mass()
         draw_line(center-Vector2(4,0),center+Vector2(4,0),Color("#ffffff"))
         draw_line(center-Vector2(0,4),center+Vector2(0,4),Color("#ffffff"))
+    if creature.surface.active and debug:
+        var s=creature.surface
+        draw_line(Vector2(s.wall_x,s.face.position.y),Vector2(s.wall_x,s.face.end.y),Color("#e9be70"),2)
     if creature.grip_index>=0:
         draw_line(head,creature.grip_target,Color("#e9be70"),2)
         draw_circle(creature.grip_target,3,Color("#e9be70"))
@@ -130,6 +137,14 @@ func _unhandled_input(e: InputEvent) -> void:
         match e.keycode:
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_R:_reset()
+            KEY_C:
+                walls_on=not walls_on
+                creature.surface.enabled=walls_on
+                if not walls_on:creature.surface.detach()
+            KEY_M:
+                course=1-course
+                _set_course()
+                _reset()
             KEY_Q:
                 legs_on=not legs_on
                 creature.limbs.enabled=legs_on
@@ -149,3 +164,9 @@ func _unhandled_input(e: InputEvent) -> void:
             for i in range(creature.body.nodes.size()):
                 var d: float=get_global_mouse_position().distance_to(creature.body.nodes[i].p)
                 if d<best:best=d;selected=i
+
+func _set_course() -> void:
+    if course==0:
+        boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70),Rect2(230,432,72,38),Rect2(302,390,90,80),Rect2(470,360,120,20),Rect2(660,300,130,20),Rect2(790,300,28,170),Rect2(60,320,145,18),Rect2(250,225,160,18),Rect2(530,180,220,18),Rect2(836,414,124,56)])
+    else:
+        boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70),Rect2(280,215,65,255),Rect2(345,215,110,18),Rect2(475,422,140,26),Rect2(650,360,90,110),Rect2(800,200,45,270),Rect2(845,280,115,18)])

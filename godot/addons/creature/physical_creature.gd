@@ -2,6 +2,10 @@ extends RefCounted
 ## Locomotion controller; physical body is independent of poses and skin.
 const LIMBS=preload("res://addons/creature/limbs.gd")
 var limbs=LIMBS.new()
+const SURFACE=preload("res://addons/creature/surface_motor.gd")
+var surface=SURFACE.new()
+var climb_axis: float=0
+var wall_ticks: int=0
 var grip_age: float=0
 var grip_side: float=1
 var grip_cooldown: float=0
@@ -44,18 +48,52 @@ func _init(at: Vector2,boxes: Array[Rect2],tail: int=5,mass: float=1,with_limbs:
     limbs.enabled=with_limbs
     limbs.setup(body)
 
-func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false) -> void:
+func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: float=0) -> void:
     input_axis=clampf(axis,-1,1)
+    climb_axis=clampf(climb,-1,1)
     if jump:jump_requested=true
     body.advance(dt,_control)
     limbs.update_geometry(body,dt,direction)
 
 func _control(dt: float) -> void:
     grip_cooldown=maxf(0,grip_cooldown-dt)
+    surface.cooldown=maxf(0,surface.cooldown-dt)
+    jump_cooldown=maxf(0,jump_cooldown-dt)
+    if grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested:
+        surface.try_attach(body,input_axis,climb_axis)
+    if surface.validate(body,input_axis,limbs.enabled):
+        limbs.step_wall(body,dt,climb_axis,surface.normal,surface.face)
+        var top: Dictionary=surface.top_goal(body,climb_axis)
+        if jump_requested:
+            for i in range(body.nodes.size()):
+                body.impulse(i,Vector2(surface.normal.x*115,-jump_speed*.8)/sqrt(mass_scale))
+            surface.detach()
+            limbs.release_all()
+            jump_requested=false
+            jump_cooldown=.24
+            coyote=0
+            jump_count+=1
+            return
+        if not top.is_empty():
+            grip_target=top.target
+            grip_side=top.side
+            direction=grip_side
+            grip_index=0
+            grip_age=0
+            grip_count+=1
+            surface.detach()
+            limbs.release_all()
+        elif limbs.support_count>0:
+            surface.drive(body,climb_axis,limbs.support_count)
+            grounded=false
+            coyote=0
+            wall_ticks+=1
+            return
+        else:
+            surface.detach()
     limbs.step(body,dt,input_axis,direction,jump_cooldown<=0 and grip_index<0 and not jump_requested)
     grounded=body.nodes[0].ground or body.nodes[1].ground or limbs.support_count>0
     coyote=.09 if grounded else maxf(0,coyote-dt)
-    jump_cooldown=maxf(0,jump_cooldown-dt)
     if absf(input_axis)>.05:direction=signf(input_axis)
     if grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1:
         _find_grip()

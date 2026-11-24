@@ -14,6 +14,8 @@ var swing_time: float=.14
 var phase: int=0
 var step_clock: float=0
 var last_dir: float=1
+var surface_normal:=Vector2.UP
+var current_height: float=18
 
 func setup(body) -> void:
     legs.clear()
@@ -22,6 +24,7 @@ func setup(body) -> void:
         var hip: Vector2=body.nodes[parent].p
         legs.append({"parent":parent,"side":-1 if i%2==0 else 1,"group":i%2 if parent==0 else 1-i%2,"foot":hip+Vector2(0,rest_height),"knee":hip,"start":hip,"target":hip,"planted":false,"swing":false,"age":0.0})
     support_count=0
+    surface_normal=Vector2.UP
     phase=0
     step_clock=0
 
@@ -56,6 +59,9 @@ func release_all() -> void:
 
 func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> void:
     support_count=0
+    if surface_normal!=Vector2.UP:
+        release_all()
+        surface_normal=Vector2.UP
     if not enabled:
         release_all()
         return
@@ -110,7 +116,13 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         for l in active:y+=float(l.foot.y)
         y/=active.size()
         var height: float=y-float(n.p.y)
-        var ay: float=clampf(-body.gravity.y+(height-rest_height)*155-float(n.v.y)*23,-1250,0)
+        # Compress support posture below low ceilings, without shrinking collision circles.
+        var desired_height: float=rest_height
+        for box in body.obstacles:
+            if float(n.p.x)>=box.position.x-7 and float(n.p.x)<=box.end.x+7 and box.end.y<float(n.p.y) and box.end.y>y-40:
+                desired_height=minf(desired_height,maxf(7.5,y-box.end.y-8))
+        current_height=desired_height
+        var ay: float=clampf(-body.gravity.y+(height-desired_height)*155-float(n.v.y)*23,-1250,0)
         body.force(parent,Vector2(0,ay/float(n.inv)))
 
 func update_geometry(body,dt: float,direction: float) -> void:
@@ -118,6 +130,7 @@ func update_geometry(body,dt: float,direction: float) -> void:
         var hip: Vector2=body.nodes[l.parent].p
         if not l.planted and not l.swing:
             var tuck:=Vector2(direction*(5 if l.parent==0 else -5)+float(l.side)*2,12)
+            if surface_normal!=Vector2.UP:tuck=-surface_normal*12+Vector2(0,float(l.side)*5)
             l.foot=Vector2(l.foot).lerp(hip+tuck,clampf(dt*18,0,1))
         # IK only draws a reachable endpoint, never teleports a physical chunk.
         var d: Vector2=Vector2(l.foot)-hip
@@ -128,3 +141,42 @@ func update_geometry(body,dt: float,direction: float) -> void:
         var sign0: float=direction if l.parent==0 else -direction
         l.knee=hip+axis*along+axis.orthogonal()*bend*sign0
         l.tip=hip+axis*length
+
+func step_wall(body,dt: float,climb: float,normal: Vector2,face: Rect2) -> void:
+    if surface_normal!=normal:
+        release_all()
+        surface_normal=normal
+    support_count=0
+    if not enabled:return
+    step_clock+=dt
+    if step_clock>=swing_time:
+        step_clock=0
+        phase=1-phase
+    var edge: float=face.position.x if normal.x<0 else face.end.x
+    for l in legs:
+        var hip: Vector2=body.nodes[l.parent].p
+        var wanted_y: float=hip.y+climb*stride+float(l.side)*4
+        var target:=Vector2(edge+normal.x*.15,clampf(wanted_y,face.position.y+1,face.end.y-1))
+        if l.planted and (hip.distance_to(l.foot)>max_reach or _blocked(hip,l.foot,body.obstacles)):
+            l.planted=false
+        if l.swing:
+            l.age+=dt
+            var u: float=clampf(float(l.age)/swing_time,0,1)
+            l.foot=Vector2(l.start).lerp(l.target,u*u*(3-2*u))+normal*sin(u*PI)*5
+            if u>=1:
+                l.swing=false
+                l.planted=hip.distance_to(l.target)<=max_reach and not _blocked(hip,l.target,body.obstacles)
+                if l.planted:
+                    l.foot=l.target
+                    steps_taken+=1
+        elif not l.planted:
+            if hip.distance_to(target)<=max_reach and not _blocked(hip,target,body.obstacles):
+                l.foot=target
+                l.planted=true
+        elif absf(climb)>.1 and l.group==phase and Vector2(l.foot).distance_to(target)>9 and hip.distance_to(target)<=max_reach:
+            l.start=l.foot
+            l.target=target
+            l.planted=false
+            l.swing=true
+            l.age=0.0
+        if l.planted:support_count+=1
