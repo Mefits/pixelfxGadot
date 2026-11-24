@@ -48,6 +48,20 @@ func _run()->void:
     await sequence(scene,"run",36,"run")
     await sequence(scene,"back",32,"back")
     await sequence(scene,"leap",30,"jump")
+    scene.world=W.new()
+    scene.world.a.separate(150)
+    scene.world.b.separate(scene.world.a.pos.x+66-scene.world.b.pos.x)
+    scene.world.rig_a.sample(scene.world.a)
+    scene.world.rig_b.sample(scene.world.b)
+    scene.debug=false
+    DirAccess.make_dir_recursive_absolute("res://reports/jab")
+    for frame in range(34):
+        for i in range(4):
+            scene.world.tick({"jab":frame==3 and i==0},{})
+        scene._hud()
+        scene.queue_redraw()
+        await capture("jab/frame_%03d"%frame)
+    if scene.world.hits!=1:push_error("Jab capture missed");quit(1);return
     scene._pause()
     if not scene.paused:quit(1);return
     scene._reset()

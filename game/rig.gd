@@ -19,7 +19,7 @@ static func chain(a:Vector2,target:Vector2,l1:float,l2:float,bend:float)->Array[
     var end:Vector2=a+direction*d
     var joint:Vector2=a+direction*along+Vector2(-direction.y,direction.x)*height*bend
     return [joint,end]
-func sample(m)->Dictionary:
+func sample(m,action:Dictionary={})->Dictionary:
     var direction:float=float(m.facing)
     var speed:float=absf(m.velocity.x)
     var relative:float=m.velocity.x*direction
@@ -38,6 +38,11 @@ func sample(m)->Dictionary:
         var ap:Dictionary=MOTION.air(m,0)
         lean=float(ap.lean)
         hip_y=float(ap.hip_y)
+    var weight:float=float(action.get("weight",0))
+    if weight>0:
+        hip_x=lerpf(hip_x,float(action.hip.x),weight)
+        hip_y=lerpf(hip_y,float(action.hip.y),weight)
+        lean=lerpf(lean,float(action.lean),weight)
     if m.grounded:
         # Keep BOTH target feet within the reach envelope while grounded.
         for i in range(2):
@@ -68,6 +73,7 @@ func sample(m)->Dictionary:
         var hand_goal:Vector2=shoulder+guard.lerp(travel,blend)
         if m.grounded:hand_goal+=Vector2(4*m.land,8*m.land)
         else:hand_goal=shoulder+Vector2(MOTION.air(m,i).hand)
+        if weight>0:hand_goal=hand_goal.lerp(shoulder+Vector2(action.lead if i==0 else action.rear),weight)
         var arm:Array[Vector2]=chain(shoulder,hand_goal,UPPER_ARM,LOWER_ARM,1)
         local["shoulder_"+side]=shoulder
         local["elbow_"+side]=arm[0]

@@ -20,6 +20,7 @@ func _ready()->void:
     _button("Сброс [R]",_reset)
     _button("Скелет [F1]",func():debug=not debug;queue_redraw())
     _button("Игрок 2 [F2]",_toggle_second)
+    _button("Hitstop [F3]",_toggle_hitstop)
     hud=Label.new()
     hud.position=Vector2(24,490)
     hud.add_theme_font_size_override("font_size",15)
@@ -41,6 +42,9 @@ func _reset()->void:
     world=WORLD.new()
     queue_redraw()
     _hud()
+func _toggle_hitstop()->void:
+    world.hitstop_enabled=not world.hitstop_enabled
+    _hud()
 func _toggle_second()->void:
     single_player=not single_player
     _hud()
@@ -51,16 +55,17 @@ func _unhandled_key_input(e:InputEvent)->void:
         KEY_R:_reset()
         KEY_F1:debug=not debug;queue_redraw()
         KEY_F2:_toggle_second()
+        KEY_F3:_toggle_hitstop()
 func _held(key:Key)->bool:return Input.is_physical_key_pressed(key)
 func _physics_process(dt:float)->void:
     if paused:return
-    var left:Dictionary={"move":float(_held(KEY_D))-float(_held(KEY_A)),"jump":_held(KEY_W),"run":_held(KEY_SHIFT)}
-    var right:Dictionary={} if single_player else {"move":float(_held(KEY_RIGHT))-float(_held(KEY_LEFT)),"jump":_held(KEY_UP),"run":_held(KEY_CTRL)}
+    var left:Dictionary={"move":float(_held(KEY_D))-float(_held(KEY_A)),"jump":_held(KEY_W),"run":_held(KEY_SHIFT),"jab":_held(KEY_F)}
+    var right:Dictionary={} if single_player else {"move":float(_held(KEY_RIGHT))-float(_held(KEY_LEFT)),"jump":_held(KEY_UP),"run":_held(KEY_CTRL),"jab":_held(KEY_K)}
     world.advance(dt,left,right)
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl")+"\nN  /  0.03  /  Движение и опора   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег · F — удар   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl · K")+"\nN  /  0.04  /  Jab · попаданий "+str(world.hits)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)
@@ -111,5 +116,9 @@ func _draw()->void:
     draw_line(Vector2(0,430),Vector2(960,430),Color("#82968e"),2)
     for i in range(24):
         draw_line(Vector2(i*40,430),Vector2(i*40-40,478),Color("#394956"),1)
+    draw_rect(Rect2(24,61,300,9),Color("#101923"))
+    draw_rect(Rect2(24,61,3*world.jab_a.hp,9),Color("#6daac8"))
+    draw_rect(Rect2(636,61,300,9),Color("#101923"))
+    draw_rect(Rect2(936-3*world.jab_b.hp,61,3*world.jab_b.hp,9),Color("#c88b72"))
     _fighter(world.a,world.rig_a,Color("#6daac8"))
     _fighter(world.b,world.rig_b,Color("#c88b72"))

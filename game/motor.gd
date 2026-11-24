@@ -60,11 +60,11 @@ func tick(input:Dictionary,opponent_x:float)->void:
     var axis:float=clampf(float(input.get("move",0)),-1,1)
     sprint=bool(input.get("run",false))
     var jump:bool=bool(input.get("jump",false))
-    if grounded and absf(opponent_x-pos.x)>5:facing=1 if opponent_x>pos.x else -1
+    if grounded and not input.get("lock_facing",false) and absf(opponent_x-pos.x)>5:facing=1 if opponent_x>pos.x else -1
     # Backpedal in guard rather than playing a forward sprint backwards.
     var backward:bool=axis*facing<0
     var target:float=axis*(96.0 if backward else (RUN if sprint else WALK))
-    velocity.x=move_toward(velocity.x,target,DT*(BRAKE if absf(axis)<.01 else ACCEL))
+    velocity.x=move_toward(velocity.x,target,DT*(550.0 if input.get("hurt",false) else (BRAKE if absf(axis)<.01 else ACCEL)))
     if grounded and jump and not jump_latch:
         takeoff_feet.clear()
         for foot in feet:takeoff_feet.append(Vector2((foot.x-pos.x)*facing,foot.y-pos.y-2))
