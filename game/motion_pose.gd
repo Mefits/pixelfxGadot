@@ -18,6 +18,6 @@ static func air(m,side:int)->Dictionary:
     hand=hand.lerp(Vector2(19.0 if side==0 else 9.0,12.0),extend)
     return {"foot":f,"hand":hand,"lean":lerpf(12.0,25.0,tuck)*(1.0-extend)+4.0*extend,"hip_y":-50.0+6.0*tuck,"phase":phase}
 static func arm_target(stride:float,run:float,side:int)->Vector2:
-    var upper:float=-stride*lerpf(24.0,48.0,run)
+    var upper:float=stride*lerpf(24.0,48.0,run)
     var elbow:float=lerpf(35.0,91.0,run)
     return Vector2(0,22).rotated(deg_to_rad(upper))+Vector2(0,23).rotated(deg_to_rad(upper-elbow))

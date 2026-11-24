@@ -3,6 +3,7 @@ const W=preload("res://game/world.gd")
 const M=preload("res://game/motor.gd")
 const R=preload("res://game/rig.gd")
 const G=preload("res://game/guard_pose.gd")
+const POSE=preload("res://game/motion_pose.gd")
 var errors:int=0
 func _initialize()->void:call_deferred("_run")
 func check(ok:bool,msg:String)->void:
@@ -69,6 +70,7 @@ func _run()->void:
     for i in range(240):w.tick({"move":1,"run":true},{})
     check(w.b.pos.x-w.a.pos.x>=37.99,"No crossing on ground")
     check(w.a.facing==1 and w.b.facing==-1,"Face opponent")
+    check(POSE.arm_target(-1,1,0).x>POSE.arm_target(1,1,0).x,"Opposite arm swing")
     # Separate repeated steady locomotion, backward movement, and a Shift change mid-step.
     for mode in ["walk","run","back"]:
         var motion=W.new()
