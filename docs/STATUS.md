@@ -1,11 +1,19 @@
-# Verification status
+# Status — 2026-11-24, verified implementation 0ba5552
+Latest implementation test: https://github.com/Mefits/pixelfxGadot/actions/runs/45382920708
+Portable package: https://github.com/Mefits/pixelfxGadot/actions/runs/45382920708/artifacts/14913418629
+
 ## Verified
-- Original pinned via submodule; original MIT notice retained.
-- Actions run [45381798574](https://github.com/Mefits/pixelfxGadot/actions/runs/45381798574): six Node tests passed, seven original exports (614 frames) have zero CPU composition error across three opaque backgrounds; seven Godot 4.4.1 clip smoke tests passed.
-- Real GL capture of Chain Lightning, three times and two backgrounds: max RGB difference 1/255, zero channels above 2.
-- Native tests in [45382102168](https://github.com/Mefits/pixelfxGadot/actions/runs/45382102168): seeded RNG, hash, transformed Painter color and light and three seeded branched bolt fixtures all passed with zero differing pixels. This verifies the implemented subset, not all of PixelFX.
-## Latest work pending validation
-- Portable package with original source snapshot and seven clips; CI validates offline re-export.
-- Seven hard particle kinds and Lights direct port; state and buffer parity fixtures and CPU benchmark added.
-- Not yet implemented: soft particles, fire, Bits, complete Painter, actor masks/rig, native live display, performance optimization.
-- Offline playback limitation: combined front/back, stock actor pixels in body-dependent clips, shared-buffer multi-effect blend order can differ. No real-user laptop FPS measurements.
+- Original pinned commit 5294518ce7c72e48b6100a744596e0acf57f2826; MIT notices retained. Portable snapshot contains 300 original files (effect sources, core, tools, docs/skill), seven exported clips. Offline regeneration from snapshot verified.
+- Six Node unit tests; seven original exports / 614 frames. Max CPU composition difference 0 on three opaque backgrounds.
+- Godot 4.4.1 clip smoke: all seven clips. Actual GL capture of Chain Lightning at three times on two backgrounds: max RGB difference 1/255.
+- Native RNG/hash, palette subset, Painter transformed pixel/line/blend/glow, three seeded bolt geometry + stroke/crackle fixtures: zero differences in tested buffers.
+- All 12 particle kinds, including fire-to-smoke, burning chunks, floor callbacks, and Lights: state and color/light fixtures at seven simulation times, zero failures.
+- Bits: three kinds (shard, chunk, drip), six times, zero failures in state and pixels.
+- Live interactive lab: automated scene smoke passed. Full visual quality judgment and representative hardware test still needed.
+## Performance (Linux GitHub-hosted runner, headless CPU)
+Benchmark: 160x112, one seeded bolt + steady sparks, 120 measured frames, excluding GPU upload. Original GDScript port p95 23.957 ms (55a24ca); first optimized p95 17.874 ms (73d9a8d); current p95 18.251 ms, p50 15.089, p99 18.586, max 23.022. Current stage p95: shape/clear 0.591 ms, ink/glow 16.120 ms, particles 1.561 ms, conversion 0.011 ms. Values are not target laptop FPS. Exact native reference is still too slow for multiple concurrent complex effects; use cached original clips where dynamic endpoints are unnecessary.
+## Remaining
+- Port remaining Painter primitives, callbacks, sprite/mask/text, native effect lifecycle, actor rig and moves, Blazes and other helpers; complete authored native effects.
+- Accelerate ink/glow while preserving golden fixtures. Next priority: optional compiled GDExtension kernel (C++), with GDScript reference as fallback; benchmark before choosing default. No compiled kernel exists yet.
+- Add actual multi-instance GPU stress test, first-cast warmup, in-game collision adaptation and human visual review.
+- Combined front/back in offline atlas; stock actor pixels in actor-dependent clips; per-clip multi-effect blend order may differ from original shared frame. These are known limitations, not parity claims.

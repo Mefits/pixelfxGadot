@@ -23,3 +23,7 @@ Press L in the export lab or run godot/lab/live_lightning.tscn. Hold left mouse 
 
 ## Embed offline effects in a game
 Use addons/pixelfx/clip_bank.gd to prepare required manifests before combat and addons/pixelfx/pool.gd for fixed-capacity reuse. Call pool.play(bank.get_clip(id), position, facing, pixel_scale). No disk loading is performed by play(). Prewarm on the actual target GPU if first-use stalls occur.
+
+## Проверенная сборка (24 ноября 2026)
+[Переносимый архив с последними реализациями](https://github.com/Mefits/pixelfxGadot/actions/runs/45382920708/artifacts/14913418629) · [Результаты CI](https://github.com/Mefits/pixelfxGadot/actions/runs/45382920708) · [Статус и ограничения](docs/STATUS.md) · [Интеграция](docs/INTEGRATION.md).
+Все семь оригинальных экспортов, нативные тесты молний, 12 видов частиц и три типа физических фрагментов прошли подготовленные проверки. Нативный CPU-рендерер ещё требует ускорения; не считать лабораторию готовым высокопроизводительным VFX-движком.
