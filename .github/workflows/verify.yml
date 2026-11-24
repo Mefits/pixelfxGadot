@@ -20,6 +20,7 @@ jobs:
       - run: npm run bootstrap
       - run: node tools/check_exports.mjs
       - run: node tools/make_fixture.mjs
+      - run: node tools/make_native_fixture.mjs
       - name: Install Godot 4.4.1
         run: |
           curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
@@ -32,6 +33,8 @@ jobs:
         run: godot --headless --path godot --editor --import
       - name: Engine smoke tests
         run: godot --headless --path godot --script res://tests/smoke.gd
+      - name: Native CPU parity tests
+        run: godot --headless --path godot --script res://tests/native.gd
       - name: Actual GL pixel comparison
         run: timeout 90s xvfb-run -a godot --path godot --rendering-method gl_compatibility --script res://tests/visual.gd
       - uses: actions/upload-artifact@v4
