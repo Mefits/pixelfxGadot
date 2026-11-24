@@ -1,5 +1,6 @@
 extends RefCounted
 ## Locomotion controller; physical body is independent of poses and skin.
+const ANATOMY=preload("res://addons/creature/anatomy.gd")
 const LIMBS=preload("res://addons/creature/limbs.gd")
 var limbs=LIMBS.new()
 const ATTACK=preload("res://addons/creature/hybrid_attack.gd")
@@ -39,20 +40,46 @@ var wall_push_side: float=0
 var motion_state: String="air"
 var contact_polish: bool=true
 var smooth_motion: bool=true
+var anatomy:Dictionary={}
+var branches:Array=[]
+var tail_start:int=2
+var upright:bool=false
 var tail_count: int=2
 var mass_scale: float=1
 var grounded: bool=false
 var jump_count: int=0
 var grip_count: int=0
 
-func _init(at: Vector2,boxes: Array[Rect2],tail: int=2,mass: float=1,with_limbs: bool=true,initial_direction: float=1) -> void:
+func _init(at: Vector2,boxes: Array[Rect2],tail: int=2,mass: float=1,with_limbs: bool=true,initial_direction: float=1,profile:Dictionary={}) -> void:
     direction=-1.0 if initial_direction<0 else 1.0
     tail_count=clampi(tail,0,12)
     mass_scale=clampf(mass,.5,3)
+    anatomy=ANATOMY.normalize(profile) if ANATOMY.valid(profile) else ANATOMY.normalize({"tail":tail_count,"mass":mass_scale,"limbs":with_limbs})
+    tail_count=int(anatomy.tail)
+    mass_scale=float(anatomy.mass)
+    upright=anatomy.type=="biped"
+    max_speed=float(anatomy.speed)
+    jump_speed=float(anatomy.jump)
     body.obstacles.assign(boxes)
+    var trunk:float=float(anatomy.trunk)
+    var offset:Vector2=Vector2(0,trunk) if upright else Vector2(-16*direction,2).normalized()*trunk
     body.add_point("front",at,7,1.4*mass_scale)
-    body.add_point("rear",at+Vector2(-16*direction,2),7,1.8*mass_scale)
-    body.connect_points(0,1,sqrt(260.0),.000001)
+    body.add_point("rear",at+offset,7,1.8*mass_scale)
+    body.connect_points(0,1,trunk,.000001)
+    for branch in range(int(anatomy.tentacles)):
+        var parent:int=0
+        var chain:Array=[0]
+        var pos:Vector2=at
+        var axis:Vector2=Vector2(direction*(.6 if branch%2==0 else -.6),-1).normalized()
+        for j in range(int(anatomy.tentacle_segments)):
+            var length:float=float(anatomy.tentacle_length)
+            pos+=axis*length
+            var index:int=body.add_point("tentacle_%d_%d"%[branch,j],pos,maxf(1.5,3-j*.25),.14*mass_scale)
+            body.connect_points(parent,index,length,.000012)
+            chain.append(index)
+            parent=index
+        branches.append(chain)
+    tail_start=body.nodes.size()
     var last: int=1
     var p: Vector2=body.nodes[last].p
     for i in range(tail_count):
@@ -62,8 +89,12 @@ func _init(at: Vector2,boxes: Array[Rect2],tail: int=2,mass: float=1,with_limbs:
         var index: int=body.add_point("tail_%d"%i,p,r,maxf(.07,.24-i*.018)*mass_scale)
         body.connect_points(last,index,length,.000006)
         last=index
-    limbs.enabled=with_limbs
-    limbs.setup(body)
+    limbs.enabled=bool(anatomy.limbs)
+    limbs.min_legs=2 if upright else (0 if anatomy.type=="crawler" else 4)
+    limbs.upright=upright
+    limb_scale=float(anatomy.reach)
+    limbs.scale_reach(limb_scale)
+    limbs.setup(body,int(anatomy.leg_count))
 
 func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: float=0,strike: bool=false,held: bool=true) -> void:
     input_axis=clampf(axis,-1,1)
@@ -102,7 +133,7 @@ func _control(dt: float) -> void:
     limbs.front_height_offset=-sin(float(intent.get("tilt",0)))*float(body.links[0].length)*.7 if attack.active else 0.0
     if smooth_motion and not attack.active and not surface.active and grip_index<0:
         var axis: Vector2=body.point("front")-body.point("rear")
-        if axis.x*direction<8:
+        if not upright and axis.x*direction<8:
             limbs.front_height_offset=5
             limbs.rear_height_offset=-5
     grip_cooldown=maxf(0,grip_cooldown-dt)
@@ -110,7 +141,7 @@ func _control(dt: float) -> void:
     jump_cooldown=maxf(0,jump_cooldown-dt)
     jump_buffer=maxf(0,jump_buffer-dt)
     jump_requested=jump_buffer>0
-    if grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested and not attack.active:
+    if not upright and grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested and not attack.active:
         if surface.try_attach(body,input_axis,climb_axis):
             direction=-surface.normal.x
     if surface.validate(body,input_axis,limbs.enabled):
@@ -169,7 +200,7 @@ func _control(dt: float) -> void:
     coyote=.12 if grounded else maxf(0,coyote-dt)
     if attack.active:direction=attack.facing
     elif absf(input_axis)>.05:direction=signf(input_axis)
-    if not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1 and not jump_requested:
+    if not upright and not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1 and not jump_requested:
         _find_grip()
     if grip_index>=0:
         grip_age+=dt
@@ -227,7 +258,7 @@ func _control(dt: float) -> void:
     # It is not a transform animation: external contacts can override it.
     var front: Vector2=body.nodes[0].p
     var rear: Vector2=body.nodes[1].p
-    var goal:=Vector2(direction*16,-2)
+    var goal:Vector2=Vector2(0,-float(body.links[0].length)) if upright else Vector2(direction*16,-2).normalized()*float(body.links[0].length)
     if attack.active:
         var trunk: float=body.links[0].length
         var tilt: float=float(intent.tilt)
@@ -238,7 +269,7 @@ func _control(dt: float) -> void:
         # is exactly opposite the current trunk. Radial forces cannot turn it.
         var axis: Vector2=(front-rear).normalized()
         var tangent:=Vector2(-axis.y,axis.x)
-        var target_angle: float=Vector2(direction*16,-2).angle()
+        var target_angle: float=goal.angle()
         var error: float=wrapf(target_angle-axis.angle(),-PI,PI)
         var relative: Vector2=Vector2(body.nodes[0].v)-Vector2(body.nodes[1].v)
         var torque: float=clampf(error*950-relative.dot(tangent)*12,-1550,1550)
@@ -248,14 +279,30 @@ func _control(dt: float) -> void:
     body.force(1,-correction)
     # Soft tail muscles resist folding and damp relative velocity; no rigid animation.
     if smooth_motion:
-        for i in range(2,body.nodes.size()):
+        for i in range(tail_start,body.nodes.size()):
             var n: Dictionary=body.nodes[i]
-            var parent: Dictionary=body.nodes[i-1]
-            var axis: Vector2=(Vector2(parent.p)-Vector2(body.nodes[i-2].p)).normalized()
+            var parent_index:int=1 if i==tail_start else i-1
+            var grandparent:int=0 if i<=tail_start+1 else i-2
+            if i==tail_start+1:grandparent=1
+            var parent: Dictionary=body.nodes[parent_index]
+            var axis: Vector2=(Vector2(parent.p)-Vector2(body.nodes[grandparent].p)).normalized()
             var goal_tail: Vector2=Vector2(parent.p)+axis*float(body.links[i-1].length)
             var f: Vector2=((goal_tail-Vector2(n.p))*9-(Vector2(n.v)-Vector2(parent.v))*1.8).limit_length(26)
             body.force(i,f)
-            body.force(i-1,-f)
+            body.force(parent_index,-f)
+    # Branches are true collision-bearing chains with bounded muscular forces.
+    for branch_index in range(branches.size()):
+        var chain:Array=branches[branch_index]
+        for j in range(1,chain.size()):
+            var index:int=chain[j]
+            var parent:int=chain[j-1]
+            var axis:Vector2=Vector2(direction*(.65 if branch_index%2==0 else -.65),-.85).normalized()
+            if j>1:axis=(Vector2(body.nodes[parent].p)-Vector2(body.nodes[chain[j-2]].p)).normalized()
+            axis=axis.rotated(sin(float(body.steps)*.045+j*.8+branch_index)*.22)
+            var goal_branch:Vector2=Vector2(body.nodes[parent].p)+axis*float(anatomy.tentacle_length)
+            var force:Vector2=((goal_branch-Vector2(body.nodes[index].p))*19-(Vector2(body.nodes[index].v)-Vector2(body.nodes[parent].v))*2).limit_length(36)
+            body.force(index,force)
+            body.force(parent,-force)
     # Automatic pull is limited to reachable top corners in the movement direction.
 
 func _find_grip() -> void:
@@ -302,11 +349,12 @@ func change_tail(delta: int) -> bool:
         tail_count-=1
     else:
         if tail_count>=12:return false
-        var last: int=body.nodes.size()-1
+        var last: int=1 if tail_count==0 else body.nodes.size()-1
         var anchor: Vector2=body.nodes[last].p
         var radius: float=maxf(2.0,4.0-tail_count*.4)
         var length: float=maxf(5,7-tail_count*.25)
-        var axis: Vector2=(anchor-Vector2(body.nodes[last-1].p)).normalized()
+        var prior:int=0 if tail_count==0 else (1 if tail_count==1 else last-1)
+        var axis: Vector2=(anchor-Vector2(body.nodes[prior].p)).normalized()
         if axis.length_squared()<.001:axis=Vector2(-direction,0)
         var point:=Vector2.ZERO
         var found: bool=false
@@ -338,7 +386,7 @@ func change_mass(delta: float) -> bool:
     return true
 
 func change_legs(add: bool) -> bool:
-    if not can_mutate():return false
+    if not can_mutate() or upright:return false
     var ok: bool=limbs.add_pair(body) if add else limbs.remove_pair()
     if ok:mutations+=1
     return ok
@@ -351,3 +399,12 @@ func change_reach(delta: float) -> bool:
     limbs.scale_reach(next)
     mutations+=1
     return true
+
+func anatomy_snapshot()->Dictionary:
+    var out:Dictionary=anatomy.duplicate(true)
+    out.tail=tail_count
+    out.mass=mass_scale
+    out.limbs=limbs.enabled and not limbs.legs.is_empty()
+    out.leg_count=limbs.legs.size()
+    out.reach=limb_scale
+    return out

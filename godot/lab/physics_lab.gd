@@ -78,9 +78,9 @@ func _reset() -> void:
         tail=int(catalog_entry.payload.tail)
         mass=float(catalog_entry.payload.mass)
         legs_on=bool(catalog_entry.payload.limbs)
-    creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
+    creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on,1.0,catalog_entry.get("payload",{}))
     creature.attack.set_track(TRACK.load_track())
-    creature.surface.enabled=walls_on
+    creature.surface.enabled=walls_on and not creature.upright
     creature.smooth_motion=motion_on
     creature.limbs.adaptive_gait=motion_on
     creature.contact_polish=contact_on
@@ -128,7 +128,7 @@ func _update_hud() -> void:
     var vel: Vector2=(Vector2(creature.body.nodes[0].v)+Vector2(creature.body.nodes[1].v))*.5
     var states: Dictionary={"wall":"лазание","ledge":"подтягивание","landing":"приземление","run":"бег","idle":"стойка","rise":"взлёт","fall":"падение","air":"воздух"}
     motion_label.text="%.0f px/с | %s | B мотор: %s · N контакты: %s | посадок %d"%[vel.x,states.get(creature.motion_state,""),"новый" if motion_on else "старый","новые" if contact_on else "старые",creature.landing_count]
-    mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · X медленно"%[creature.tail_count,creature.limb_scale,creature.mutations]
+    mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · S сохранить"%[creature.tail_count,creature.limb_scale,creature.mutations]
     if Time.get_ticks_msec()<notice_until:mutation_label.text=notice
 
 func _draw() -> void:
@@ -205,6 +205,7 @@ func _unhandled_input(e: InputEvent) -> void:
         match UI.physical_key(e):
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_R:_reset()
+            KEY_S:_save_anatomy()
             KEY_H:
                 if is_instance_valid(panel):panel.queue_free();panel=null
                 else:
@@ -213,13 +214,14 @@ func _unhandled_input(e: InputEvent) -> void:
                     ui_layer.add_child(panel)
             KEY_C:
                 walls_on=not walls_on
-                creature.surface.enabled=walls_on
+                creature.surface.enabled=walls_on and not creature.upright
                 if not walls_on:creature.surface.detach()
             KEY_M:
                 course=(course+1)%4
                 _set_course()
                 _reset()
             KEY_Q:
+                if creature.limbs.legs.is_empty():return
                 legs_on=not legs_on
                 creature.limbs.enabled=legs_on
                 creature.limbs.release_all()
@@ -268,3 +270,14 @@ func _set_course() -> void:
 func _mutation(ok: bool) -> void:
     notice="Мутация применена" if ok else "Недоступно: занят, нет места или достигнут предел"
     notice_until=Time.get_ticks_msec()+1800
+
+func _save_anatomy()->void:
+    var profile:Dictionary=creature.anatomy_snapshot()
+    var value:Dictionary=catalog_entry if not catalog_entry.is_empty() else CAT.entry("","creature",profile.name,profile)
+    var saved:Dictionary=CAT.save_draft(value,profile)
+    if saved.is_empty():
+        notice="Не удалось сохранить анатомию"
+    else:
+        catalog_entry=saved
+        notice="Анатомия сохранена в библиотеке"
+    notice_until=Time.get_ticks_msec()+2500

@@ -7,7 +7,35 @@ func _initialize() -> void:
     call_deferred("_run")
 func check(ok: bool,msg: String) -> void:
     if not ok:failures+=1;push_error(msg)
+func _anatomies()->void:
+    var A=preload("res://addons/creature/anatomy.gd")
+    var boxes:Array[Rect2]=[Rect2(-1000,200,2000,80)]
+    for profile in A.templates():
+        check(A.valid(profile),"Anatomy schema "+profile.type)
+        var c=C.new(Vector2(100,150),boxes,2,1,true,1.0,profile)
+        check(c.body.nodes.size()==2+int(profile.tail)+int(profile.tentacles)*int(profile.tentacle_segments),"Body topology "+profile.type)
+        check(c.body.links.size()==c.body.nodes.size()-1,"Tree constraints "+profile.type)
+        check(c.limbs.legs.size()==int(profile.leg_count),"Leg count "+profile.type)
+        check(c.branches.size()==int(profile.tentacles),"Tentacle count "+profile.type)
+        for i in range(120):c.advance(1.0/60,0,false)
+        var start:float=c.body.point("front").x
+        for i in range(120):c.advance(1.0/60,1,false)
+        check(c.body.finite() and c.body.penetration()<.08,"Stable contacts "+profile.type)
+        check(c.body.point("front").x>start+15,"Actual locomotion "+profile.type)
+        check(A.valid(c.anatomy_snapshot()),"Live anatomy roundtrip "+profile.type)
+        if profile.type=="tentacled":
+            check(c.change_tail(-1),"Remove tail with branches")
+            check(c.body.ids.has("tentacle_1_3") and c.branches.size()==2,"Branches survive tail mutation")
+            check(c.body.links.size()==c.body.nodes.size()-1,"Branched graph consistent")
+    var invalid:Dictionary=A.defaults()
+    invalid.leg_count=7
+    check(not A.valid(invalid),"Reject odd leg count")
+    invalid=A.defaults()
+    invalid.tentacles=99
+    check(not A.valid(invalid),"Reject excess branches")
+
 func _run() -> void:
+    _anatomies()
     var track: Dictionary=T.defaults()
     check(T.valid(track),"Default motion valid")
     track.keys[2].speed=180

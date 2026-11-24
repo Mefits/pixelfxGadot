@@ -1,4 +1,5 @@
 extends Node2D
+const PHYS=preload("res://addons/creature/physical_creature.gd")
 const P=preload("res://addons/pixelfx/composer/preset.gd")
 const C=preload("res://addons/creature/clips.gd")
 const A=preload("res://addons/creature/ability.gd")
@@ -7,6 +8,7 @@ const SKIN=preload("res://addons/creature/skin.gd")
 const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
 const R=preload("res://addons/pixelfx/composer/renderer.gd")
 const V=preload("res://addons/creature/vfx_preview.gd")
+var physical
 var entry:Dictionary={}
 var clip:Dictionary={}
 var rig=RIG.humanoid()
@@ -24,6 +26,8 @@ func _ready()->void:
 func set_entry(e:Dictionary)->void:
     entry=e.duplicate(true)
     clip={}
+    physical=null
+    if e.kind=="creature":_reset_body()
     if e.kind=="animation":clip=e.payload.clip
     elif e.kind=="ability":clip=A.compile(e.payload)
     time=0
@@ -33,8 +37,15 @@ func _process(dt:float)->void:
     elapsed+=dt
     if elapsed<1.0/15:return
     time+=elapsed
+    if physical!=null:
+        physical.advance(minf(elapsed,.1),1.0,false)
+        if physical.body.point("front").x>203:_reset_body()
     elapsed=0
     _render()
+func _reset_body()->void:
+    var boxes:Array[Rect2]=[Rect2(-100,128,440,60)]
+    physical=PHYS.new(Vector2(100,86),boxes,2,1,true,1.0,entry.payload)
+
 func _anchor(name:String,t:float)->Vector2:
     if name=="hand":return Vector2(94+sin(t*4)*22,76-cos(t*4)*12)
     if name=="target":return Vector2(166,76)
@@ -56,17 +67,17 @@ func _draw()->void:
     draw_line(Vector2(0,128),Vector2(240,128),Color("#526878"))
     if entry.is_empty():return
     if not clip.is_empty():SKIN.draw_body(self,rig,Vector2(112,125),1,Color("#84c7d9"),false)
-    elif entry.kind=="creature":
-        var p:Dictionary=entry.payload
-        var a:=Vector2(144,111)
-        var b:=Vector2(126,113)
-        if p.limbs:
-            for x in [126,144]:
-                draw_polyline(PackedVector2Array([Vector2(x,113),Vector2(x-5,120),Vector2(x+5,128)]),Color("#8ab5a7"),3)
-        draw_line(a,b,Color("#78a89b"),12)
-        for i in range(int(p.tail)):
-            var q:Vector2=b+Vector2(-7,0)
-            draw_line(b,q,Color("#537b76"),maxf(3,8-i*.5))
-            b=q
-        draw_circle(a,7,Color("#81b3a0"))
-        draw_circle(a+Vector2(3,-2),1.5,Color("#f8ebbb"))
+    elif physical!=null:
+        var body=physical.body
+        if physical.limbs.enabled:
+            for l in physical.limbs.legs:
+                var hip:Vector2=body.nodes[l.parent].p
+                draw_polyline(PackedVector2Array([hip,l.knee,l.get("tip",l.foot)]),Color("#8ab5a7") if l.side>0 else Color("#46736e"),2)
+        for link in body.links:
+            var a:Dictionary=body.nodes[link.a]
+            var b:Dictionary=body.nodes[link.b]
+            draw_line(a.p,b.p,Color("#537b76"),minf(a.r,b.r)*2)
+        for i in range(body.nodes.size()-1,-1,-1):
+            var n:Dictionary=body.nodes[i]
+            draw_circle(n.p,n.r,Color("#81b3a0") if i<2 else Color("#537b76"))
+        draw_circle(body.point("front")+Vector2(3,-2),1.5,Color("#f8ebbb"))

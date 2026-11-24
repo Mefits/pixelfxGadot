@@ -6,3 +6,6 @@ Retry: run 45459076664 passed combat and visual tests; one VFX save/load asserti
 
 ## v0.27 catalogue checkpoint
 Unified launcher, 27 templates, JSON imports and independent library copies, lazy previews and editor handoffs. Run complete regressions plus catalogue launcher tests. No changes to the v0.26 Windows release artifact.
+
+## v0.28 anatomy checkpoint
+Five physical body profiles, bounded branched chains, upright two-leg prototype, real catalogue preview, live anatomy save and schema/locomotion tests. Verify previous default locomotion regressions and all profile topology/contact tests.

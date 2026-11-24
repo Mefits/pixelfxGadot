@@ -1,5 +1,6 @@
 extends RefCounted
 ## Unified data-only catalogue. No simulation or native renderer on scan.
+const ANATOMY=preload("res://addons/creature/anatomy.gd")
 const P=preload("res://addons/pixelfx/composer/preset.gd")
 const C=preload("res://addons/creature/clips.gd")
 const A=preload("res://addons/creature/ability.gd")
@@ -24,7 +25,7 @@ static func valid(e:Variant)->bool:
             bank[p.slot]=p.clip
             return C.valid(bank)
         "creature":
-            return P.num(p.get("tail"),0,12) and float(p.tail)==floorf(float(p.tail)) and P.num(p.get("mass"),.5,3) and p.get("limbs") is bool
+            return ANATOMY.valid(p)
     return false
 
 static func builtins()->Array:
@@ -37,7 +38,7 @@ static func builtins()->Array:
     for slot in C.NAMES:out.append(entry("anim_"+slot,"animation",UI.label(slot),{"slot":slot,"clip":bank[slot]}))
     out.append(entry("ability_dash","ability","Импульсный рывок",A.defaults()))
     out.append(entry("ability_electric","ability","Электрический прорыв",A.electric_demo()))
-    out.append(entry("creature_basic","creature","Базовое физическое существо",{"tail":2,"mass":1.0,"limbs":true}))
+    for a in ANATOMY.templates():out.append(entry("creature_"+a.type,"creature",a.name,a))
     return out
 
 static func safe_id(id:String)->bool:
@@ -116,6 +117,9 @@ static func import_file(path:String)->Dictionary:
     var data:Variant=JSON.parse_string(f.get_as_text())
     if P.valid(data):return save_copy(entry("","vfx",data.name,data))
     if A.valid(data):return save_copy(entry("","ability",data.name,data))
+    if ANATOMY.valid(data):
+        var a:Dictionary=ANATOMY.normalize(data)
+        return save_copy(entry("","creature",a.name,a))
     return {}
 
 static func matches(e:Dictionary,kind:String,query:String)->bool:
