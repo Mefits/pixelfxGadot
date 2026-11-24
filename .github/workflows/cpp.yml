@@ -4,7 +4,8 @@ on:
     branches: [main]
     paths:
       - 'native_cpp/**'
-      - 'godot/addons/pixelfx/native/**'
+      - 'godot/addons/pixelfx/**'
+      - 'godot/lab/**'
       - 'godot/tests/**'
       - 'tools/make_native_fixture.mjs'
       - '.github/workflows/cpp.yml'
@@ -72,8 +73,14 @@ jobs:
       - run: godot --headless --path godot --script res://tests/bits.gd -- --cpp
       - run: godot --headless --path godot --script res://tests/ball.gd
       - run: godot --headless --path godot --script res://tests/ball.gd -- --cpp
+      - run: godot --headless --path godot --script res://tests/custom.gd -- --cpp
+      - run: godot --headless --path godot res://lab/custom_effects.tscn --quit-after 120
       - run: godot --headless --path godot --script res://tests/native_benchmark.gd -- --cpp --batch
       - run: godot --headless --path godot --script res://tests/cpp_stress.gd -- --cpp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: custom-preview-${{ runner.os }}
+          path: reports/rift-collapse-cpp.png
       - uses: actions/upload-artifact@v4
         with:
           name: pixelfx-cpp-${{ runner.os }}
@@ -114,6 +121,8 @@ jobs:
           "$GODOT" --headless --path "$PROJECT" --editor --import
           "$GODOT" --headless --path "$PROJECT" --script res://tests/native.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" --script res://tests/ball.gd -- --cpp
+          "$GODOT" --headless --path "$PROJECT" --script res://tests/custom.gd -- --cpp
+          "$GODOT" --headless --path "$PROJECT" res://lab/custom_effects.tscn --quit-after 120
           "$GODOT" --headless --path "$PROJECT" --script res://tests/smoke.gd
           "$GODOT" --headless --path "$PROJECT" res://lab/live_lightning.tscn --quit-after 120 -- --demo-native
           rm -rf "$PROJECT/.godot"

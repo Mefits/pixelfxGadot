@@ -45,7 +45,7 @@ func _ready() -> void:
     layer.add_child(menu)
     status = Label.new()
     status.position = Vector2(24, 98)
-    status.text = "Click: play | B: background | M: mirror | Space: stress | C: clear | L: live | O: orb"
+    status.text = "Click: play | B: background | M: mirror | Space: stress | C: clear | L: live | O: orb | K: workshop"
     if paths.is_empty():
         status.text = "Run setup_windows.bat to export original effects, then reopen Godot."
     layer.add_child(status)
@@ -68,7 +68,7 @@ func _select(i: int) -> void:
     var clip = CLIP.read_clip(paths[i])
     if clip != null:
         clips[i] = clip
-        status.text = "Ready | Click: play | B: background | M: mirror | Space: stress | C: clear"
+        status.text = "Ready | Click: play | Space: stress | L: live | O: orb | K: workshop | B/M/C"
     else:
         status.text = "Clip load failed; inspect import and manifest."
 
@@ -86,6 +86,8 @@ func _unhandled_input(event: InputEvent) -> void:
             queue_redraw()
         elif event.keycode == KEY_M:
             mirrored = not mirrored
+        elif event.keycode == KEY_K:
+            get_tree().change_scene_to_file("res://lab/custom_effects.tscn")
         elif event.keycode == KEY_O:
             get_tree().change_scene_to_file("res://lab/ball_lightning.tscn")
         elif event.keycode == KEY_L:

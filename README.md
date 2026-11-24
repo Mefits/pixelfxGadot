@@ -41,3 +41,6 @@ Build instructions: [native_cpp/README.md](native_cpp/README.md). The live light
 
 ## Unified packages
 The first verified complete package is [here](https://github.com/Mefits/pixelfxGadot/actions/runs/45389604977/artifacts/14918625502). New C++ workflow packages both binaries after the two platform jobs pass; [latest builds](https://github.com/Mefits/pixelfxGadot/actions/workflows/cpp.yml). O in lab opens the experimental full native Ball Lightning port; all 120 frames are compared in CI.
+
+## Original workshop (development)
+K in the main lab opens Rift Collapse, a new composition using the toolkit (not an upstream effect). 1/2/3 select three art directions; pause/scrub/replay, change seed and backend. See [custom effect authoring](docs/CUSTOM_EFFECTS.md). CI tests replay and backend parity; artistic review pending.
