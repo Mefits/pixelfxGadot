@@ -181,3 +181,36 @@ func crackle(p,paths: Array,k: float,c: Array,glow_k: float=0.5,a: float=1.0) ->
         for i in range(0,pts.size()-1,3):
             p.glow(pts[i][0],pts[i][1],(9.0 if thick else 5.0)*(0.5+k*0.5),c[4],glow_k*k*float(q["w"]))
     _flush(p,[c[3],c[5],c[5],c[7]],[minf(1.0,(k-0.45)*1.6)*a,a,a,a])
+
+static func trace(p,pts: Array,c: int,a: float=1.0,from_index: int=0,to_index: int=-1) -> void:
+    var last: int=pts.size()-1 if to_index<0 else mini(to_index,pts.size()-1)
+    for i in range(maxi(0,from_index),last):
+        p.line(pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1],c,a)
+
+static func scorch(p,cx: float,cy: float,rx: float,t0: float,fade: float=1.0,ry: float=-1.0) -> void:
+    if fade<=0 or rx<=0:
+        return
+    if ry<0:
+        ry=maxf(2.5,rx*.12)
+    const PAL=preload("res://addons/pixelfx/native/palette.gd")
+    const R=preload("res://addons/pixelfx/native/rng.gd")
+    const P=preload("res://addons/pixelfx/native/particles.gd")
+    var ramp: Array=PAL.fit(P.FIRE_HEX,P.FIRE_HEX.size())
+    var soot: int=PAL.from_hex("#110c16")
+    var soot2: int=PAL.from_hex("#1c1522")
+    for y in range(int(floor(cy)),int(floor(cy+ry))+1):
+        for x in range(int(floor(cx-rx)),int(ceil(cx+rx))+1):
+            var dx: float=(x+.5-cx)/rx
+            var dy: float=(y+.5-cy)/ry
+            var d: float=sqrt(dx*dx+dy*dy)
+            if d>1:
+                continue
+            var n: float=float(R.hash32([x,y,41]))/4294967296.0
+            var temp: float=t0*(1.25-d)-n*.35
+            if temp>.06:
+                var c: int=ramp[mini(ramp.size()-1,int(floor((1-minf(1,temp))*(ramp.size()-1))))]
+                p.dot(x,y,c,fade)
+                if (x&3)==0:
+                    p.glow(x+.5,y,6,c,.18*temp*fade)
+            else:
+                p.dot(x,y,soot if d<.5 else soot2,(1.0 if d<.95-n*.3 else 1-d)*fade)

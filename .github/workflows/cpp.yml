@@ -48,6 +48,7 @@ jobs:
       - run: node tools/make_native_fixture.mjs
       - run: node tools/make_painter_fixture.mjs
       - run: node tools/make_core_fixture.mjs
+      - run: node tools/make_chain_fixture.mjs
       - run: node tools/make_particles_fixture.mjs
       - run: node tools/make_bits_fixture.mjs
       - run: node tools/make_ball_fixture.mjs
@@ -77,6 +78,8 @@ jobs:
       - run: godot --headless --path godot --script res://tests/bits.gd -- --cpp
       - run: godot --headless --path godot --script res://tests/ball.gd
       - run: godot --headless --path godot --script res://tests/ball.gd -- --cpp
+      - run: godot --headless --path godot --script res://tests/chain.gd -- --cpp
+      - run: godot --headless --path godot res://lab/chain_lightning.tscn --quit-after 120
       - run: godot --headless --path godot --script res://tests/custom.gd -- --cpp
       - run: godot --headless --path godot res://lab/custom_effects.tscn --quit-after 120
       - run: godot --headless --path godot --script res://tests/native_benchmark.gd -- --cpp --batch
@@ -113,6 +116,7 @@ jobs:
       - run: node tools/make_native_fixture.mjs
       - run: node tools/make_painter_fixture.mjs
       - run: node tools/make_core_fixture.mjs
+      - run: node tools/make_chain_fixture.mjs
       - run: node tools/make_particles_fixture.mjs
       - run: node tools/make_bits_fixture.mjs
       - run: node tools/make_ball_fixture.mjs
@@ -129,6 +133,7 @@ jobs:
           "$GODOT" --headless --path "$PROJECT" --script res://tests/painter_full.gd
           "$GODOT" --headless --path "$PROJECT" --script res://tests/core.gd
           "$GODOT" --headless --path "$PROJECT" --script res://tests/ball.gd -- --cpp
+          "$GODOT" --headless --path "$PROJECT" --script res://tests/chain.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" --script res://tests/custom.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" res://lab/custom_effects.tscn --quit-after 120
           "$GODOT" --headless --path "$PROJECT" --script res://tests/smoke.gd
