@@ -175,6 +175,12 @@ func _run() -> void:
     root.add_child(arena)
     await process_frame
     arena.set_physics_process(false)
+    arena.advanced_mode=true
+    arena._apply_mode()
+    arena._unhandled_input(space)
+    check(arena.paused,"Combat Space pause")
+    arena._unhandled_input(space)
+    check(not arena.paused,"Combat Space resume")
     arena.world.a.pos.x=100
     arena.world.b.pos.x=180
     for i in range(28):

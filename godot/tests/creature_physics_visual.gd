@@ -8,6 +8,15 @@ func _run() -> void:
     root.add_child(lab)
     await process_frame
     lab.set_physics_process(false)
+    var space:=InputEventKey.new()
+    space.physical_keycode=KEY_SPACE
+    space.pressed=true
+    lab._unhandled_input(space)
+    if not lab.paused or lab.pause_button.text!="Пуск":push_error("Physics Space pause");quit(1);return
+    lab._unhandled_input(space)
+    if lab.paused:push_error("Physics Space resume");quit(1);return
+    lab.advanced_mode=true
+    lab._apply_mode()
     var c=lab.creature
     for i in range(120):
         c.advance(1.0/60,0,false,false)

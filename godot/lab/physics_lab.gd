@@ -48,6 +48,10 @@ var trail: Array[Vector2]=[]
 var track_clock: float=0
 var dragging: bool=false
 var selected: int=-1
+var pause_button:Button
+var mode_button:Button
+var advanced_mode:bool=false
+var advanced_buttons:Array[Button]=[]
 
 func _ready() -> void:
     var layer:=CanvasLayer.new()
@@ -55,7 +59,7 @@ func _ready() -> void:
     ui_layer=layer
     var title:=Label.new()
     title.position=Vector2(18,10)
-    title.text="ФИЗИКА И ЭВОЛЮЦИЯ / физическое тело"
+    title.text="ФИЗИКА И ЭВОЛЮЦИЯ"
     title.add_theme_font_size_override("font_size",22)
     layer.add_child(title)
     hud=Label.new()
@@ -63,8 +67,8 @@ func _ready() -> void:
     hud.add_theme_font_size_override("font_size",13)
     layer.add_child(hud)
     info=Label.new()
-    info.position=Vector2(18,505)
-    info.text="A/D ходьба · W/пробел прыжок · F удар · ↑↓ лазание · H атака · M комната · G мишень · R сброс · Esc меню"
+    info.position=Vector2(18,98)
+    info.text="A/D ходьба · W прыжок · F удар · E способность · ↑↓ лазание · G мишень · Space пауза"
     info.add_theme_font_size_override("font_size",13)
     layer.add_child(info)
     mutation_label=Label.new()
@@ -100,6 +104,7 @@ func _ready() -> void:
     layer.add_child(special_label)
     _reset()
     _refresh_abilities()
+    _build_toolbar()
 
 func _reset() -> void:
     if is_instance_valid(panel):panel.queue_free();panel=null
@@ -126,7 +131,7 @@ func _reset() -> void:
 
 func _physics_process(dt: float) -> void:
     if creature==null:return
-    var pressed: bool=Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_SPACE)
+    var pressed: bool=Input.is_physical_key_pressed(KEY_W)
     var jump: bool=pressed and not jump_latch
     jump_latch=pressed
     var attack_pressed: bool=Input.is_physical_key_pressed(KEY_F)
@@ -167,6 +172,9 @@ func _update_hud() -> void:
     motion_label.text="%.0f px/с | %s | B мотор: %s · N контакты: %s | посадок %d"%[vel.x,states.get(creature.motion_state,""),"новый" if motion_on else "старый","новые" if contact_on else "старые",creature.landing_count]
     mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · S сохранить"%[creature.tail_count,creature.limb_scale,creature.mutations]
     if Time.get_ticks_msec()<notice_until:mutation_label.text=notice
+    if not advanced_mode:
+        hud.text="Лапы %d · хвост %d · щупальца %d · масса ×%.1f · %s"%[creature.limbs.legs.size(),creature.tail_count,creature.branches.size(),creature.mass_scale,"ПАУЗА" if paused else "СИМУЛЯЦИЯ"]
+        mutation_label.text="Анатомия: 1/2 хвост · 3/4 масса · 5/6 лапы · 7/8 длина" if Time.get_ticks_msec()>=notice_until else notice
     if special_label!=null:
         special_label.text="E — "+str(ability_entry.get("name","выбери способность"))+" | "+str(creature.special.phase)+" · задержка %.2f с"%creature.special.cooldown
 
@@ -257,12 +265,7 @@ func _unhandled_input(e: InputEvent) -> void:
                 if not is_instance_valid(panel) and not paused and not creature.special.begin(creature,dummy):
                     notice="Способность недоступна: проверь дистанцию, тело и задержку"
                     notice_until=Time.get_ticks_msec()+1600
-            KEY_H:
-                if is_instance_valid(panel):panel.queue_free();panel=null
-                else:
-                    paused=false
-                    panel=INTENT.new(creature)
-                    ui_layer.add_child(panel)
+            KEY_H:_toggle_attack_panel()
             KEY_C:
                 walls_on=not walls_on
                 creature.surface.enabled=walls_on and not creature.upright
@@ -289,7 +292,7 @@ func _unhandled_input(e: InputEvent) -> void:
             KEY_G:
                 dummy.p=get_global_mouse_position()
                 dummy.hp=100
-            KEY_P:paused=not paused
+            KEY_P,KEY_SPACE:_toggle_pause()
             KEY_X:slow=not slow
             KEY_1:_mutation(creature.change_tail(-1));selected=-1;dragging=false
             KEY_2:_mutation(creature.change_tail(1))
@@ -398,3 +401,50 @@ func _edit_ability()->void:
         dlg.queue_free())
     dlg.canceled.connect(dlg.queue_free)
     dlg.popup_centered(Vector2i(370,240))
+
+func _tool(row:HBoxContainer,label:String,hint:String,action:Callable,primary:bool=false)->Button:
+    var b:=Button.new()
+    b.text=label
+    b.focus_mode=Control.FOCUS_NONE
+    row.add_child(b)
+    UI.action_button(b,hint,primary)
+    b.pressed.connect(action)
+    return b
+func _build_toolbar()->void:
+    var row:=HBoxContainer.new()
+    row.position=Vector2(18,505)
+    row.add_theme_constant_override("separation",5)
+    var compact:=Theme.new()
+    compact.default_font_size=13
+    row.theme=compact
+    ui_layer.add_child(row)
+    pause_button=_tool(row,"Пауза","Space / P",_toggle_pause,true)
+    _tool(row,"Сброс","R",_reset)
+    _tool(row,"Сохранить тело","S / Ctrl+S",_save_anatomy,true)
+    _tool(row,"Комната","M",func():course=(course+1)%4;_set_course();_reset())
+    _tool(row,"Редактор атаки","H",_toggle_attack_panel)
+    _tool(row,"Меню","Esc",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
+    mode_button=_tool(row,"Простой","Показать диагностику",_toggle_mode)
+    advanced_buttons.append(_tool(row,"Отладка","V",func():debug=not debug))
+    advanced_buttons.append(_tool(row,"Медленно","X",func():slow=not slow))
+    advanced_mode=UI.advanced("physics")
+    _apply_mode()
+func _toggle_pause()->void:
+    paused=not paused
+    if pause_button!=null:pause_button.text="Пуск" if paused else "Пауза"
+func _toggle_attack_panel()->void:
+    if is_instance_valid(panel):panel.queue_free();panel=null
+    else:
+        paused=false
+        pause_button.text="Пауза"
+        panel=INTENT.new(creature)
+        ui_layer.add_child(panel)
+func _toggle_mode()->void:
+    advanced_mode=not advanced_mode
+    UI.set_advanced("physics",advanced_mode)
+    _apply_mode()
+func _apply_mode()->void:
+    for b in advanced_buttons:b.visible=advanced_mode
+    mode_button.text="Расширенный" if advanced_mode else "Простой"
+    motion_label.visible=advanced_mode
+    _update_hud()

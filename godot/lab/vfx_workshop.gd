@@ -142,8 +142,8 @@ func _ready() -> void:
     kind.clip_text=true
     var addrow:=HBoxContainer.new()
     left.add_child(addrow)
-    _button(addrow,"+ Слой",_add_layer)
-    _button(addrow,"Копия",_copy_layer)
+    _button(addrow,"+ Слой",_add_layer).tooltip_text="Добавить слой выбранного типа"
+    _button(addrow,"Копия",_copy_layer).tooltip_text="Дублировать слой (Ctrl+D)"
     delete_button=_button(addrow,"Del",_delete_layer_action)
     UI.action_button(delete_button,"Удалить выбранный слой (Delete). Последний слой защищён.")
     delete_button.text="Del"
@@ -151,13 +151,14 @@ func _ready() -> void:
     left.add_child(order)
     _button(order,"↑",func():_move_layer(-1))
     _button(order,"↓",func():_move_layer(1))
-    _button(order,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
+    _button(order,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn")).tooltip_text="Главное меню (Esc)"
     var history_row:=HBoxContainer.new()
     left.add_child(history_row)
-    undo_button=_button(history_row,"↶ Отмена",_undo)
-    redo_button=_button(history_row,"↷ Повтор",_redo)
+    undo_button=_button(history_row,"↶",_undo)
+    redo_button=_button(history_row,"↷",_redo)
     undo_button.tooltip_text="Ctrl+Z"
     redo_button.tooltip_text="Ctrl+Y / Ctrl+Shift+Z"
+    _label(left,"Space · Del · Ctrl+S")
     status=_label(left,"")
     status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     var viewport:=SubViewport.new()

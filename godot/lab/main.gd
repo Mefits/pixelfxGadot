@@ -1,7 +1,7 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.36"
+const VERSION="0.37"
 const EXP=preload("res://addons/creature/kit_export.gd")
 const CAT=preload("res://addons/creature/catalog.gd")
 const PREVIEW=preload("res://lab/catalog_preview.gd")
@@ -47,6 +47,12 @@ func _ready() -> void:
     layer.add_child(root)
     _label(root,"CREATURE & PIXELFX",Vector2(28,20),28,Color("#e5edf4"))
     _label(root,"ИНСТРУМЕНТАРИЙ РАЗРАБОТКИ    /    "+VERSION,Vector2(30,56),13,Color("#91a5b9"))
+    var help:=Button.new()
+    help.text="Горячие клавиши"
+    help.position=Vector2(748,26)
+    help.size=Vector2(184,32)
+    root.add_child(help)
+    help.pressed.connect(_show_help)
     _label(root,"ИНСТРУМЕНТЫ",Vector2(28,96),14,Color("#92c6af"))
     var y:float=122
     for section in SECTIONS:
@@ -284,3 +290,12 @@ func _unhandled_input(e: InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
         var key: String=OS.get_keycode_string(UI.physical_key(e))
         if routes.has(key):_open(routes[key])
+
+func _show_help()->void:
+    var dialog:=AcceptDialog.new()
+    dialog.title="Горячие клавиши"
+    dialog.dialog_text="РЕДАКТОРЫ АНИМАЦИИ И VFX\nSpace — пуск/пауза · Delete — удалить выбранное\nCtrl+S — сохранить · Ctrl+Z — отменить\nCtrl+Y / Ctrl+Shift+Z — повторить\nHome — начало · ←/→ — кадр назад/вперёд\nK — записать ключ · Ctrl+D — дублировать слой VFX\n\nФИЗИКА И БОЙ\nSpace — пауза · W — прыжок · R — сброс\nE — способность · Esc — меню\n\nПростой/расширенный режим запоминается отдельно."
+    add_child(dialog)
+    dialog.confirmed.connect(dialog.queue_free)
+    dialog.canceled.connect(dialog.queue_free)
+    dialog.popup_centered(Vector2i(530,300))

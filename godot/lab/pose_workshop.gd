@@ -226,9 +226,9 @@ func _ready() -> void:
     actions.size=Vector2(576,32)
     actions.theme=compact
     add_child(actions)
-    var store:=_button(actions,"Записать ключ",_key)
+    var store:=_button(actions,"+ Ключ",_key)
     UI.action_button(store,"Записать ключ (K)",true)
-    delete_button=_button(actions,"Удалить (Del)",_delete_selected)
+    delete_button=_button(actions,"Удалить",_delete_selected)
     UI.action_button(delete_button,"Удалить выбранный ключ или событие")
     play_button=_button(actions,"Пуск (Space)",_play)
     UI.action_button(play_button,"Пуск / пауза (Space)",true)
@@ -836,7 +836,7 @@ func _delete_selected()->void:
         status.text="Ключ удалён. Ctrl+Z — отменить."
     _update_transport()
 func _update_transport()->void:
-    if play_button!=null:play_button.text="Пауза (Space)" if playing else "Пуск (Space)"
+    if play_button!=null:play_button.text="Пауза" if playing else "Пуск"
     if delete_button!=null and keys!=null and event_list!=null:
         delete_button.disabled=event_list.get_selected_items().is_empty() if delete_lane==1 else (keys.get_selected_items().is_empty() or bank[name_id].keys.size()<=1)
 func _toggle_mode()->void:
