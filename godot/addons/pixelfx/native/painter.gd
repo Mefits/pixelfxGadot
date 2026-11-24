@@ -1,8 +1,11 @@
 extends RefCounted
-## Partial direct port of src/core/painter.js. CPU reference, not yet optimized.
+## Direct port of src/core/painter.js. CPU reference, not yet optimized.
 ## Original MIT: Patch, Hugo Duprez, 2026.
 ## Signed packed int32 slots retain exact RGBA bits; direct native byte conversion.
 ## Little-endian target (Windows/Linux x86-64). Empty light has alpha zero and RGB zero.
+const FONT=preload("res://addons/pixelfx/native/font.gd")
+const PAL=preload("res://addons/pixelfx/native/palette.gd")
+var layer: String="front"
 const BAYER = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5]
 var width: int
 var height: int
@@ -107,7 +110,7 @@ func dot(x: float,y: float,c: int,a: float=1.0) -> void:
 func blend(x: float,y: float,c: int,a: float) -> void:
     blend_px(cell_x(x,y),cell_y(x,y),c,a)
 
-func line(x0: float,y0: float,x1: float,y1: float,c: int,a: float=1.0) -> void:
+func line(x0: float,y0: float,x1: float,y1: float,c: Variant,a: Variant=1.0) -> void:
     var sx: int = cell_x(x0,y0)
     var sy: int = cell_y(x0,y0)
     var ex: int = cell_x(x1,y1)
@@ -117,8 +120,16 @@ func line(x0: float,y0: float,x1: float,y1: float,c: int,a: float=1.0) -> void:
     var stepx: int = 1 if sx<ex else -1
     var stepy: int = 1 if sy<ey else -1
     var err: int = dx+dy
+    var n: int=maxi(1,maxi(dx,-dy))
+    var step: int=0
+    var dynamic: bool=c is Callable or a is Callable
     while true:
-        put(sx,sy,c,a)
+        if dynamic:
+            var u: float=float(step)/n
+            put(sx,sy,int(_value(c,[u])),float(_value(a,[u])))
+        else:
+            put(sx,sy,c,a)
+        step+=1
         if sx==ex and sy==ey:
             break
         var e2: int = 2*err
@@ -214,19 +225,28 @@ func _radial(cx: float,cy: float,rx: float,ry: float,c: int,a: float,soft: bool,
             else:
                 put(sx,sy,c,a)
 
-func circle(cx: float,cy: float,r: float,c: int,a: float=1.0) -> void:
+func circle(cx: float,cy: float,r: float,c: Variant,a: Variant=1.0) -> void:
+    if c is Callable or a is Callable:
+        _circle_callback(cx,cy,r,c,a,false)
+        return
     if r<0.6:
         dot(cx,cy,c,a)
     else:
         _radial(cx,cy,r,r,c,a,false)
 
-func disc(cx: float,cy: float,r: float,c: int,a: float) -> void:
+func disc(cx: float,cy: float,r: float,c: Variant,a: Variant) -> void:
+    if c is Callable or a is Callable:
+        _circle_callback(cx,cy,r,c,a,true)
+        return
     if r<0.5:
         blend(cx,cy,c,a)
     else:
         _radial(cx,cy,r,r,c,a,true)
 
-func ellipse(cx: float,cy: float,rx: float,ry: float,c: int,a: float=1.0) -> void:
+func ellipse(cx: float,cy: float,rx: float,ry: float,c: Variant,a: Variant=1.0) -> void:
+    if c is Callable or a is Callable:
+        _ellipse_callback(cx,cy,rx,ry,c,a)
+        return
     # Upstream normalizes even if radii are equal; preserve that ordering.
     if rx<=0.0 or ry<=0.0:
         return
@@ -238,7 +258,10 @@ func ellipse(cx: float,cy: float,rx: float,ry: float,c: int,a: float=1.0) -> voi
             if dx*dx+dy*dy<=1.0:
                 put(sx,sy,c,a)
 
-func ring(cx: float,cy: float,r: float,w: float,c: int,a: float=1.0) -> void:
+func ring(cx: float,cy: float,r: float,w: float,c: Variant,a: Variant=1.0) -> void:
+    if c is Callable or a is Callable:
+        _ring_callback(cx,cy,r,w,c,a)
+        return
     _radial(cx,cy,r,r,c,a,false,maxf(0.0,r-w))
 
 func rect(x: float,y: float,w: float,h: float,c: int,a: float=1.0) -> void:
@@ -255,7 +278,10 @@ func rect(x: float,y: float,w: float,h: float,c: int,a: float=1.0) -> void:
             if lx>=x and ly>=y and lx<x+w and ly<y+h:
                 put(sx,sy,c,a)
 
-func beam(x0: float,y0: float,x1: float,y1: float,w: float,c: int,a: float=1.0) -> void:
+func beam(x0: float,y0: float,x1: float,y1: float,w: float,c: Variant,a: Variant=1.0) -> void:
+    if c is Callable or a is Callable:
+        _beam_callback(x0,y0,x1,y1,w,c,a)
+        return
     var r: float=w/2.0
     var dx: float=x1-x0
     var dy: float=y1-y0
@@ -272,3 +298,270 @@ func beam(x0: float,y0: float,x1: float,y1: float,w: float,c: int,a: float=1.0) 
             var py0: float=y0+dy*u-y
             if px0*px0+py0*py0<=r*r:
                 put(sx,sy,c,a)
+
+# Dynamic shader/shape callbacks mirror upstream coordinate conventions.
+static func _value(v: Variant,args: Array) -> Variant:
+    return v.callv(args) if v is Callable else v
+
+func reset() -> void:
+    place(0,0)
+    fade=1.0
+    light_k=1.0
+    layer="front"
+
+func get_color(x: float,y: float) -> int:
+    var i: int=_index(cell_x(x,y),cell_y(x,y))
+    return (color[i]&0xffffffff) if i>=0 else 0
+
+func light_pixel(x: float,y: float,c: int,k: float=1.0) -> void:
+    add(cell_x(x,y),cell_y(x,y),c,k)
+
+func each(x0: float,y0: float,x1: float,y1: float,fn: Callable) -> void:
+    var b: Rect2i=_bounds(x0,y0,x1,y1)
+    for sy in range(b.position.y,b.end.y):
+        for sx in range(b.position.x,b.end.x):
+            fn.call(from_x(sx+0.5,sy+0.5),from_y(sx+0.5,sy+0.5),sx,sy)
+
+func shade(x0: float,y0: float,x1: float,y1: float,fn: Callable) -> void:
+    var o: Dictionary={}
+    each(x0,y0,x1,y1,func(x: float,y: float,sx: int,sy: int):
+        o["c"]=0
+        o["a"]=1.0
+        o["l"]=0
+        o["k"]=0.0
+        var result: Variant=fn.call(x,y,o)
+        var c: int=int(result) if result!=null and result!=0 else int(o["c"])
+        if c!=0:
+            put(sx,sy,c,o["a"])
+        if float(o["k"])>0.0:
+            add(sx,sy,int(o["l"]) if int(o["l"])!=0 else c,o["k"])
+    )
+
+func polyline(pts: Array,c: Variant,a: Variant=1.0) -> void:
+    for i in range(1,pts.size()):
+        line(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1],c,a)
+
+func _circle_callback(cx: float,cy: float,r: float,c: Variant,a: Variant,soft: bool) -> void:
+    if r<(0.5 if soft else 0.6):
+        var col: int=int(_value(c,[0.0,0.0]))
+        var alpha: float=float(_value(a,[0.0,0.0]))
+        if soft:
+            blend(cx,cy,col,alpha)
+        else:
+            dot(cx,cy,col,alpha)
+        return
+    each(cx-r,cy-r,cx+r,cy+r,func(x: float,y: float,sx: int,sy: int):
+        var dx: float=x-cx
+        var dy: float=y-cy
+        var d2: float=dx*dx+dy*dy
+        if d2>r*r:
+            return
+        var args: Array=[sqrt(d2)/r,atan2(dy,dx)]
+        var col: int=int(_value(c,args))
+        var alpha: float=float(_value(a,args))
+        if soft:
+            blend_px(sx,sy,col,alpha)
+        else:
+            put(sx,sy,col,alpha)
+    )
+
+func _ellipse_callback(cx: float,cy: float,rx: float,ry: float,c: Variant,a: Variant) -> void:
+    if rx<=0.0 or ry<=0.0:
+        return
+    each(cx-rx,cy-ry,cx+rx,cy+ry,func(x: float,y: float,sx: int,sy: int):
+        var dx: float=(x-cx)/rx
+        var dy: float=(y-cy)/ry
+        var d2: float=dx*dx+dy*dy
+        if d2<=1.0:
+            var args: Array=[sqrt(d2),atan2(dy,dx)]
+            put(sx,sy,int(_value(c,args)),float(_value(a,args)))
+    )
+
+func _ring_callback(cx: float,cy: float,r: float,w: float,c: Variant,a: Variant) -> void:
+    var r0: float=maxf(0,r-w)
+    each(cx-r,cy-r,cx+r,cy+r,func(x: float,y: float,sx: int,sy: int):
+        var dx: float=x-cx
+        var dy: float=y-cy
+        var d2: float=dx*dx+dy*dy
+        if d2>r*r or d2<r0*r0:
+            return
+        var denom: float=r-r0 if r!=r0 else 1.0
+        var v: float=(sqrt(d2)-r0)/denom if w>0 else 1.0
+        var args: Array=[v,atan2(dy,dx)]
+        put(sx,sy,int(_value(c,args)),float(_value(a,args)))
+    )
+
+func _beam_callback(x0: float,y0: float,x1: float,y1: float,w: float,c: Variant,a: Variant) -> void:
+    var r: float=w/2.0
+    var dx: float=x1-x0
+    var dy: float=y1-y0
+    var l2: float=dx*dx+dy*dy
+    if l2==0:
+        l2=0.000000001
+    each(minf(x0,x1)-r,minf(y0,y1)-r,maxf(x0,x1)+r,maxf(y0,y1)+r,func(x: float,y: float,sx: int,sy: int):
+        var u: float=clampf(((x-x0)*dx+(y-y0)*dy)/l2,0,1)
+        var ex: float=x0+dx*u-x
+        var ey: float=y0+dy*u-y
+        var d2: float=ex*ex+ey*ey
+        if d2<=r*r and r>0:
+            var args: Array=[u,sqrt(d2)/r]
+            put(sx,sy,int(_value(c,args)),float(_value(a,args)))
+    )
+
+func arc(cx: float,cy: float,r: float,w: Variant,a0: float,a1: float,c: Variant,a: Variant=1.0) -> void:
+    var span: float=a1-a0
+    if span<=0:
+        return
+    each(cx-r,cy-r,cx+r,cy+r,func(x: float,y: float,sx: int,sy: int):
+        var dx: float=x-cx
+        var dy: float=y-cy
+        var d: float=sqrt(dx*dx+dy*dy)
+        if d>r:
+            return
+        var ang: float=atan2(dy,dx)-a0
+        ang-=floor(ang/TAU)*TAU
+        if ang>span:
+            return
+        var u: float=ang/span
+        var ww: float=float(_value(w,[u]))
+        if ww<=0 or d<r-ww:
+            return
+        var args: Array=[u,(d-(r-ww))/ww]
+        put(sx,sy,int(_value(c,args)),float(_value(a,args)))
+    )
+
+func poly(pts: Array,c: Variant,a: Variant=1.0) -> void:
+    if pts.size()<3:
+        return
+    var x0: float=INF
+    var y0: float=INF
+    var x1: float=-INF
+    var y1: float=-INF
+    for q in pts:
+        x0=minf(x0,q[0])
+        y0=minf(y0,q[1])
+        x1=maxf(x1,q[0])
+        y1=maxf(y1,q[1])
+    each(x0,y0,x1,y1,func(x: float,y: float,sx: int,sy: int):
+        var inside: bool=false
+        var j: int=pts.size()-1
+        for i in range(pts.size()):
+            var xi: float=pts[i][0]
+            var yi: float=pts[i][1]
+            var xj: float=pts[j][0]
+            var yj: float=pts[j][1]
+            if (yi>y)!=(yj>y) and x<((xj-xi)*(y-yi))/(yj-yi)+xi:
+                inside=not inside
+            j=i
+        if inside:
+            put(sx,sy,int(_value(c,[x,y])),float(_value(a,[x,y])))
+    )
+
+func tri(x0: float,y0: float,x1: float,y1: float,x2: float,y2: float,c: Variant,a: Variant=1.0) -> void:
+    poly([[x0,y0],[x1,y1],[x2,y2]],c,a)
+
+func glow_line(x0: float,y0: float,x1: float,y1: float,r: float,c: int,k: float=0.5) -> void:
+    if r<1 or k<=0.004:
+        return
+    var ax: float=to_x(x0,y0)
+    var ay: float=to_y(x0,y0)
+    var bx: float=to_x(x1,y1)
+    var by: float=to_y(x1,y1)
+    var dx: float=bx-ax
+    var dy: float=by-ay
+    var l2: float=dx*dx+dy*dy
+    if l2==0:
+        l2=0.000000001
+    for sy in range(maxi(oy,int(floor(minf(ay,by)-r))),mini(oy+height-1,int(ceil(maxf(ay,by)+r)))+1):
+        for sx in range(maxi(ox,int(floor(minf(ax,bx)-r))),mini(ox+width-1,int(ceil(maxf(ax,bx)+r)))+1):
+            var px0: float=sx+0.5
+            var py0: float=sy+0.5
+            var u: float=clampf(((px0-ax)*dx+(py0-ay)*dy)/l2,0,1)
+            var ex: float=ax+dx*u-px0
+            var ey: float=ay+dy*u-py0
+            var d: float=sqrt(ex*ex+ey*ey)/r
+            if d<1:
+                var f: float=1-d
+                add(sx,sy,c,f*f*k)
+
+func glow_ring(x: float,y: float,radius: float,r: float,c: int,k: float=0.5) -> void:
+    if r<1 or k<=0.004:
+        return
+    var cx: float=to_x(x,y)
+    var cy: float=to_y(x,y)
+    var e: float=radius+r
+    for sy in range(maxi(oy,int(floor(cy-e))),mini(oy+height-1,int(ceil(cy+e)))+1):
+        for sx in range(maxi(ox,int(floor(cx-e))),mini(ox+width-1,int(ceil(cx+e)))+1):
+            var dx: float=sx+0.5-cx
+            var dy: float=sy+0.5-cy
+            var d: float=absf(sqrt(dx*dx+dy*dy)-radius)/r
+            if d<1:
+                var f: float=1-d
+                add(sx,sy,c,f*f*k)
+
+func sprite(rows: Array,pal: Dictionary,x: float,y: float,opts: Dictionary={}) -> void:
+    if rows.is_empty():
+        return
+    var k: float=opts.get("scale",1)
+    var a: float=opts.get("a",1)
+    var w: int=rows[0].length()
+    var cache: Dictionary={}
+    for r in range(rows.size()):
+        for q in range(rows[r].length()):
+            var ch: String=rows[r][q]
+            if ch=="." or ch==" ":
+                continue
+            var col: int=0
+            if opts.has("tint"):
+                col=int(opts["tint"])
+            else:
+                if not cache.has(ch):
+                    var v: Variant=pal.get(ch,0)
+                    cache[ch]=PAL.from_hex(v) if v is String else int(v)
+                col=cache[ch]
+            if col==0:
+                continue
+            var xx: int=w-1-q if opts.get("flip",false) else q
+            var yy: int=rows.size()-1-r if opts.get("flipY",false) else r
+            if k==1:
+                dot(x+xx,y+yy,col,a)
+            else:
+                rect(x+xx*k,y+yy*k,k,k,col,a)
+
+func measure(value: String,opts: Dictionary={}) -> Array:
+    var font: String=opts.get("font","mini")
+    var k: float=opts.get("scale",1)
+    return [FONT.text_width(value,font)*k,FONT.height(font)*k]
+
+func text(value: String,x: float,y: float,c: Variant,opts: Dictionary={}) -> void:
+    var font: String=opts.get("font","mini")
+    var k: float=opts.get("scale",1)
+    var a: float=opts.get("a",1)
+    var w: float=FONT.text_width(value,font)*k
+    var align: String=opts.get("align","left")
+    var left: float=floor((x-w/2 if align=="center" else (x-w if align=="right" else x))+0.5)
+    var top: float=floor(y+0.5)
+    var pixels: Array=FONT.pixels(value,font)
+    if opts.has("outline"):
+        for q in pixels:
+            rect(left+q[0]*k-1,top+q[1]*k-1,k+2,k+2,opts["outline"],a)
+    if opts.has("shadow"):
+        for q in pixels:
+            rect(left+q[0]*k+1,top+q[1]*k+1,k,k,opts["shadow"],a)
+    for q in pixels:
+        rect(left+q[0]*k,top+q[1]*k,k,k,int(_value(c,q)),a)
+
+static func _mask_at(m: Dictionary,x: int,y: int) -> bool:
+    return x>=0 and y>=0 and x<int(m["w"]) and y<int(m["h"]) and bool(m["data"][y*int(m["w"])+x])
+
+func mask(m: Dictionary,x: float,y: float,c: Variant,a: Variant=1.0) -> void:
+    for yy in range(int(m["h"])):
+        for xx in range(int(m["w"])):
+            if _mask_at(m,xx,yy):
+                dot(x+xx,y+yy,int(_value(c,[xx,yy])),float(_value(a,[xx,yy])))
+
+func outline(m: Dictionary,x: float,y: float,c: Variant,a: Variant=1.0) -> void:
+    for yy in range(-1,int(m["h"])+1):
+        for xx in range(-1,int(m["w"])+1):
+            if not _mask_at(m,xx,yy) and (_mask_at(m,xx-1,yy) or _mask_at(m,xx+1,yy) or _mask_at(m,xx,yy-1) or _mask_at(m,xx,yy+1)):
+                dot(x+xx,y+yy,int(_value(c,[xx,yy])),float(_value(a,[xx,yy])))

@@ -21,6 +21,7 @@ jobs:
       - run: node tools/check_exports.mjs
       - run: node tools/make_fixture.mjs
       - run: node tools/make_native_fixture.mjs
+      - run: node tools/make_painter_fixture.mjs
       - run: node tools/make_particles_fixture.mjs
       - run: node tools/make_bits_fixture.mjs
       - run: node tools/make_ball_fixture.mjs
@@ -50,6 +51,8 @@ jobs:
         run: godot --headless --path godot --script res://tests/smoke.gd
       - name: Native CPU parity tests
         run: godot --headless --path godot --script res://tests/native.gd
+      - name: Full Painter parity
+        run: godot --headless --path godot --script res://tests/painter_full.gd
       - name: Native particles parity
         run: godot --headless --path godot --script res://tests/particles.gd
       - name: Native debris parity
