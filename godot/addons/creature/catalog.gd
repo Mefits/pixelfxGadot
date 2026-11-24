@@ -105,9 +105,19 @@ static func save_copy(value:Dictionary,replace_id:String="")->Dictionary:
     elif not safe_id(id) or not FileAccess.file_exists(FOLDER.path_join(id+".json")):return {}
     if not safe_id(id):return {}
     var result:Dictionary=entry(id,value.kind,value.name,value.payload,"library")
-    var f:=FileAccess.open(FOLDER.path_join(id+".json"),FileAccess.WRITE)
+    var path:String=FOLDER.path_join(id+".json")
+    var temporary:String=path+".partial_"+str(Time.get_ticks_usec())
+    var f:=FileAccess.open(temporary,FileAccess.WRITE)
     if f==null:return {}
     f.store_string(JSON.stringify(result,"  ",true,true))
+    var err:Error=f.get_error()
+    f.close()
+    if err!=OK or read_entry(temporary).is_empty():
+        DirAccess.remove_absolute(temporary)
+        return {}
+    if DirAccess.rename_absolute(temporary,path)!=OK:
+        DirAccess.remove_absolute(temporary)
+        return {}
     return result
 
 static func import_file(path:String)->Dictionary:
@@ -142,3 +152,23 @@ static func save_draft(e:Dictionary,payload:Dictionary,name:String="")->Dictiona
 static func route(e:Dictionary)->String:
     if e.kind=="ability" and SPECIAL.valid(e.payload):return "physics_lab"
     return ROUTES[e.kind]
+
+## Library management only. Saved legacy banks and builtins remain read-only.
+const TRASH="user://creature_library_trash"
+static func rename_copy(id:String,new_name:String)->Dictionary:
+    if not safe_id(id):return {}
+    var e:Dictionary=read_entry(FOLDER.path_join(id+".json"))
+    if e.is_empty():return {}
+    e.name=new_name.strip_edges()
+    if e.kind in ["vfx","ability","creature"]:e.payload.name=e.name
+    return save_copy(e,id)
+
+static func trash_copy(id:String)->Error:
+    if not safe_id(id):return ERR_INVALID_PARAMETER
+    var source:String=FOLDER.path_join(id+".json")
+    if read_entry(source).is_empty():return ERR_FILE_NOT_FOUND
+    var err:Error=DirAccess.make_dir_recursive_absolute(TRASH)
+    if err!=OK:return err
+    var target:String=TRASH.path_join(id+".json")
+    if FileAccess.file_exists(target):return ERR_ALREADY_EXISTS
+    return DirAccess.rename_absolute(source,target)

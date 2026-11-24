@@ -1,7 +1,17 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.37"
+const VERSION="0.38"
+const VIEW=preload("res://lab/library_view.gd")
+var view_state=VIEW.new()
+var scope:OptionButton
+var favorite_button:Button
+var rename_button:Button
+var trash_button:Button
+var rename_dialog:ConfirmationDialog
+var rename_edit:LineEdit
+var trash_dialog:ConfirmationDialog
+var pending_id:String=""
 const EXP=preload("res://addons/creature/kit_export.gd")
 const CAT=preload("res://addons/creature/catalog.gd")
 const PREVIEW=preload("res://lab/catalog_preview.gd")
@@ -73,6 +83,7 @@ func _ready() -> void:
             y+=48
     _label(root,"БИБЛИОТЕКА ШАБЛОНОВ",Vector2(274,96),14,Color("#79b9d4"))
     category=OptionButton.new()
+    view_state.load_state()
     category.position=Vector2(274,122)
     category.size=Vector2(143,32)
     category.add_item("Все категории")
@@ -85,9 +96,15 @@ func _ready() -> void:
     search.placeholder_text="Поиск…"
     root.add_child(search)
     search.text_changed.connect(func(_s:String):_filter())
+    scope=OptionButton.new()
+    scope.position=Vector2(274,160)
+    scope.size=Vector2(339,30)
+    for value in ["Все шаблоны","Мои шаблоны","Избранное","Недавние"]:scope.add_item(value)
+    root.add_child(scope)
+    scope.item_selected.connect(func(_i:int):_filter())
     catalog_list=ItemList.new()
-    catalog_list.position=Vector2(274,162)
-    catalog_list.size=Vector2(339,278)
+    catalog_list.position=Vector2(274,196)
+    catalog_list.size=Vector2(339,244)
     catalog_list.add_theme_constant_override("v_separation",5)
     root.add_child(catalog_list)
     catalog_list.item_selected.connect(_select_entry)
@@ -111,15 +128,18 @@ func _ready() -> void:
     root.add_child(viewport)
     picture=TextureRect.new()
     picture.position=Vector2(632,122)
-    picture.size=Vector2(300,200)
+    picture.size=Vector2(270,180)
+    picture.position=Vector2(647,122)
     picture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
     picture.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
     picture.texture=viewport.get_texture()
     picture.hide()
     root.add_child(picture)
-    detail_label=_label(root,"Выбери шаблон из списка.",Vector2(632,330),14,Color("#c4d0db"))
-    detail_label.size=Vector2(300,76)
+    detail_label=_label(root,"Выбери шаблон из списка.",Vector2(632,306),14,Color("#c4d0db"))
+    detail_label.size=Vector2(300,64)
     detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    detail_label.clip_text=true
+    _management(root)
     open_button=Button.new()
     open_button.text="Открыть в редакторе"
     open_button.position=Vector2(632,448)
@@ -165,13 +185,17 @@ func _filter()->void:
     filtered.clear()
     catalog_list.clear()
     var kind:String="" if category.selected<=0 else CAT.KINDS[category.selected-1]
-    for e in entries:
-        if not CAT.matches(e,kind,search.text):continue
+    var ordered:Array=entries.duplicate()
+    if scope.selected==3:
+        ordered.sort_custom(func(a:Dictionary,b:Dictionary):return view_state.recent.find(a.id)<view_state.recent.find(b.id))
+    for e in ordered:
+        if not view_state.includes(e,scope.selected) or not CAT.matches(e,kind,search.text):continue
         filtered.append(e)
         var prefix:String="★ " if e.source=="library" else ("● " if e.source=="saved" else "")
-        catalog_list.add_item(prefix+e.name+" · "+CAT.LABELS[e.kind])
+        var star:String="☆ " if e.id in view_state.favorites else ""
+        catalog_list.add_item(star+prefix+e.name+" · "+CAT.LABELS[e.kind])
     _clear_preview()
-    status.text="Шаблонов: %d / %d · ★ копия библиотеки · ● сохранённый"%[filtered.size(),entries.size()]
+    status.text="Шаблонов: %d / %d · ☆ избранное · ★ копия · ● сохранённый"%[filtered.size(),entries.size()]
 
 func _clear_preview()->void:
     if is_instance_valid(preview):
@@ -184,6 +208,9 @@ func _clear_preview()->void:
     open_button.disabled=true
     copy_button.disabled=true
     export_button.disabled=true
+    favorite_button.disabled=true
+    rename_button.disabled=true
+    trash_button.disabled=true
 
 func _selected_entry()->Dictionary:
     var selected:PackedInt32Array=catalog_list.get_selected_items()
@@ -211,6 +238,10 @@ func _select_entry(i:int)->void:
     detail_label.text=e.name+"\n"+source+"\n"+detail
     open_button.disabled=false
     copy_button.disabled=false
+    favorite_button.disabled=false
+    favorite_button.text="★ Убрать" if e.id in view_state.favorites else "☆ Избранное"
+    rename_button.disabled=e.source!="library"
+    trash_button.disabled=e.source!="library"
     export_button.disabled=not EXP.available()
     if not EXP.available():export_button.tooltip_text="Runtime ZIP не включён. Используй полный проверенный пакет."
 
@@ -222,16 +253,17 @@ func _open_entry()->void:
     if err!=OK:
         get_tree().remove_meta(CAT.HANDOFF)
         status.text="Ошибка открытия шаблона: "+str(err)
+    else:view_state.opened(e.id)
 
 func _copy_entry()->void:
     var e:Dictionary=_selected_entry()
     if e.is_empty():return
     var value:Dictionary=e.duplicate(true)
     value.name=(str(e.name)+" — копия").left(120)
-    if e.kind in ["vfx","ability"]:value.payload.name=value.name
+    if e.kind in ["vfx","ability","creature"]:value.payload.name=value.name
     var saved:Dictionary=CAT.save_copy(value)
     if saved.is_empty():status.text="Не удалось сохранить копию";return
-    _reload()
+    _show_saved(saved.id)
     status.text="Копия сохранена: "+str(saved.name)
 
 func _begin_export()->void:
@@ -251,7 +283,7 @@ func _export_entry(path:String)->void:
 func _import_entry(path:String)->void:
     var saved:Dictionary=CAT.import_file(path)
     if saved.is_empty():status.text="Файл не поддерживается или не прошёл проверку";return
-    _reload()
+    _show_saved(saved.id)
     status.text="Импортировано: "+str(saved.name)
 
 func _label(parent: Control,value: String,at: Vector2,font_size: int,color: Color) -> Label:
@@ -286,10 +318,16 @@ func _open(path: String) -> void:
     if err!=OK:status.text="Ошибка открытия: "+str(err)
 
 func _unhandled_input(e: InputEvent) -> void:
-    if search.has_focus():return
-    if e is InputEventKey and e.pressed and not e.echo:
-        var key: String=OS.get_keycode_string(UI.physical_key(e))
-        if routes.has(key):_open(routes[key])
+    if not UI.editor_shortcut(self,e):return
+    if e.ctrl_pressed and UI.physical_key(e)==KEY_F:
+        search.grab_focus()
+        get_viewport().set_input_as_handled()
+        return
+    if e.ctrl_pressed:return
+    if UI.physical_key(e)==KEY_F2:_begin_rename();return
+    if UI.physical_key(e)==KEY_DELETE:_begin_trash();return
+    var key:String=OS.get_keycode_string(UI.physical_key(e))
+    if routes.has(key):_open(routes[key])
 
 func _show_help()->void:
     var dialog:=AcceptDialog.new()
@@ -299,3 +337,85 @@ func _show_help()->void:
     dialog.confirmed.connect(dialog.queue_free)
     dialog.canceled.connect(dialog.queue_free)
     dialog.popup_centered(Vector2i(530,300))
+
+func _management(root:Control)->void:
+    favorite_button=Button.new()
+    favorite_button.text="☆ Избранное"
+    favorite_button.position=Vector2(632,376)
+    favorite_button.size=Vector2(112,30)
+    root.add_child(favorite_button)
+    favorite_button.pressed.connect(_favorite)
+    rename_button=Button.new()
+    rename_button.text="Имя"
+    rename_button.position=Vector2(750,376)
+    rename_button.size=Vector2(80,30)
+    rename_button.tooltip_text="Переименовать копию (F2)"
+    root.add_child(rename_button)
+    rename_button.pressed.connect(_begin_rename)
+    trash_button=Button.new()
+    trash_button.text="В корзину"
+    trash_button.position=Vector2(836,376)
+    trash_button.size=Vector2(96,30)
+    trash_button.tooltip_text="Переместить копию в корзину (Delete)"
+    root.add_child(trash_button)
+    trash_button.pressed.connect(_begin_trash)
+    rename_dialog=ConfirmationDialog.new()
+    rename_dialog.title="Переименовать шаблон"
+    rename_dialog.ok_button_text="Сохранить имя"
+    rename_edit=LineEdit.new()
+    rename_edit.max_length=120
+    rename_dialog.add_child(rename_edit)
+    root.add_child(rename_dialog)
+    rename_dialog.confirmed.connect(_rename_confirmed)
+    trash_dialog=ConfirmationDialog.new()
+    trash_dialog.title="Переместить копию в корзину?"
+    trash_dialog.ok_button_text="В корзину"
+    root.add_child(trash_dialog)
+    trash_dialog.confirmed.connect(_trash_confirmed)
+func _select_id(id:String)->void:
+    for i in range(filtered.size()):
+        if filtered[i].id==id:
+            catalog_list.select(i)
+            catalog_list.ensure_current_is_visible()
+            _select_entry(i)
+            return
+func _show_saved(id:String)->void:
+    search.text=""
+    scope.select(1)
+    category.select(0)
+    _reload()
+    _select_id(id)
+func _favorite()->void:
+    var e:Dictionary=_selected_entry()
+    if e.is_empty():return
+    view_state.toggle(e.id)
+    _filter()
+    _select_id(e.id)
+func _begin_rename()->void:
+    var e:Dictionary=_selected_entry()
+    if e.get("source")!="library":return
+    pending_id=e.id
+    rename_edit.text=e.name
+    rename_dialog.popup_centered(Vector2i(420,100))
+    rename_edit.grab_focus()
+    rename_edit.select_all()
+func _rename_confirmed()->void:
+    var saved:Dictionary=CAT.rename_copy(pending_id,rename_edit.text)
+    pending_id=""
+    if saved.is_empty():status.text="Не удалось переименовать. Проверь имя.";return
+    _show_saved(saved.id)
+    status.text="Имя сохранено: "+saved.name
+func _begin_trash()->void:
+    var e:Dictionary=_selected_entry()
+    if e.get("source")!="library":return
+    pending_id=e.id
+    trash_dialog.dialog_text="«"+e.name+"» будет перемещён в папку creature_library_trash. Исходные шаблоны не меняются."
+    trash_dialog.popup_centered(Vector2i(440,140))
+func _trash_confirmed()->void:
+    var id:String=pending_id
+    pending_id=""
+    var err:Error=CAT.trash_copy(id)
+    if err!=OK:status.text="Не удалось переместить: "+error_string(err);return
+    view_state.remove(id)
+    _reload()
+    status.text="Копия в корзине. Файл сохранён в user://creature_library_trash."

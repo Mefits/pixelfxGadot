@@ -64,6 +64,10 @@ var loop: bool=true
 var dirty: bool=true
 var syncing: bool=false
 var clock: float=0
+var saved_preset:Dictionary={}
+var unsaved_label:Label
+var leave_dialog:ConfirmationDialog
+var pending_action:Callable
 var advanced_mode:bool=false
 var mode_button:Button
 var delete_button:Button
@@ -113,7 +117,7 @@ func _ready() -> void:
     left.size=Vector2(172,475)
     add_child(left)
     _label(left,"ПРЕСЕТЫ")
-    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань","Ударная волна","Энергетический луч","Вихрь","Энергетическая сфера","Разлом"],_select_demo)
+    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань","Ударная волна","Энергетический луч","Вихрь","Энергетическая сфера","Разлом"],func(i:int):_guard_change(func():_select_demo(i)))
     demos.fit_to_longest_item=false
     demos.clip_text=true
     preset.name=UI.label(preset.name)
@@ -127,7 +131,7 @@ func _ready() -> void:
     var io:=HBoxContainer.new()
     left.add_child(io)
     UI.action_button(_button(io,"Сохранить",_save),"Ctrl+S",true)
-    _button(io,"Загрузить",_load)
+    _button(io,"Загрузить",func():_guard_change(_load))
     library=OptionButton.new()
     library.fit_to_longest_item=false
     library.clip_text=true
@@ -151,13 +155,15 @@ func _ready() -> void:
     left.add_child(order)
     _button(order,"↑",func():_move_layer(-1))
     _button(order,"↓",func():_move_layer(1))
-    _button(order,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn")).tooltip_text="Главное меню (Esc)"
+    _button(order,"Меню",func():_leave("res://lab/main.tscn")).tooltip_text="Главное меню (Esc)"
     var history_row:=HBoxContainer.new()
     left.add_child(history_row)
     undo_button=_button(history_row,"↶",_undo)
     redo_button=_button(history_row,"↷",_redo)
     undo_button.tooltip_text="Ctrl+Z"
     redo_button.tooltip_text="Ctrl+Y / Ctrl+Shift+Z"
+    unsaved_label=_label(left,"Сохранено")
+    unsaved_label.add_theme_color_override("font_color",Color("#e6be7d"))
     _label(left,"Space · Del · Ctrl+S")
     status=_label(left,"")
     status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -233,8 +239,8 @@ func _ready() -> void:
     binding_role.clip_text=true
     _button(combat_page,"Назначить текущий",_bind_current)
     _button(combat_page,"Вернуть стандартный",_unbind_current)
-    _button(combat_page,"Открыть привязанный",_load_bound)
-    _button(combat_page,"В боевую лабораторию",func():get_tree().change_scene_to_file("res://lab/combat_lab.tscn"))
+    _button(combat_page,"Открыть привязанный",func():_guard_change(_load_bound))
+    _button(combat_page,"В боевую лабораторию",func():_leave("res://lab/combat_lab.tscn"))
     binding_info=_label(combat_page,"")
     binding_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     var binding_hint: Label=_label(combat_page,"Назначение хранит копию эффекта. Редактируй и назначай заново. В бою «Рука» означает конечность из маркера анимации, в том числе ногу; «Цель» — точка события.")
@@ -418,6 +424,8 @@ func _ready() -> void:
             if l.type=="trail":stage.moving=true;stage.sweep=true;break
         status.text="Библиотека: сохранение в отдельную копию."
     _refresh()
+    _mark_clean()
+    _make_leave_dialog()
     advanced_mode=UI.advanced("vfx")
     _apply_mode()
 func _quick_open() -> void:
@@ -459,13 +467,14 @@ func _unbind_current() -> void:
 func _load_bound() -> void:
     var role: String=BINDINGS.ROLES[maxi(0,binding_role.selected)]
     if not binding_bank.has(role):return
-    _remember()
+    catalog_entry={}
     preset=binding_bank[role].duplicate(true)
     selected=0
     stage.sweep=false
     for l in preset.layers:
         if l.type=="trail":stage.moving=true;stage.sweep=true;break
     _refresh()
+    _mark_clean()
 
 func _inspector_page(label_text: String) -> VBoxContainer:
     var scroll:=ScrollContainer.new()
@@ -524,7 +533,7 @@ func _effect_duration() -> float:
     return maxf(P.duration(preset),P.duration(reference)) if compare_labels!=null and compare_labels.visible else P.duration(preset)
 
 func _select_demo(i: int) -> void:
-    _remember()
+    catalog_entry={}
     preset=P.demo(i)
     preset.name=UI.label(preset.name)
     selected=0
@@ -537,6 +546,7 @@ func _select_demo(i: int) -> void:
         if i==6:time=.7
         if i>=7:time=float(preset.layers[0].duration)*.4
     _refresh()
+    _mark_clean()
 
 func _toggle_play() -> void:
     playing=not playing
@@ -858,25 +868,32 @@ func _library() -> void:
     for f in dir.get_files():
         if f.ends_with(".json"):library.add_item(f)
 func _save() -> void:
+    _save_current()
+func _save_current()->bool:
     if not catalog_entry.is_empty():
         var saved:Dictionary=CAT.save_draft(catalog_entry,preset,preset.name)
-        if saved.is_empty():status.text="Ошибка сохранения";return
+        if saved.is_empty():status.text="Ошибка сохранения";return false
         catalog_entry=saved
         status.text="Копия сохранена в общей библиотеке"
-        return
-    status.text="Сохранено в user://vfx_presets" if P.save_preset(preset) else "Неверный пресет"
+        saved_preset=preset.duplicate(true)
+        return true
+    if not P.save_preset(preset):status.text="Неверный пресет";return false
+    status.text="Сохранено в user://vfx_presets"
+    saved_preset=preset.duplicate(true)
     _library()
+    return true
 func _load() -> void:
     if library.selected<0:return
     var value: Dictionary=P.load_preset(P.FOLDER.path_join(library.get_item_text(library.selected)))
     if value.is_empty():status.text="Неверный файл";return
-    _remember()
+    catalog_entry={}
     preset=value
     selected=0
     stage.sweep=false
     for l in preset.layers:
         if l.type=="trail":stage.moving=true;stage.sweep=true;break
     _refresh()
+    _mark_clean()
 func _process(dt: float) -> void:
     if surface==null:return
     clock+=dt
@@ -919,6 +936,7 @@ func _process(dt: float) -> void:
         timeline.tooltip_text="ЛКМ — время и слой. Колесо — масштаб. СКМ — сдвиг. "+perf.text
         dirty=false
     play_button.text="Пауза" if playing else "Пуск"
+    if unsaved_label!=null:unsaved_label.text="● Не сохранено" if _has_changes() else "Нет изменений"
 func _input(e:InputEvent)->void:
     if not UI.editor_shortcut(self,e):return
     var key:Key=UI.physical_key(e)
@@ -933,7 +951,7 @@ func _input(e:InputEvent)->void:
             _ :return
     else:
         match key:
-            KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
+            KEY_ESCAPE:_leave("res://lab/main.tscn")
             KEY_SPACE:_toggle_play()
             KEY_DELETE:_delete_selected()
             KEY_HOME:_seek(0)
@@ -1000,3 +1018,37 @@ func _apply_mode()->void:
     _sync_visibility()
     _update_history_buttons()
     status.text="Все параметры доступны" if advanced_mode else "Простой: цвет, размер, время, свечение. Остальное — в расширенном."
+
+func _mark_clean()->void:
+    saved_preset=preset.duplicate(true)
+    history.clear()
+    redo_history.clear()
+    _update_history_buttons()
+func _has_changes()->bool:
+    return preset!=saved_preset
+func _make_leave_dialog()->void:
+    leave_dialog=ConfirmationDialog.new()
+    leave_dialog.title="Несохранённые изменения"
+    leave_dialog.dialog_text="Эффект изменён. Сохранить перед переходом?"
+    leave_dialog.ok_button_text="Сохранить"
+    leave_dialog.cancel_button_text="Остаться"
+    leave_dialog.add_button("Не сохранять",true,"discard")
+    add_child(leave_dialog)
+    leave_dialog.confirmed.connect(func():
+        if _save_current():_run_pending()
+        else:pending_action=Callable())
+    leave_dialog.custom_action.connect(func(action:StringName):
+        if action==&"discard":
+            leave_dialog.hide()
+            _run_pending())
+    leave_dialog.canceled.connect(func():pending_action=Callable())
+func _guard_change(action:Callable)->void:
+    if not _has_changes():action.call();return
+    pending_action=action
+    leave_dialog.popup_centered(Vector2i(440,150))
+func _run_pending()->void:
+    var action:Callable=pending_action
+    pending_action=Callable()
+    if action.is_valid():action.call()
+func _leave(path:String)->void:
+    _guard_change(func():get_tree().change_scene_to_file(path))
