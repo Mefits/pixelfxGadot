@@ -21,7 +21,7 @@ func add_point(id: String,p: Vector2,radius: float,mass: float) -> int:
         return -1
     var i: int=nodes.size()
     ids[id]=i
-    nodes.append({"id":id,"p":p,"v":Vector2.ZERO,"old":p,"r":radius,"inv":1.0/mass,"force":Vector2.ZERO,"normal":Vector2.ZERO,"ground":false,"wall":false})
+    nodes.append({"id":id,"p":p,"v":Vector2.ZERO,"old":p,"r":radius,"inv":1.0/mass,"force":Vector2.ZERO,"normal":Vector2.ZERO,"normal_push":0.0,"ground":false,"wall":false})
     return i
 
 func connect_points(a: int,b: int,length: float,compliance: float=0.0) -> bool:
@@ -55,6 +55,7 @@ func step() -> void:
     for n in nodes:
         n.old=n.p
         n.normal=Vector2.ZERO
+        n.normal_push=0.0
         n.ground=false
         n.wall=false
         n.v=(Vector2(n.v)+(gravity+Vector2(n.force)*float(n.inv))*DT)*exp(-damping*DT)
@@ -78,7 +79,12 @@ func step() -> void:
             var vn: float=Vector2(n.v).dot(normal)
             if vn<0:n.v-=normal*vn
             var tangent: Vector2=Vector2(n.v)-normal*Vector2(n.v).dot(normal)
-            n.v-=tangent*friction
+            # Coulomb-style limit from normal positional correction, not
+            # a percentage of speed every tick. Preserve floor mobility.
+            var speed: float=tangent.length()
+            if speed>.00001:
+                var loss: float=minf(speed,friction*float(n.normal_push)/DT)
+                n.v-=tangent*(loss/speed)
     steps+=1
 
 func _distance(l: Dictionary) -> void:
@@ -112,6 +118,7 @@ func _contact(n: Dictionary,box: Rect2) -> void:
     else:return
     n.p+=normal*push
     n.normal+=normal
+    n.normal_push+=push
     if normal.y<-.55:n.ground=true
     if absf(normal.x)>.7:n.wall=true
 

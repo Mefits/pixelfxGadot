@@ -25,6 +25,7 @@ func _run() -> void:
     check(a.grounded,"grounded creature")
     var before: float=a.body.point("front").x
     for i in range(30):a.advance(1.0/60,1,false,false)
+    print("Ground movement in 0.5 s: ",a.body.point("front").x-before," px")
     check(a.body.point("front").x>before+8,"movement")
     var y: float=a.body.point("front").y
     a.advance(1.0/60,1,true,false)
