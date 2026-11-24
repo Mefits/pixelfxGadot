@@ -16,7 +16,7 @@ func _run() -> void:
     for route in menu.routes.values():check(ResourceLoader.exists(route),"Scene exists "+route)
     for button in menu.buttons:check(button.get_global_rect().end.x<=960 and button.get_global_rect().end.y<=485,"Menu button fits")
     check(menu.get_child_count()==1 and menu.preview==null,"No simulation or pool at startup")
-    check(menu.entries.size()>=31,"Unified catalogue populated")
+    check(menu.entries.size()>=37,"Unified catalogue populated")
     for e in CAT.builtins():check(CAT.valid(e),"Builtin template valid: "+str(e.id))
     menu.category.select(1)
     menu.search.text="шлейф"
@@ -69,7 +69,7 @@ func _run() -> void:
         for candidate in CAT.builtins():
             if candidate.kind==kind:entry=candidate;break
         set_meta(CAT.HANDOFF,entry)
-        change_scene_to_file("res://lab/"+CAT.ROUTES[kind]+".tscn")
+        change_scene_to_file("res://lab/"+CAT.route(entry)+".tscn")
         await process_frame
         await process_frame
         check(not has_meta(CAT.HANDOFF) and current_scene.catalog_entry.id==entry.id,"Editor receives catalogue template: "+kind)

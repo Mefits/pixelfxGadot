@@ -1,7 +1,7 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.28"
+const VERSION="0.29"
 const CAT=preload("res://addons/creature/catalog.gd")
 const PREVIEW=preload("res://lab/catalog_preview.gd")
 const SECTIONS=[
@@ -179,7 +179,9 @@ func _select_entry(i:int)->void:
     match e.kind:
         "vfx":detail="%d слоёв"%e.payload.layers.size()
         "animation":detail="%.2f с · %d ключей"%[e.payload.clip.duration,e.payload.clip.keys.size()]
-        "ability":detail="%d урона · 4 фазы · постановочный просмотр"%int(e.payload.damage)
+        "ability":
+            if e.payload.get("engine","")=="physical":detail="Физическая способность · %.2f с · %d урона"%[e.payload.duration,int(e.payload.damage)]
+            else:detail="%d урона · 4 фазы · постановочный просмотр"%int(e.payload.damage)
         "creature":detail="Лап: %d · хвост: %d · щупалец: %d"%[int(e.payload.get("leg_count",4)) if e.payload.limbs else 0,int(e.payload.tail),int(e.payload.get("tentacles",0))]
     detail_label.text=e.name+"\n"+source+"\n"+detail
     open_button.disabled=false
@@ -189,7 +191,7 @@ func _open_entry()->void:
     var e:Dictionary=_selected_entry()
     if e.is_empty():return
     get_tree().set_meta(CAT.HANDOFF,e.duplicate(true))
-    var err:Error=get_tree().change_scene_to_file("res://lab/"+CAT.ROUTES[e.kind]+".tscn")
+    var err:Error=get_tree().change_scene_to_file("res://lab/"+CAT.route(e)+".tscn")
     if err!=OK:
         get_tree().remove_meta(CAT.HANDOFF)
         status.text="Ошибка открытия шаблона: "+str(err)

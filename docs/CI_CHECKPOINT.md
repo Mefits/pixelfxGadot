@@ -9,3 +9,6 @@ Unified launcher, 27 templates, JSON imports and independent library copies, laz
 
 ## v0.28 anatomy checkpoint
 Five physical body profiles, bounded branched chains, upright two-leg prototype, real catalogue preview, live anatomy save and schema/locomotion tests. Verify previous default locomotion regressions and all profile topology/contact tests.
+
+## v0.29 physical ability checkpoint
+Six portable physical profiles, bounded tip-directed grab, swept projectile and acid ticks, live mutation, catalogue handoff and compatible picker. Full regression suite, no art acceptance claim.

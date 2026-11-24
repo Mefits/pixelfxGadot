@@ -1,5 +1,6 @@
 extends RefCounted
 ## Unified data-only catalogue. No simulation or native renderer on scan.
+const SPECIAL=preload("res://addons/creature/physical_ability.gd")
 const ANATOMY=preload("res://addons/creature/anatomy.gd")
 const P=preload("res://addons/pixelfx/composer/preset.gd")
 const C=preload("res://addons/creature/clips.gd")
@@ -18,7 +19,7 @@ static func valid(e:Variant)->bool:
     var p: Dictionary=e.payload
     match e.kind:
         "vfx":return P.valid(p)
-        "ability":return A.valid(p)
+        "ability":return A.valid(p) or SPECIAL.valid(p)
         "animation":
             if not p.get("slot") in C.NAMES or not p.get("clip") is Dictionary:return false
             var bank: Dictionary=C.defaults()
@@ -38,6 +39,7 @@ static func builtins()->Array:
     for slot in C.NAMES:out.append(entry("anim_"+slot,"animation",UI.label(slot),{"slot":slot,"clip":bank[slot]}))
     out.append(entry("ability_dash","ability","Импульсный рывок",A.defaults()))
     out.append(entry("ability_electric","ability","Электрический прорыв",A.electric_demo()))
+    for a in SPECIAL.templates():out.append(entry("physical_"+a.type,"ability",a.name,a))
     for a in ANATOMY.templates():out.append(entry("creature_"+a.type,"creature",a.name,a))
     return out
 
@@ -116,7 +118,7 @@ static func import_file(path:String)->Dictionary:
     if f==null or f.get_length()>8*1024*1024:return {}
     var data:Variant=JSON.parse_string(f.get_as_text())
     if P.valid(data):return save_copy(entry("","vfx",data.name,data))
-    if A.valid(data):return save_copy(entry("","ability",data.name,data))
+    if A.valid(data) or SPECIAL.valid(data):return save_copy(entry("","ability",data.name,data))
     if ANATOMY.valid(data):
         var a:Dictionary=ANATOMY.normalize(data)
         return save_copy(entry("","creature",a.name,a))
@@ -136,3 +138,7 @@ static func save_draft(e:Dictionary,payload:Dictionary,name:String="")->Dictiona
     value.payload=payload.duplicate(true)
     if not name.strip_edges().is_empty():value.name=name.strip_edges()
     return save_copy(value,str(e.id) if e.get("source")=="library" else "")
+
+static func route(e:Dictionary)->String:
+    if e.kind=="ability" and SPECIAL.valid(e.payload):return "physics_lab"
+    return ROUTES[e.kind]

@@ -1,5 +1,7 @@
 extends RefCounted
 ## Locomotion controller; physical body is independent of poses and skin.
+const SPECIAL=preload("res://addons/creature/physical_ability_runtime.gd")
+var special=SPECIAL.new()
 const ANATOMY=preload("res://addons/creature/anatomy.gd")
 const LIMBS=preload("res://addons/creature/limbs.gd")
 var limbs=LIMBS.new()
@@ -108,6 +110,7 @@ func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: fl
     
 func _after_step(dt: float) -> void:
     attack.after_step(body,limbs,dt)
+    special.after(self,dt)
     limbs.update_geometry(body,dt,direction)
     if surface.active:motion_state="wall"
     elif grip_index>=0:motion_state="ledge"
@@ -118,7 +121,7 @@ func _after_step(dt: float) -> void:
 func _control(dt: float) -> void:
     if attack.active and (not limbs.enabled or surface.active or grip_index>=0):attack.cancel(limbs)
     if attack_requested:
-        if not surface.active and grip_index<0 and not attack.active:
+        if not special.active and not surface.active and grip_index<0 and not attack.active:
             if absf(input_axis)>.05:direction=signf(input_axis)
             attack.begin(limbs,direction)
         attack_requested=false
@@ -141,7 +144,7 @@ func _control(dt: float) -> void:
     jump_cooldown=maxf(0,jump_cooldown-dt)
     jump_buffer=maxf(0,jump_buffer-dt)
     jump_requested=jump_buffer>0
-    if not upright and grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested and not attack.active:
+    if not special.active and not upright and grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested and not attack.active:
         if surface.try_attach(body,input_axis,climb_axis):
             direction=-surface.normal.x
     if surface.validate(body,input_axis,limbs.enabled):
@@ -200,7 +203,7 @@ func _control(dt: float) -> void:
     coyote=.12 if grounded else maxf(0,coyote-dt)
     if attack.active:direction=attack.facing
     elif absf(input_axis)>.05:direction=signf(input_axis)
-    if not upright and not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1 and not jump_requested:
+    if not special.active and not upright and not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1 and not jump_requested:
         _find_grip()
     if grip_index>=0:
         grip_age+=dt
@@ -303,6 +306,7 @@ func _control(dt: float) -> void:
             var force:Vector2=((goal_branch-Vector2(body.nodes[index].p))*19-(Vector2(body.nodes[index].v)-Vector2(body.nodes[parent].v))*2).limit_length(36)
             body.force(index,force)
             body.force(parent,-force)
+    special.steer(self,dt)
     # Automatic pull is limited to reachable top corners in the movement direction.
 
 func _find_grip() -> void:
@@ -336,7 +340,7 @@ var limb_scale: float=1
 var mutations: int=0
 
 func can_mutate() -> bool:
-    return not attack.active and not surface.active and grip_index<0
+    return not special.active and not attack.active and not surface.active and grip_index<0
 
 func change_tail(delta: int) -> bool:
     if not can_mutate() or delta==0:return false

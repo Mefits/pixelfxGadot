@@ -34,7 +34,50 @@ func _anatomies()->void:
     invalid.tentacles=99
     check(not A.valid(invalid),"Reject excess branches")
 
+func _physical_abilities()->void:
+    var A=preload("res://addons/creature/anatomy.gd")
+    var P=preload("res://addons/creature/physical_ability.gd")
+    var boxes:Array[Rect2]=[Rect2(-1000,200,2000,80)]
+    for p in P.templates():check(P.valid(p),"Physical ability schema "+p.type)
+    var profiles:Array=P.templates()
+    var c=C.new(Vector2(100,160),boxes,2,1,true,1.0,A.templates()[4])
+    for i in range(120):c.advance(1.0/60,0,false)
+    var at:Vector2=c.body.point("front")
+    var target:Dictionary={"id":"target","p":at+Vector2(29,0),"r":8.0,"hp":100}
+    check(c.special.configure(profiles[0]) and c.special.begin(c,target),"Grab begins with compatible branch")
+    check(not c.special.begin(c,target),"No overlapping ability")
+    for i in range(95):c.advance(1.0/60,0,false)
+    check(c.special.hits==1,"Physical tip acquires target")
+    check(Vector2(target.p).distance_to(at+Vector2(29,0))>2,"Grab actually pulls")
+    check(c.body.finite() and c.body.penetration()<.1,"Grab body remains stable")
+    var plain=C.new(Vector2(100,160),boxes)
+    check(not P.compatible(profiles[0],plain),"No grab without tentacles")
+    for i in range(120):plain.advance(1.0/60,0,false)
+    var front:Vector2=plain.body.point("front")
+    var enemy:Dictionary={"id":"enemy","p":front+Vector2(60,0),"r":8.0,"hp":100}
+    check(plain.special.configure(profiles[3]) and plain.special.begin(plain,enemy),"Bolt launched")
+    for i in range(120):plain.advance(1.0/60,0,false)
+    check(enemy.hp==78 and plain.special.hits==1,"Swept bolt hits once")
+    front=plain.body.point("front")
+    enemy.p=front+Vector2(60,0)
+    enemy.hp=100
+    plain.body.obstacles.append(Rect2(front+Vector2(25,-15),Vector2(8,30)))
+    check(plain.special.begin(plain,enemy),"Blocked bolt launched")
+    for i in range(100):plain.advance(1.0/60,0,false)
+    check(enemy.hp==100,"Wall blocks projectile")
+    plain.body.obstacles.assign(boxes)
+    check(plain.special.configure(profiles[4]) and plain.special.begin(plain,{}),"Growth uses mutation")
+    check(plain.tail_count==3,"Physical tail added")
+    for i in range(100):plain.advance(1.0/60,0,false)
+    front=plain.body.point("front")
+    enemy.p=front+Vector2(35,0)
+    check(plain.special.configure(profiles[5]) and plain.special.begin(plain,enemy),"Acid launched")
+    for i in range(140):plain.advance(1.0/60,0,false)
+    check(enemy.hp==65,"Acid direct hit and four ticks")
+    check(plain.body.finite(),"Body finite after abilities")
+
 func _run() -> void:
+    _physical_abilities()
     _anatomies()
     var track: Dictionary=T.defaults()
     check(T.valid(track),"Default motion valid")
