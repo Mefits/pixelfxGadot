@@ -60,6 +60,8 @@ jobs:
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/visual.log
           timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_physics_visual.gd 2>&1 | tee /tmp/physics_visual.log
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/physics_visual.log
+          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_intent_visual.gd 2>&1 | tee /tmp/intent_visual.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/intent_visual.log
           rm -rf .godot
           find . -name '*.import' -delete
       - uses: actions/upload-artifact@v4

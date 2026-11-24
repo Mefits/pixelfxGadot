@@ -15,7 +15,10 @@ func _init(c) -> void:
 
 func _ready() -> void:
     position=Vector2(640,76)
-    size=Vector2(308,408)
+    size=Vector2(308,402)
+    var compact:=Theme.new()
+    compact.default_font_size=14
+    theme=compact
     var style:=StyleBoxFlat.new()
     style.bg_color=Color("#202c3b")
     style.content_margin_left=10
@@ -58,6 +61,7 @@ func _ready() -> void:
     _button(row2,"Save",_save)
     _button(row2,"Load",func():draft=TRACK.load_track();chosen=0;_refresh())
     _button(row2,"Reset",func():draft=TRACK.defaults();chosen=0;_refresh())
+    _button(row2,"Close",queue_free)
     status=Label.new()
     status.add_theme_font_size_override("font_size",12)
     status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -125,5 +129,6 @@ func preview() -> void:
 
 func _save() -> void:
     if TRACK.save_track(draft):
-        status.text="Saved JSON. Preview applies changes."
+        var applied: bool=creature.attack.set_track(draft)
+        status.text="Saved and applied." if applied else "Saved. Preview after current attack."
     else:status.text="Invalid track. Check hit window."

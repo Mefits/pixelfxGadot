@@ -5,6 +5,8 @@ const TRACK=preload("res://addons/creature/motion_track.gd")
 var panel
 var ui_layer: CanvasLayer
 var mutation_label: Label
+var notice: String=""
+var notice_until: float=0
 const ROOM: Vector2=Vector2(960,540)
 var boxes: Array[Rect2]=[
     Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),
@@ -105,6 +107,7 @@ func _update_hud() -> void:
         creature.body.nodes.size(),creature.limbs.support_count,creature.limbs.legs.size(),creature.mass_scale,("WALL" if creature.surface.active else ("GROUND" if creature.grounded else "AIR")),creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz"),"ON" if walls_on else "OFF"]
     hud.text+=" | claw %s | HP %d"%[creature.attack.phase(),dummy.get("hp",100)]
     mutation_label.text="LIVE: 1/2 tail (%d) | 3/4 mass | 5/6 legs | 7/8 reach (x%.2f) | mutations %d | Q legs C walls V debug X slow"%[creature.tail_count,creature.limb_scale,creature.mutations]
+    if Time.get_ticks_msec()<notice_until:mutation_label.text=notice+" | "+mutation_label.text
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))
@@ -191,7 +194,7 @@ func _unhandled_input(e: InputEvent) -> void:
                 creature.surface.enabled=walls_on
                 if not walls_on:creature.surface.detach()
             KEY_M:
-                course=1-course
+                course=(course+1)%3
                 _set_course()
                 _reset()
             KEY_Q:
@@ -204,14 +207,14 @@ func _unhandled_input(e: InputEvent) -> void:
                 dummy.hp=100
             KEY_P:paused=not paused
             KEY_X:slow=not slow
-            KEY_1:creature.change_tail(-1);selected=-1;dragging=false
-            KEY_2:creature.change_tail(1)
-            KEY_3:creature.change_mass(-.25)
-            KEY_4:creature.change_mass(.25)
-            KEY_5:creature.change_legs(false)
-            KEY_6:creature.change_legs(true)
-            KEY_7:creature.change_reach(-.1)
-            KEY_8:creature.change_reach(.1)
+            KEY_1:_mutation(creature.change_tail(-1));selected=-1;dragging=false
+            KEY_2:_mutation(creature.change_tail(1))
+            KEY_3:_mutation(creature.change_mass(-.25))
+            KEY_4:_mutation(creature.change_mass(.25))
+            KEY_5:_mutation(creature.change_legs(false))
+            KEY_6:_mutation(creature.change_legs(true))
+            KEY_7:_mutation(creature.change_reach(-.1))
+            KEY_8:_mutation(creature.change_reach(.1))
     elif e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT:
         dragging=e.pressed
         selected=-1
@@ -224,5 +227,11 @@ func _unhandled_input(e: InputEvent) -> void:
 func _set_course() -> void:
     if course==0:
         boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70),Rect2(230,432,72,38),Rect2(302,390,90,80),Rect2(470,360,120,20),Rect2(660,300,130,20),Rect2(790,300,28,170),Rect2(60,320,145,18),Rect2(250,225,160,18),Rect2(530,180,220,18),Rect2(836,414,124,56)])
-    else:
+    elif course==1:
         boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70),Rect2(280,215,65,255),Rect2(345,215,110,18),Rect2(475,418,140,32),Rect2(650,360,90,110),Rect2(800,200,45,270),Rect2(845,280,115,18)])
+    else:
+        boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70)])
+
+func _mutation(ok: bool) -> void:
+    notice="Mutation applied" if ok else "Unavailable (busy, blocked or limit)"
+    notice_until=Time.get_ticks_msec()+1800
