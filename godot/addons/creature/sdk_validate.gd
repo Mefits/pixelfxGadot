@@ -25,6 +25,10 @@ func _type(v:Variant,kind:String)->bool:
         "integer":return (v is float or v is int) and is_finite(float(v)) and float(v)==floorf(float(v))
     return false
 
+func _equal(a:Variant,b:Variant)->bool:
+    if (a is int or a is float) and (b is int or b is float):return float(a)==float(b)
+    return typeof(a)==typeof(b) and a==b
+
 func _matches(s:Variant,v:Variant)->bool:
     var before:Array=errors
     errors=[]
@@ -45,8 +49,12 @@ func _walk(s:Variant,v:Variant,path:String)->void:
     if s.has("type") and not _type(v,s.type):
         _issue(path,"schema.type","Expected "+str(s.type))
         return
-    if s.has("const") and v!=s["const"]:_issue(path,"schema.const","Expected "+str(s["const"]))
-    if s.has("enum") and not v in s["enum"]:_issue(path,"schema.enum","Allowed values: "+str(s["enum"]))
+    if s.has("const") and not _equal(v,s["const"]):_issue(path,"schema.const","Expected "+str(s["const"]))
+    if s.has("enum"):
+        var found:bool=false
+        for allowed in s["enum"]:
+            if _equal(v,allowed):found=true;break
+        if not found:_issue(path,"schema.enum","Allowed values: "+str(s["enum"]))
     if v is float or v is int:
         for key in ["minimum","maximum","exclusiveMinimum"]:
             if not s.has(key):continue
