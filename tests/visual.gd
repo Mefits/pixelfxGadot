@@ -22,6 +22,22 @@ func sequence(scene,name:String,count:int,kind:String)->void:
             scene.world.tick(input,{})
         scene.queue_redraw()
         await capture(name+"/frame_%03d"%frame)
+func impact_sequence(scene,name:String,hybrid:bool,heavy:bool)->void:
+    scene.world=W.new()
+    scene.world.hybrid_enabled=hybrid
+    scene.world.a.separate(150)
+    scene.world.b.separate(scene.world.a.pos.x+66-scene.world.b.pos.x)
+    scene.world.rig_a.sample(scene.world.a)
+    scene.world.rig_b.sample(scene.world.b)
+    scene.debug=false
+    DirAccess.make_dir_recursive_absolute("res://reports/"+name)
+    for frame in range(44):
+        for i in range(4):
+            scene.world.tick({"heavy":heavy and frame==3 and i==0,"jab":not heavy and frame==3 and i==0},{})
+        scene._hud()
+        scene.queue_redraw()
+        await capture(name+"/frame_%03d"%frame)
+    if scene.world.hits!=1:push_error("Impact capture missed: "+name);quit(1)
 func _run()->void:
     root.size=Vector2i(960,540)
     DirAccess.make_dir_recursive_absolute("res://reports")
@@ -62,6 +78,9 @@ func _run()->void:
         scene.queue_redraw()
         await capture("jab/frame_%03d"%frame)
     if scene.world.hits!=1:push_error("Jab capture missed");quit(1);return
+    await impact_sequence(scene,"heavy_hybrid",true,true)
+    await impact_sequence(scene,"heavy_authored",false,true)
+    await impact_sequence(scene,"jab_hybrid",true,false)
     scene._pause()
     if not scene.paused:quit(1);return
     scene._reset()

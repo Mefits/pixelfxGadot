@@ -1,5 +1,13 @@
 extends RefCounted
-## One authored jab, no combo or secondary physics. Fixed 120 Hz.
+## Two authored attacks and optional bounded spring reaction. Fixed 120 Hz.
+const REACTION=preload("res://game/impact_reaction.gd")
+const HEAVY_DURATION=80
+const HEAVY_ACTIVE_FROM=24
+const HEAVY_ACTIVE_TO=36
+const HEAVY_DAMAGE=25
+const HEAVY_KNOCKBACK=235.0
+const HEAVY_HURT=50
+const HEAVY_HITSTOP=10
 const DURATION=48
 const ACTIVE_FROM=12
 const ACTIVE_TO=23
@@ -18,6 +26,23 @@ const KEYS=[
     [32,1.0,2.0,-50.0,6.0,Vector2(25,5),Vector2(7,10)],
     [48,0.0,0.0,-50.0,0.0,Vector2(20,0),Vector2(7,10)]
 ]
+# Heavy uses the rear fist, compact preparation, full torso drive and longer recovery.
+const HEAVY_KEYS=[
+    [0,0.0,0.0,-50.0,0.0,Vector2(20,0),Vector2(7,10)],
+    [10,1.0,-5.0,-48.0,-12.0,Vector2(17,2),Vector2(-12,9)],
+    [20,1.0,-1.0,-49.0,-4.0,Vector2(17,5),Vector2(3,8)],
+    [24,1.0,6.0,-51.0,19.0,Vector2(10,9),Vector2(42,-2)],
+    [29,1.0,9.0,-51.0,28.0,Vector2(6,10),Vector2(44,-3)],
+    [36,1.0,7.0,-50.0,23.0,Vector2(8,10),Vector2(42,0)],
+    [51,1.0,1.0,-49.0,8.0,Vector2(17,5),Vector2(20,13)],
+    [80,0.0,0.0,-50.0,0.0,Vector2(20,0),Vector2(7,10)]
+]
+var reaction=REACTION.new()
+var kind:String="jab"
+var heavy_latch:bool=false
+var queued_kind:String="jab"
+var hurt_total:int=HURT_TICKS
+var hurt_heavy:bool=false
 var age:int=-1
 var hurt:int=0
 var hp:int=100
@@ -25,38 +50,58 @@ var attacks:int=0
 var connected:bool=false
 var latch:bool=false
 var queued:bool=false
-func capture(pressed:bool)->void:
-    if pressed and not latch:queued=true
+func capture(pressed:bool,heavy:bool=false)->void:
+    if heavy and not heavy_latch:
+        queued=true
+        queued_kind="heavy"
+    elif pressed and not latch:
+        queued=true
+        queued_kind="jab"
     latch=pressed
+    heavy_latch=heavy
+func duration()->int:return HEAVY_DURATION if kind=="heavy" else DURATION
+func fist()->String:return "hand_far" if kind=="heavy" else "hand_near"
+func profile()->Dictionary:
+    return {"damage":HEAVY_DAMAGE,"knockback":HEAVY_KNOCKBACK,"hurt":HEAVY_HURT,"freeze":HEAVY_HITSTOP,"strength":2.0,"heavy":true} if kind=="heavy" else {"damage":DAMAGE,"knockback":KNOCKBACK,"hurt":HURT_TICKS,"freeze":HITSTOP,"strength":1.0,"heavy":false}
 func tick(m)->void:
+    reaction.step()
     if hurt>0:hurt-=1
     if age>=0:
         age+=1
-        if age>=DURATION:age=-1
+        if age>=duration():age=-1
     if queued and hp>0 and hurt==0 and age<0 and m.grounded:
         age=0
+        kind=queued_kind
         connected=false
         attacks+=1
     queued=false
 func locked()->bool:return age>=0 or hurt>0 or hp<=0
-func active()->bool:return age>=ACTIVE_FROM and age<=ACTIVE_TO and not connected
-func receive(m,direction:int)->void:
-    hp=maxi(0,hp-DAMAGE)
+func active()->bool:
+    return age>=(HEAVY_ACTIVE_FROM if kind=="heavy" else ACTIVE_FROM) and age<=(HEAVY_ACTIVE_TO if kind=="heavy" else ACTIVE_TO) and not connected
+func receive(m,direction:int,attack:Dictionary,lever:float)->void:
+    hp=maxi(0,hp-int(attack.damage))
     age=-1
-    hurt=HURT_TICKS
+    hurt=int(attack.hurt)
+    hurt_total=hurt
+    hurt_heavy=bool(attack.heavy)
     queued=false
-    m.velocity.x=KNOCKBACK*direction
-func pose()->Dictionary:
+    m.velocity.x=float(attack.knockback)*direction
+    reaction.impulse(float(attack.strength),lever,float(direction*m.facing))
+func pose(hybrid:bool=false)->Dictionary:
     if hurt>0:
-        var u:float=float(hurt)/HURT_TICKS
-        return {"weight":u,"hip":Vector2(-3,-47),"lean":-24.0,"lead":Vector2(8,19),"rear":Vector2(-6,20)}
+        var u:float=float(hurt)/hurt_total
+        if hybrid:
+            # Small authored loss of balance; actual upper-body motion comes from springs.
+            return {"weight":u*.55,"hip":Vector2(-2,-45 if hurt_heavy else -48),"lean":-5.0,"lead":Vector2(16,8),"rear":Vector2(6,12)}
+        return {"weight":u,"hip":Vector2(-5,-44) if hurt_heavy else Vector2(-3,-47),"lean":-36.0 if hurt_heavy else -24.0,"lead":Vector2(8,19),"rear":Vector2(-6,20)}
     if age<0:return {}
-    var a:Array=KEYS[0]
-    var b:Array=KEYS[1]
-    for i in range(1,KEYS.size()):
-        if age<=int(KEYS[i][0]):
-            a=KEYS[i-1]
-            b=KEYS[i]
+    var keys:Array=HEAVY_KEYS if kind=="heavy" else KEYS
+    var a:Array=keys[0]
+    var b:Array=keys[1]
+    for i in range(1,keys.size()):
+        if age<=int(keys[i][0]):
+            a=keys[i-1]
+            b=keys[i]
             break
     var u:float=float(age-int(a[0]))/float(int(b[0])-int(a[0]))
     u=u*u*(3-2*u)

@@ -19,7 +19,7 @@ static func chain(a:Vector2,target:Vector2,l1:float,l2:float,bend:float)->Array[
     var end:Vector2=a+direction*d
     var joint:Vector2=a+direction*along+Vector2(-direction.y,direction.x)*height*bend
     return [joint,end]
-func sample(m,action:Dictionary={})->Dictionary:
+func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
     var direction:float=float(m.facing)
     var speed:float=absf(m.velocity.x)
     var relative:float=m.velocity.x*direction
@@ -50,9 +50,10 @@ func sample(m,action:Dictionary={})->Dictionary:
             var dx:float=absf((foot.x-m.pos.x)*direction-hip_x-(2 if i==0 else -2))
             var max_height:float=sqrt(maxf(4,59.7*59.7-minf(dx,58)*minf(dx,58)))
             hip_y=maxf(hip_y,foot.y-m.pos.y-2-max_height)
+    lean=clampf(lean+reaction.x,-55,55)
     var hip:=Vector2(hip_x,hip_y)
     var chest:=hip+Vector2(0,-TORSO).rotated(deg_to_rad(lean))
-    var head:=chest+Vector2(0,-NECK).rotated(deg_to_rad(lerpf(float(g.head),lean*.6,moving)))
+    var head:=chest+Vector2(0,-NECK).rotated(deg_to_rad(clampf(lerpf(float(g.head),(lean-reaction.x)*.6,moving)+reaction.y,-45,60)))
     var local:Dictionary={"hips":hip,"chest":chest,"head":head}
     for i in range(2):
         var side:String="near" if i==0 else "far"
@@ -74,6 +75,7 @@ func sample(m,action:Dictionary={})->Dictionary:
         if m.grounded:hand_goal+=Vector2(4*m.land,8*m.land)
         else:hand_goal=shoulder+Vector2(MOTION.air(m,i).hand)
         if weight>0:hand_goal=hand_goal.lerp(shoulder+Vector2(action.lead if i==0 else action.rear),weight)
+        hand_goal=shoulder+(hand_goal-shoulder).rotated(deg_to_rad(reaction.z if i==0 else reaction.w))
         var arm:Array[Vector2]=chain(shoulder,hand_goal,UPPER_ARM,LOWER_ARM,1)
         local["shoulder_"+side]=shoulder
         local["elbow_"+side]=arm[0]

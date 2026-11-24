@@ -13,3 +13,6 @@ Final 0.03 checkpoint: initial regression passed; repeat after correcting opposi
 
 ## 0.04
 Jab milestone: all locomotion regressions, one hit, held-key protection, mirrored hit, miss, trade, airborne rejection, six freeze ticks, root knockback, real 30 fps capture. No hybrid joint physics yet.
+
+## 0.05
+Heavy rear-hand attack, contact-derived torque, bounded angular spring dynamics with delayed channels, hitstop freeze and A/B reset. Verify old locomotion/jab, hybrid strength/lever/lag/settle, heavy miss/contact/trade, symmetry, bone lengths and actual capture comparisons.
