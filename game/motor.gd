@@ -1,5 +1,6 @@
 extends RefCounted
 ## Fixed-step root movement and planted-foot state. All positions are world pixels.
+const STANCE=preload("res://game/guard_pose.gd")
 const FLOOR=430.0
 const DT=1.0/120.0
 const WALK=135.0
@@ -25,20 +26,21 @@ var airborne_time:float=0
 var steps:int=0
 var time:float=0
 var gait:float=0
+var guard_phase:float=0
 var sprint:bool=false
 func _init(x:float,side:int)->void:
     pos=Vector2(x,FLOOR)
     facing=side
     _plant()
 func _plant()->void:
-    feet.assign([Vector2(pos.x+14*facing,FLOOR),Vector2(pos.x-14*facing,FLOOR)])
+    feet.assign([Vector2(pos.x+STANCE.HALF_WIDTH*facing,FLOOR),Vector2(pos.x-STANCE.HALF_WIDTH*facing,FLOOR)])
     swing=-1
     swing_t=0
 func _begin_step(index:int,axis:float)->void:
     swing=index
     swing_from=feet[index]
     var ahead:float=signf(axis)*(29 if sprint else 22)
-    if absf(axis)<.01:ahead=(14 if index==0 else -14)*facing
+    if absf(axis)<.01:ahead=(STANCE.HALF_WIDTH if index==0 else -STANCE.HALF_WIDTH)*facing
     swing_to=Vector2(clampf(pos.x+ahead,32,928),FLOOR)
     swing_t=0
     next_foot=1-index
@@ -71,6 +73,8 @@ func tick(input:Dictionary,opponent_x:float)->void:
         airborne_time+=DT
         return
     gait=move_toward(gait,clampf(absf(velocity.x)/WALK,0,1),DT*8)
+    # Continue phase only as a breathing/weight cycle; never move planted feet.
+    guard_phase=fposmod(guard_phase+DT,STANCE.DURATION)
     if swing>=0:
         var duration:float=.12 if sprint else STEP_TIME
         swing_t=minf(duration,swing_t+DT)
@@ -88,9 +92,9 @@ func tick(input:Dictionary,opponent_x:float)->void:
             if absf(feet[trailing].x-pos.x)>12 or absf(feet[0].x-feet[1].x)<8:_begin_step(trailing,velocity.x)
         else:
             # Return to a stable stance one foot at a time, never teleport feet.
-            var desired:float=pos.x+14*facing
+            var desired:float=pos.x+STANCE.HALF_WIDTH*facing
             if absf(feet[0].x-desired)>4:_begin_step(0,0)
-            elif absf(feet[1].x-(pos.x-14*facing))>4:_begin_step(1,0)
+            elif absf(feet[1].x-(pos.x-STANCE.HALF_WIDTH*facing))>4:_begin_step(1,0)
 func separate(dx:float)->void:
     pos.x+=dx
     # Push-box displacement moves the whole support frame, not only the pelvis.

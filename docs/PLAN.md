@@ -14,3 +14,6 @@
 6. Художественная оболочка: оригинальные персонажи, модульный скин, волосы/одежда и вторичная физика. Референсы определяет владелец. Звук, камера, игровые правила и баланс по мере необходимости.
 
 Не развивать SDK, редакторы или библиотеку в рамках N. Сохранять данные игрового прототипа и его тесты независимо от Toolkit. Никаких художественных оценок по одному успешному CI.
+
+## 0.02 — guard reference
+User's eight right-facing stickman frames (2026-11-24) are the primary guard reference. Retarget frames 1/3/4–5/6/8 as a 1.2-second breathing/weight loop, fixed 48 px ankle span, pelvis travel 6 px, hands raised toward opponent. Chosen duration/amplitude are authoring estimates, not measured timings. Preserve fixed bone lengths and IK contacts, mirror all points for P2. Reference only; no sprite art copied. Next: movement stage from Craftpix Walking/Running/Jumping/Landing and martial arts run, then one jab. Do not implement attack physics before stance/motion review.

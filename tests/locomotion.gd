@@ -2,6 +2,7 @@ extends SceneTree
 const W=preload("res://game/world.gd")
 const M=preload("res://game/motor.gd")
 const R=preload("res://game/rig.gd")
+const G=preload("res://game/guard_pose.gd")
 var errors:int=0
 func _initialize()->void:call_deferred("_run")
 func check(ok:bool,msg:String)->void:
@@ -15,6 +16,32 @@ func _run()->void:
         var r:Vector2=b[id]-w.b.pos
         check(l.distance_to(Vector2(-r.x,r.y))<.001,"Mirrored joint "+id)
     check(a.knee_near.x>a.thigh_near.x and b.knee_near.x<b.thigh_near.x,"Knees bend toward opponent")
+    var idle=W.new()
+    var initial_feet:Array[Vector2]=idle.a.feet.duplicate()
+    var start_pose:Dictionary=idle.rig_a.points.duplicate(true)
+    var low:float=start_pose.hips.y
+    var high:float=low
+    for i in range(144):
+        idle.tick({}, {})
+        var p:Dictionary=idle.rig_a.points
+        var q:Dictionary=idle.rig_b.points
+        check(idle.a.feet==initial_feet and idle.a.swing==-1,"Guard support stays fixed")
+        low=minf(low,p.hips.y)
+        high=maxf(high,p.hips.y)
+        for id in p:
+            var l:Vector2=p[id]-idle.a.pos
+            var r:Vector2=q[id]-idle.b.pos
+            check(l.distance_to(Vector2(-r.x,r.y))<.001,"Guard mirror "+id)
+        for side in ["near","far"]:
+            check(absf(p["shoulder_"+side].distance_to(p["elbow_"+side])-R.UPPER_ARM)<.001,"Arm length")
+            check(absf(p["elbow_"+side].distance_to(p["hand_"+side])-R.LOWER_ARM)<.001,"Forearm length")
+            check(p["hand_"+side].x>p["shoulder_"+side].x,"Guard hands forward")
+            check(p["hand_"+side].y<p.hips.y-10,"Guard hands raised")
+            var idx:int=0 if side=="near" else 1
+            check(p["foot_"+side].distance_to(initial_feet[idx]-Vector2(0,2))<.01,"Guard support IK")
+    check(high-low>4 and high-low<7,"Guard reference amplitude")
+    for id in start_pose:check(start_pose[id].distance_to(idle.rig_a.points[id])<.01,"Seamless loop "+id)
+    check(G.sample(0)==G.sample(G.DURATION),"Guard phase wraps")
     for i in range(120):
         var previous:Array[Vector2]=w.a.feet.duplicate()
         var old_swing:int=w.a.swing

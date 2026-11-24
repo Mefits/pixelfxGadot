@@ -13,7 +13,14 @@ func _run()->void:
     root.add_child(scene)
     await process_frame
     scene.set_physics_process(false)
+    scene.world=preload("res://game/world.gd").new()
+    scene.queue_redraw()
     await capture("stance")
+    DirAccess.make_dir_recursive_absolute("res://reports/guard")
+    for frame in range(24):
+        scene.queue_redraw()
+        await capture("guard/frame_%03d"%frame)
+        for tick in range(6):scene.world.tick({}, {})
     for i in range(47):scene.world.tick({"move":1,"run":true},{})
     scene.debug=true
     scene.queue_redraw()
