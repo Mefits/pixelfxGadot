@@ -5,3 +5,6 @@ Fixtures compare original JS RNG integer outputs, bolt geometry, and every packe
 
 ## Hard particles and lights
 SPARK, MOTE, STREAK, FLAKE, STAR, EMBER and GRIT with upstream fixed-step physics, ordered list, delays, floor callback, light and streak rendering. The 512-particle cap is an explicit host budget. Soft kinds and Bits remain unported. Fixtures compare state and packed pixels at six times. Native CPU benchmark measures one bolt plus sparks and buffer conversion; GPU uploads are excluded. No performance claim until the benchmark runs.
+
+## Live test
+Native surface uploads two persistent textures; the experimental lab composes a bolt between a fixed anchor and mouse at a 30 Hz visual rate, with fixed-step particle physics, 96 particle cap and separate flashes. This is a test of reusable source primitives, not a direct port of a complete authored effect. Do not use CPU reference as a shipping performance baseline until measured.

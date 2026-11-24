@@ -17,3 +17,9 @@ Original PixelFX: MIT, Patch and Hugo Duprez. See LICENSE-PixelFX.txt.
 
 ## Переносимый архив
 На странице Actions открой успешный запуск и скачай артефакт **PixelFX-Godot-Toolkit**. В отличие от обычного GitHub ZIP, он содержит все оригинальные исходники эффектов, инструменты, семь подготовленных клипов и Godot-проект. Для готовых клипов достаточно Godot; для экспорта новых — Node.js 18+, без интернета. Контрольные суммы исходников проверяются перед экспортом. Галерейные медиа и история Git не входят в архив. 
+
+## Live native lab (experimental)
+Press L in the export lab or run godot/lab/live_lightning.tscn. Hold left mouse and move to connect a live endpoint; 1/2 select original stroke/crackle helpers. This custom moving-endpoint effect uses native reference ports, not the baked Chain Lightning animation. Its CPU timing includes buffer conversion/upload submission but not full GPU cost. The native path is not yet optimized for many simultaneous effects.
+
+## Embed offline effects in a game
+Use addons/pixelfx/clip_bank.gd to prepare required manifests before combat and addons/pixelfx/pool.gd for fixed-capacity reuse. Call pool.play(bank.get_clip(id), position, facing, pixel_scale). No disk loading is performed by play(). Prewarm on the actual target GPU if first-use stalls occur.

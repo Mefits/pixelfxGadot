@@ -45,7 +45,7 @@ func _ready() -> void:
     layer.add_child(menu)
     status = Label.new()
     status.position = Vector2(24, 98)
-    status.text = "Click: play | B: background | M: mirror | Space: stress | C: clear"
+    status.text = "Click: play | B: background | M: mirror | Space: stress | C: clear | L: live"
     if paths.is_empty():
         status.text = "Run setup_windows.bat to export original effects, then reopen Godot."
     layer.add_child(status)
@@ -86,6 +86,8 @@ func _unhandled_input(event: InputEvent) -> void:
             queue_redraw()
         elif event.keycode == KEY_M:
             mirrored = not mirrored
+        elif event.keycode == KEY_L:
+            get_tree().change_scene_to_file("res://lab/live_lightning.tscn")
         elif event.keycode == KEY_C:
             for p in pool:
                 p.stop()
