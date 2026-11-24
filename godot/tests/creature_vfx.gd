@@ -101,7 +101,53 @@ func _streams() -> void:
     check(not P.valid(invalid),"Reject emitter on non-particle primitive")
     check(P.valid(P.demo(4)),"Stream demo valid")
 
+func _trails() -> void:
+    var l: Dictionary=P.layer("trail")
+    l.duration=1.0
+    l.trail.life=.5
+    l.trail.rate=32.0
+    var p: Dictionary={"schema":1,"name":"Trail","seed":71,"layers":[l]}
+    check(P.valid(p) and is_equal_approx(P.duration(p),1.5),"Trail valid and duration")
+    var times: Array=R.trail_times(l,.75)
+    check(times.size()<=P.MAX_TRAIL_SEGMENTS+2 and is_equal_approx(float(times[0]),.25) and is_equal_approx(float(times[-1]),.75),"Bounded trail history")
+    var tail: Array=R.trail_times(l,1.2)
+    check(is_equal_approx(float(tail[-1]),1.0),"Trail stops sampling at shutoff")
+    var renderer=R.new()
+    var paint=PAINT.new(240,160)
+    var provider: Callable=func(_name:String,t:float)->Vector2:
+        return Vector2(40+t*100,70+sin(t*7)*15)
+    for style in P.TRAIL_STYLES:
+        l.trail.style=style
+        renderer.render(paint,p,.8,{},128,provider)
+        check(renderer.trail_segments>0 and paint.color.count(0)<paint.color.size(),"Visible trail "+style)
+        var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,p,1.1,{},128,provider)
+        check(renderer.trail_segments>0,"Trail tail survives")
+        renderer.render(paint,p,.8,{},128,provider)
+        check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Trail seek "+style)
+    renderer.render(paint,p,1.51,{},128,provider)
+    check(renderer.trail_segments==0 and paint.color.count(0)==paint.color.size(),"Trail expires")
+    renderer.render(paint,p,.8,{"hand":Vector2(80,70)})
+    check(renderer.trail_segments==0,"Static anchor no fake trail")
+    var jump: Callable=func(_name:String,t:float)->Vector2:
+        return Vector2(20 if t<.5 else 200,80)
+    renderer.render(paint,p,.75,{},128,jump)
+    check(renderer.trail_segments==0,"Teleport not connected")
+    check(P.save_preset(p,"user://test_trail_fx.json"),"Save trail")
+    var loaded: Dictionary=P.load_preset("user://test_trail_fx.json")
+    check(P.valid(loaded),"Load trail")
+    if not loaded.is_empty():
+        renderer.render(paint,p,.8,{},128,provider)
+        var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,loaded,.8,{},128,provider)
+        check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Trail roundtrip pixels")
+    var invalid: Dictionary=p.duplicate(true)
+    invalid.layers[0].trail.rate=65
+    check(not P.valid(invalid),"Reject trail sample rate")
+    check(P.valid(P.demo(5)),"Trail demo valid")
+
 func _run() -> void:
+    _trails()
     _curves()
     _streams()
     var renderer=R.new()

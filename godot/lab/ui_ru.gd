@@ -36,6 +36,7 @@ const LABELS={
     "slash": "Дуга удара",
     "droplets": "Капли",
     "smoke": "Дым",
+    "trail": "Шлейф",
     "origin": "Центр",
     "hand": "Рука",
     "target": "Цель",

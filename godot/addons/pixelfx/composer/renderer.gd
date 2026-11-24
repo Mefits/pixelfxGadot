@@ -12,6 +12,7 @@ var accelerated: bool=false
 var render_ms: float=0
 var active_layers: int=0
 var particles: int=0
+var trail_segments: int=0
 func enable_acceleration(on: bool=true) -> bool:
     var a: bool=batch.enable_acceleration(on)
     var b: bool=bolt.enable_acceleration(on)
@@ -28,11 +29,15 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
     painter.light_k=1.0
     active_layers=0
     particles=0
+    trail_segments=0
     for i in range(preset.layers.size()):
         var l: Dictionary=preset.layers[i]
         var age: float=time-float(l.start)
         if not l.enabled or age<0 or age>=P.layer_duration(l):continue
         active_layers+=1
+        if l.type=="trail":
+            _trail(painter,l,time,R.hash32([int(preset.seed),i]),anchors,provider)
+            continue
         if P.is_stream(l):
             _stream(painter,l,age,time,R.hash32([int(preset.seed),i]),anchors,floor_y,provider)
             continue
@@ -91,6 +96,71 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
                     if glow>.01:d.glow(q.x,q.y,maxf(2,rad*2),color,glow*alpha)
         batch.finish()
     render_ms=(Time.get_ticks_usec()-stamp)/1000.0
+# Sample history on an emission-relative time grid, including clipped endpoints.
+static func trail_times(l: Dictionary,time: float) -> Array:
+    var start: float=float(l.start)
+    var end: float=start+float(l.duration)
+    var life: float=float(l.trail.life)
+    var lo: float=maxf(start,time-life)
+    var hi: float=minf(time,end)
+    if hi<=lo:return []
+    var rate: float=float(l.trail.rate)
+    var times: Array=[lo]
+    var first: int=int(floor((lo-start)*rate))+1
+    for j in range(first,first+P.MAX_TRAIL_SEGMENTS):
+        var t: float=start+float(j)/rate
+        if t>=hi-.000001:break
+        if t>lo+.000001:times.append(t)
+    times.append(hi)
+    return times
+
+func _trail(painter,l: Dictionary,time: float,seed0: int,anchors: Dictionary,provider: Callable) -> void:
+    if not provider.is_valid():return
+    var times: Array=trail_times(l,time)
+    if times.size()<2:return
+    var t: Dictionary=l.trail
+    var life: float=float(t.life)
+    var color: int=PAL.from_hex(l.color)
+    var offset: Vector2=Vector2(l.x,l.y)
+    var d=batch.begin(painter)
+    var old: Vector2=origin(l.anchor,float(times[0]),anchors,provider)+offset
+    for i in range(1,times.size()):
+        var a_time: float=float(times[i-1])
+        var b_time: float=float(times[i])
+        var pos: Vector2=origin(l.anchor,b_time,anchors,provider)+offset
+        var delta: Vector2=pos-old
+        var dist: float=delta.length()
+        if dist<.05 or dist>float(t.break_distance):
+            old=pos
+            continue
+        trail_segments+=1
+        var steps: int=clampi(int(ceil(dist/1.5)),1,32)
+        var normal: Vector2=delta.normalized().orthogonal()
+        var prev: Vector2=old
+        for j in range(1,steps+1):
+            var f: float=float(j)/steps
+            var birth: float=lerpf(a_time,b_time,f)
+            var u: float=clampf((time-birth)/life,0,1)
+            var width: float=P.value(l,"size",u)
+            var alpha: float=P.value(l,"alpha",u)
+            var glow: float=P.value(l,"glow",u)
+            var q: Vector2=old.lerp(pos,f)
+            if t.style=="electric":
+                var tick: int=int(floor((birth-float(l.start))*96.0+.00001))
+                var rng=R.new(R.hash32([seed0,tick]))
+                q+=normal*rng.between(-float(t.jitter),float(t.jitter))*(1-u)
+            if alpha>.001:
+                if t.style=="dots":
+                    if j==steps:d.disc(q.x,q.y,maxf(.5,width*.5),color,alpha)
+                else:
+                    if width<=1.5:d.line(prev.x,prev.y,q.x,q.y,color,alpha)
+                    else:d.disc(q.x,q.y,width*.5,color,alpha)
+                if glow>.01 and j==steps:
+                    d.glow(q.x,q.y,maxf(2,width*1.4),color,glow*alpha)
+            prev=q
+        old=pos
+    batch.finish()
+
 # Stream particles are evaluated directly from their birth index and current time.
 # No mutable particle pool, no replay from frame zero, and bounded work per layer.
 func _stream(painter,l: Dictionary,age: float,time: float,seed0: int,anchors: Dictionary,floor_y: float,provider: Callable) -> void:

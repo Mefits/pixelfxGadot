@@ -48,5 +48,14 @@ func _run() -> void:
     DirAccess.make_dir_recursive_absolute(dir)
     await RenderingServer.frame_post_draw
     check(root.get_texture().get_image().save_png(dir.path_join("vfx-workshop.png"))==OK,"Capture VFX")
+    scene._select_demo(5)
+    scene._seek(.8)
+    await process_frame
+    await process_frame
+    check(scene.renderer.trail_segments>0 and scene.stage.moving,"Trail demo visible")
+    scene.trail_fields.life.value=.9
+    check(is_equal_approx(float(scene.preset.layers[0].trail.life),.9),"Trail inspector")
+    await RenderingServer.frame_post_draw
+    check(root.get_texture().get_image().save_png(dir.path_join("vfx-trail.png"))==OK,"Capture trail")
     print("VFX workshop GL failures: ",failures)
     quit(0 if failures==0 else 1)

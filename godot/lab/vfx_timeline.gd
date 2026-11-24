@@ -22,7 +22,7 @@ func _draw() -> void:
         var w: float=float(l.duration)/end*(size.x-44)
         var c: Color=COLORS[i%4] if l.enabled else Color("#45515c")
         var full: float=P.layer_duration(l)/end*(size.x-44)
-        if P.is_stream(l):
+        if P.is_stream(l) or l.type=="trail":
             draw_rect(Rect2(x+w,y,maxf(1,full-w),maxf(2,h-2)),Color(c.r,c.g,c.b,.35))
         draw_rect(Rect2(x,y,maxf(2,w),maxf(2,h-2)),c)
         if i==selected:draw_rect(Rect2(x,y,maxf(2,full),maxf(2,h-2)),Color.WHITE,false,1)

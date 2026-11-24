@@ -1,5 +1,5 @@
 extends RefCounted
-const TYPES=["lightning","sparks","glow","ring","slash","droplets","smoke"]
+const TYPES=["lightning","sparks","glow","ring","slash","droplets","smoke","trail"]
 const ANCHORS=["origin","hand","target"]
 const FOLDER="user://vfx_presets"
 const CURVES=["linear","ease in","ease out","smooth"]
@@ -13,8 +13,43 @@ static func is_stream(l: Dictionary) -> bool:
     return l.type in PARTICLE_TYPES and l.has("emitter")
 static func max_particle_life(l: Dictionary) -> float:
     return float(l.emitter.life)*(1.0+float(l.emitter.life_jitter))
+const TRAIL_STYLES=["ribbon","electric","dots"]
+const MAX_TRAIL_SEGMENTS=96
+static func trail_defaults() -> Dictionary:
+    return {"life":.55,"rate":48.0,"break_distance":40.0,"style":"ribbon","jitter":3.0}
+static func valid_trail(t: Variant) -> bool:
+    if not t is Dictionary or not t.get("style") in TRAIL_STYLES:return false
+    if not num(t.get("rate"),8,64) or float(t.rate)!=floorf(float(t.rate)):return false
+    return num(t.get("life"),.05,1.5) and num(t.get("break_distance"),4,120) and num(t.get("jitter"),0,12)
 static func layer_duration(l: Dictionary) -> float:
-    return float(l.duration)+max_particle_life(l) if is_stream(l) else float(l.duration)
+    if is_stream(l):return float(l.duration)+max_particle_life(l)
+    if l.type=="trail":return float(l.duration)+float(l.trail.life)
+    return float(l.duration)
+static func trail_demo() -> Dictionary:
+    var a: Dictionary=layer("trail")
+    a.duration=1.65
+    a.trail.life=.7
+    a.size=8.0
+    a.end_size=.5
+    a.color="#397fdd"
+    a.glow=.45
+    var b: Dictionary=layer("trail")
+    b.duration=1.65
+    b.trail.style="electric"
+    b.trail.life=.45
+    b.size=2.0
+    b.end_size=.5
+    b.color="#bceeff"
+    b.glow=.75
+    var c: Dictionary=layer("glow")
+    c.anchor="hand"
+    c.duration=1.65
+    c.size=5.0
+    c.end_size=5.0
+    c.alpha=.8
+    c.end_alpha=.8
+    c.color="#8cddff"
+    return {"schema":1,"name":"Электрический шлейф","seed":121,"layers":[a,b,c]}
 static func valid_emitter(e: Variant) -> bool:
     if not e is Dictionary or not e.get("shape") in EMITTER_SHAPES:return false
     if not num(e.get("rate"),1,64) or float(e.rate)!=floorf(float(e.rate)):return false
@@ -61,9 +96,11 @@ static func layer(kind: String="sparks") -> Dictionary:
         "droplets":l.color="#a0e84b";l.size=2.0;l.end_size=1.0;l.gravity=150.0;l.collision=true;l.follow=false
         "smoke":l.color="#87919d";l.size=3.0;l.end_size=9.0;l.speed=18.0;l.end_speed=12.0;l.gravity=-10.0;l.glow=0.0;l.duration=1.4;l.alpha=.6;l.spread=65.0;l.follow=false
         "sparks":l.size=2.0;l.end_size=.5
+        "trail":l.anchor="hand";l.duration=1.2;l.size=7.0;l.end_size=.5;l.follow=false;l.trail=trail_defaults()
     return l
 static func demo(which: int=0) -> Dictionary:
     if which==4:return stream_demo()
+    if which==5:return trail_demo()
     var layers: Array=[]
     var names=["Electric burst","Acid impact","Claw slash","Fire burst"]
     match which:
@@ -102,6 +139,9 @@ static func valid(p: Variant) -> bool:
             if not num(l.get(spec[0]),spec[1],spec[2]):return false
         if float(l.start)+float(l.duration)>10:return false
         if l.has("emitter") and (not l.type in PARTICLE_TYPES or not valid_emitter(l.emitter)):return false
+        if l.type=="trail":
+            if not valid_trail(l.get("trail")):return false
+        elif l.has("trail"):return false
         if l.has("curves"):
             if not l.curves is Dictionary:return false
             for channel in l.curves:

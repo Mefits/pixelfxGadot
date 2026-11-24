@@ -29,6 +29,8 @@ var emitter_controls: VBoxContainer
 var emitter_toggle: CheckButton
 var emitter_fields: Dictionary={}
 var emitter_info: Label
+var trail_panel: VBoxContainer
+var trail_fields: Dictionary={}
 var selected: int=0
 var time: float=.3
 var playing: bool=true
@@ -73,7 +75,7 @@ func _ready() -> void:
     left.size=Vector2(172,475)
     add_child(left)
     _label(left,"ПРЕСЕТЫ")
-    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии"],_select_demo)
+    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф"],_select_demo)
     preset.name=UI.label(preset.name)
     name_edit=LineEdit.new()
     name_edit.placeholder_text="Имя эффекта"
@@ -192,6 +194,30 @@ func _ready() -> void:
     emitter_fields.shape=_option(shape_row,["Точка","Диск","Кольцо","Линия"],func(i:int):_emitter_change("shape",P.EMITTER_SHAPES[i]))
     emitter_info=_label(emitter_controls,"")
     emitter_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    trail_panel=VBoxContainer.new()
+    right.add_child(trail_panel)
+    _label(trail_panel,"ДИНАМИЧЕСКИЙ ШЛЕЙФ")
+    for spec in [["life","Жизнь следа, с",.05,1.5,.01],["rate","Проб / с",8,64,1],["break_distance","Разрыв, px",4,120,1],["jitter","Зигзаг, px",0,12,.5]]:
+        var row:=HBoxContainer.new()
+        trail_panel.add_child(row)
+        var label: Label=_label(row,spec[1])
+        label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+        var spin:=SpinBox.new()
+        spin.min_value=spec[2]
+        spin.max_value=spec[3]
+        spin.step=spec[4]
+        spin.custom_minimum_size.x=88
+        row.add_child(spin)
+        var key: String=spec[0]
+        trail_fields[key]=spin
+        spin.value_changed.connect(func(v:float):_trail_change(key,v))
+    var trail_style_row:=HBoxContainer.new()
+    trail_panel.add_child(trail_style_row)
+    var trail_style_label: Label=_label(trail_style_row,"Стиль")
+    trail_style_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    trail_fields.style=_option(trail_style_row,["Лента","Электрический","Точки"],func(i:int):_trail_change("style",P.TRAIL_STYLES[i]))
+    var trail_hint: Label=_label(trail_panel,"Включи «Движение»: след строится по истории точки. Размер = ширина.")
+    trail_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _label(right,"КРИВЫЕ ПАРАМЕТРОВ")
     _option(right,["Размер","Прозрачность","Скорость","Свечение"],func(i:int):curve_channel=i;_sync_curve())
     curve_toggle=_button(right,"Своя кривая",_toggle_curve)
@@ -236,6 +262,11 @@ func _select_demo(i: int) -> void:
     preset=P.demo(i)
     preset.name=UI.label(preset.name)
     selected=0
+    if i==5:
+        stage.moving=true
+        stage.sweep=true
+        time=.5
+    else:stage.sweep=false
     _refresh()
 
 func _toggle_play() -> void:
@@ -248,11 +279,17 @@ func _seek(v: float) -> void:
 func _change(key: String,v: Variant) -> void:
     if syncing:return
     preset.layers[selected][key]=v
-    if key=="type" and not v in P.PARTICLE_TYPES:
-        preset.layers[selected].erase("emitter")
+    if key=="type":
+        var l: Dictionary=preset.layers[selected]
+        if not v in P.PARTICLE_TYPES:l.erase("emitter")
+        if v=="trail":
+            l.trail=P.trail_defaults()
+            l.follow=false
+        else:l.erase("trail")
     if key in ["type","enabled"]:_refresh()
     else:
         _sync_emitter()
+        _sync_trail()
         _sync_curve()
         dirty=true
 func _refresh() -> void:
@@ -277,7 +314,37 @@ func _sync_fields() -> void:
         else:field.value=float(l[key])
     syncing=false
     _sync_emitter()
+    _sync_trail()
     _sync_curve()
+    dirty=true
+
+func _sync_trail() -> void:
+    if trail_panel==null:return
+    var l: Dictionary=preset.layers[selected]
+    var active: bool=l.type=="trail"
+    trail_panel.visible=active
+    for key in ["follow","collision"]:
+        if fields.has(key):
+            fields[key].disabled=active
+            fields[key].tooltip_text="Шлейф использует историю мировых координат" if active else ""
+    for key in ["count","spread","angle","gravity"]:
+        if fields.has(key):
+            fields[key].editable=not active and (key!="count" or not P.is_stream(l))
+    if not active:return
+    var previous: bool=syncing
+    syncing=true
+    for key in trail_fields:
+        if key=="style":trail_fields[key].select(P.TRAIL_STYLES.find(l.trail.style))
+        else:trail_fields[key].set_value_no_signal(float(l.trail[key]))
+    trail_fields.jitter.editable=l.trail.style=="electric"
+    syncing=previous
+
+func _trail_change(key: String,value: Variant) -> void:
+    if syncing:return
+    var l: Dictionary=preset.layers[selected]
+    if l.type!="trail":return
+    l.trail[key]=value
+    _sync_trail()
     dirty=true
 
 func _sync_emitter() -> void:
@@ -343,19 +410,20 @@ func _update_curve_controls() -> void:
     for k in ["size","end_size","alpha","end_alpha","speed","end_speed","glow"]:
         if fields.has(k):
             var base: String=k.trim_prefix("end_")
-            fields[k].editable=not P.has_curve(l,base)
+            fields[k].editable=not P.has_curve(l,base) and not (l.type=="trail" and base=="speed")
             fields[k].tooltip_text="Управляется своей кривой" if not fields[k].editable else ""
     var message: String="%d/%d точек. Своя кривая."%[graph.points.size(),P.MAX_POINTS] if custom else "Базовые значения. Включи свою кривую для редактирования."
     if channel=="speed" and l.type not in ["sparks","droplets","smoke"]:
         message+=" Скорость действует только на частицы."
     if P.is_stream(l):message+=" Время жизни одной частицы."
+    if l.type=="trail":message+=" Возраст участка следа. Размер = ширина."
     if channel=="alpha":message+=" 1 = непрозрачно."
     curve_status.text=message
 
 func _update_curve_cursor() -> void:
     if graph==null:return
     var l: Dictionary=preset.layers[selected]
-    graph.set_cursor(-1.0 if P.is_stream(l) else (time-float(l.start))/float(l.duration))
+    graph.set_cursor(-1.0 if P.is_stream(l) or l.type=="trail" else (time-float(l.start))/float(l.duration))
 
 func _toggle_curve() -> void:
     var l: Dictionary=preset.layers[selected]
@@ -415,6 +483,9 @@ func _load() -> void:
     if value.is_empty():status.text="Неверный файл";return
     preset=value
     selected=0
+    stage.sweep=false
+    for l in preset.layers:
+        if l.type=="trail":stage.moving=true;stage.sweep=true;break
     _refresh()
 func _process(dt: float) -> void:
     if surface==null:return

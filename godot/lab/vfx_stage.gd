@@ -2,10 +2,13 @@ extends Node2D
 var time: float=0
 var moving: bool=false
 var bright: bool=false
+var sweep: bool=false
 func anchor(name: String,t: float) -> Vector2:
     var offset: float=sin(t*4)*20 if moving else 0.0
     match name:
-        "hand":return Vector2(83+offset,76)
+        "hand":
+            if moving and sweep:return Vector2(112+sin(t*3.5)*42,76-cos(t*3.5)*23)
+            return Vector2(83+offset,76)
         "target":return Vector2(166,76)
     return Vector2(120,80)
 func _draw() -> void:
