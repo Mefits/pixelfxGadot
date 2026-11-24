@@ -47,6 +47,8 @@ jobs:
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log
           timeout 30s godot --headless --script res://tests/creature.gd 2>&1 | tee /tmp/test.log
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/test.log
+          timeout 30s godot --headless --script res://tests/creature_combat_motion.gd 2>&1 | tee /tmp/combat_motion.log
+          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/combat_motion.log
           timeout 30s godot --headless --script res://tests/creature_physics.gd 2>&1 | tee /tmp/physics.log
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/physics.log
           timeout 30s godot --headless --script res://tests/creature_motion.gd 2>&1 | tee /tmp/motion.log

@@ -16,6 +16,11 @@ var batch=BATCH.new()
 var palette: Array=PAL.fit(L.VOLT,8)
 var bot: bool=true
 var debug: bool=false
+var modern: bool=true
+var effects_on: bool=true
+var slow: bool=false
+var training: bool=false
+var detail: Label
 var hud: Label
 var hp1: ProgressBar
 var hp2: ProgressBar
@@ -46,11 +51,16 @@ func _ready() -> void:
     hp1=_bar(Vector2(24,17))
     hp2=_bar(Vector2(606,17))
     hud=Label.new()
-    hud.position=Vector2(24,50)
+    hud.position=Vector2(24,46)
+    hud.add_theme_font_size_override("font_size",14)
     add_child(hud)
+    detail=Label.new()
+    detail.position=Vector2(24,68)
+    detail.add_theme_font_size_override("font_size",13)
+    add_child(detail)
     var info:=Label.new()
     info.position=Vector2(24,492)
-    info.text="Игрок 1: A/D ходьба, W прыжок, F удар, G магия, S блок\nИгрок 2: стрелки, K удар, L магия | B бот · R сброс · Tab редактор · V скелет · Esc меню"
+    info.text="Игрок 1: A/D ходьба, W прыжок, F удар, G магия, S блок\nИгрок 2: стрелки, K удар, L магия | B бот · N динамика · X медленно · C эффекты · M тренировка · R сброс · Tab редактор · Esc"
     info.add_theme_font_size_override("font_size",13)
     add_child(info)
     _reset()
@@ -74,6 +84,10 @@ func _bar(at: Vector2) -> ProgressBar:
 func _reset() -> void:
     world=COMBAT.new(CLIPS.fighter_bank(0),CLIPS.fighter_bank(1))
     canvas.world=world
+    world.modern=modern
+    if training:
+        world.a.pos.x=130
+        world.b.pos.x=155
     ai_clock=0
 
 func _pressed(code: Key) -> bool:
@@ -83,14 +97,15 @@ func _physics_process(dt: float) -> void:
     if world==null:return
     var left: Dictionary={"move":float(_pressed(KEY_D))-float(_pressed(KEY_A)),"jump":_pressed(KEY_W),"strike":_pressed(KEY_F),"cast":_pressed(KEY_G),"guard":_pressed(KEY_S)}
     var right: Dictionary={"move":float(_pressed(KEY_RIGHT))-float(_pressed(KEY_LEFT)),"jump":_pressed(KEY_UP),"strike":_pressed(KEY_K),"cast":_pressed(KEY_L),"guard":_pressed(KEY_DOWN)}
-    if bot:
+    if training:right={}
+    elif bot:
         ai_clock+=dt
         var dist: float=world.a.pos.x-world.b.pos.x
         if ai_clock>.85:
             ai_clock=0
             ai_action=(ai_action+1)%4
         right={"move":signf(dist) if absf(dist)>31 else 0.0,"strike":absf(dist)<35 and ai_action==0,"cast":absf(dist)<95 and ai_action==1,"guard":ai_action==2 and absf(dist)<70}
-    world.step(dt,left,right)
+    world.step(dt*(.35 if slow else 1),left,right)
     hp1.value=world.a.hp
     hp2.value=world.b.hp
     canvas.debug=debug
@@ -104,12 +119,16 @@ func _physics_process(dt: float) -> void:
 func _update_hud() -> void:
     hp1.value=world.a.hp
     hp2.value=world.b.hp
+    detail.text="Динамика: %s · %s · серия %d (макс. %d) · блоков %d · F→F / F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
     hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["БОТ" if bot else "2 ИГРОКА",world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:
     var start: int=Time.get_ticks_usec()
     var p=surface.painter
     p.clear()
+    if not effects_on:
+        surface.present()
+        return
     var d=batch.begin(p)
     for f in world.flashes:
         var k: float=1-f.age/f.life
@@ -123,6 +142,16 @@ func _vfx() -> void:
             var b: Vector2=f.b
             d.line(a.x,a.y-5,b.x,b.y,palette[6],k)
             d.glow(b.x,b.y,8,palette[5],.6*k)
+        elif f.kind in ["impact","block"]:
+            var p0: Vector2=f.a
+            var r0=RNG.new(178)
+            var color: int=PAL.from_hex("#ffe0a0" if f.kind=="impact" else "#82dedc")
+            for j in range(9):
+                var angle: float=r0.between(-PI,PI)
+                var v: Vector2=Vector2.from_angle(angle)
+                var q: Vector2=p0+v*(4+f.age*85)
+                d.line(q.x,q.y,q.x-v.x*4,q.y-v.y*4,color,k)
+            d.glow(p0.x,p0.y,12,color,.6*k)
     batch.finish()
     for f in world.flashes:
         if f.kind=="cast":
@@ -140,5 +169,15 @@ func _unhandled_input(e: InputEvent) -> void:
             KEY_B:bot=not bot
             KEY_R:_reset()
             KEY_V:debug=not debug
+            KEY_N:
+                modern=not modern
+                world.modern=modern
+            KEY_X:slow=not slow
+            KEY_C:
+                effects_on=not effects_on
+                _vfx()
+            KEY_M:
+                training=not training
+                _reset()
             KEY_TAB:get_tree().change_scene_to_file("res://lab/pose_workshop.tscn")
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")

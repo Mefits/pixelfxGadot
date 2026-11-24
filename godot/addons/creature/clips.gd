@@ -113,3 +113,31 @@ static func fighter_bank(index: int) -> Dictionary:
         k.pose.angles["shoulder_far"]=20
         k.pose.angles["elbow_far"]=-95
     return bank
+
+static func blend_pose(a: Dictionary,b: Dictionary,u: float) -> Dictionary:
+    if a.is_empty():return b.duplicate(true)
+    u=clampf(u,0,1)
+    var ids: Array=a.angles.keys()
+    for id in b.angles:
+        if not ids.has(id):ids.append(id)
+    var out: Dictionary={}
+    for id in ids:
+        out[id]=rad_to_deg(lerp_angle(deg_to_rad(float(a.angles.get(id,0))),deg_to_rad(float(b.angles.get(id,0))),u))
+    return pose(out,lerpf(a.root[0],b.root[0],u),lerpf(a.root[1],b.root[1],u))
+
+static func followup(original: Dictionary) -> Dictionary:
+    # Derive a faster cross from the user's existing strike, not a new save slot.
+    var c: Dictionary=original.duplicate(true)
+    var r=preload("res://addons/creature/rig.gd").humanoid()
+    c.duration*=.82
+    for k in c.keys:
+        k.t*=.82
+        r.evaluate(k.pose)
+        var aim: Vector2=r.point("hand_near")
+        k.pose.angles["shoulder_near"]=-32
+        k.pose.angles["elbow_near"]=-72
+        k.pose=r.solve_ik(k.pose,"hand_far",aim,24)
+    for e in c.events:
+        e.t*=.82
+        if e.anchor=="hand_near" and e.kind=="strike":e.anchor="hand_far"
+    return c
