@@ -61,7 +61,7 @@ func _streams() -> void:
     var renderer=R.new()
     var paint=PAINT.new(240,160)
     var anchors: Dictionary={"origin":Vector2(100,80)}
-    for spec in [[0.0,1],[.24,1],[.26,2],[.51,3],[.76,3],[1.1,2],[1.26,1],[1.36,0],[1.6,0]]:
+    for spec in [[0.0,1],[.24,1],[.26,2],[.51,3],[.76,3],[1.09,2],[1.26,1],[1.36,0],[1.6,0]]:
         renderer.render(paint,p,float(spec[0]),anchors)
         check(renderer.particles==int(spec[1]),"Stream alive at "+str(spec[0]))
     check(paint.color.count(0)==paint.color.size() and paint.light.count(0)==paint.light.size(),"Stream expires")
