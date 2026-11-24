@@ -37,7 +37,7 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > /tmp/complete/CREATURE_REVISION.txt
           python3 tools/build_creature_runtime.py --project /tmp/complete/godot --example portable_example --licenses /tmp/complete
           cp -a portable_example /tmp/complete/
-          cp tools/build_creature_runtime.py /tmp/complete/tools/
+          cp tools/build_creature_runtime.py tools/check_creature_schema.py /tmp/complete/tools/
       - name: Install Godot
         run: |
           curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
@@ -57,7 +57,7 @@ jobs:
           cd /tmp/complete/godot
           verify import godot --headless --editor --import
           if [ "$failed" -ne 0 ]; then exit 1; fi
-          for test in creature creature_combat_motion creature_combat_variety creature_physics creature_motion creature_hybrid creature_evolution creature_vfx; do
+          for test in creature creature_combat_motion creature_combat_variety creature_physics creature_motion creature_hybrid creature_evolution creature_vfx creature_sdk; do
             verify "$test" timeout 45s godot --headless --script res://tests/$test.gd
           done
           for scene in pose_workshop combat_lab physics_lab vfx_workshop; do
@@ -69,6 +69,11 @@ jobs:
           if [ "$failed" -ne 0 ]; then exit 1; fi
           rm -rf .godot
           find . -name '*.import' -delete
+      - name: Cross-check canonical fixtures with standard JSON Schema
+        run: |
+          python3 -m venv /tmp/schema-venv
+          /tmp/schema-venv/bin/pip install --quiet jsonschema==4.23.0
+          /tmp/schema-venv/bin/python tools/check_creature_schema.py /tmp/complete/godot/addons/creature/template.schema.json /tmp/sdk-fixtures
       - name: Verify portable ZIPs in independent clean Godot projects
         shell: bash
         run: |

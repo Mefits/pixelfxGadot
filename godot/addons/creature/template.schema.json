@@ -970,6 +970,12 @@
           },
           "minItems": 0,
           "maxItems": 256
+        },
+        "easing": {
+          "enum": [
+            "smooth",
+            "linear"
+          ]
         }
       },
       "required": [

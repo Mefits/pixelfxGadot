@@ -16,6 +16,9 @@ for directory in ("addons/creature","addons/pixelfx/native","addons/pixelfx/comp
     for f in sorted((root/directory).glob("*.gd")):
         if f.name in ("catalog.gd","kit_export.gd"): continue
         files[f.relative_to(root).as_posix()]=f.read_bytes()
+for n in ("template.schema.json","SDK.md"):
+    name="addons/creature/"+n
+    files[name]=(root/name).read_bytes()
 for n in ("project.godot","README.md"):
     files[n]=(args.example/n).read_bytes()
 for n in ("demo.gd","demo.tscn"):

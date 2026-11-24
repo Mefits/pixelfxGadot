@@ -45,7 +45,7 @@ static func export_entry(e:Dictionary,path:String)->Error:
         var data:Dictionary={"schema":1,"id":str(e.get("id","template")),"name":e.name,"kind":e.kind,"payload":e.payload.duplicate(true),"source":"export"}
         if not _write(pack,"content/template.json",JSON.stringify(data,"  ",true,true).to_utf8_buffer()):err=ERR_CANT_CREATE
     if err==OK:
-        var manifest:Dictionary={"schema":1,"toolkit_version":"0.30","godot":"4.4.1","backend":"gdscript","entry":"content/template.json","kind":e.kind,"files":Array(files)}
+        var manifest:Dictionary={"schema":1,"toolkit_version":"0.31","godot":"4.4.1","backend":"gdscript","entry":"content/template.json","kind":e.kind,"files":Array(files)}
         if not _write(pack,"content/manifest.json",JSON.stringify(manifest,"  ").to_utf8_buffer()):err=ERR_CANT_CREATE
     var closed:Error=pack.close()
     if err==OK:err=closed

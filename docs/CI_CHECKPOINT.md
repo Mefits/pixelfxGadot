@@ -15,3 +15,6 @@ Six portable physical profiles, bounded tip-directed grab, swept projectile and 
 
 ## v0.30 portable checkpoint
 Validate source runtime dependency closure and five independent exported projects. Preserve prior complete regression checks. Export is source-only GDScript; no Windows desktop rebuild yet.
+
+## v0.31 SDK checkpoint
+Canonical JSON Schema 2020-12; engine-aware diagnostic validator, compatibility checks, API reference and all built-in fixtures checked by both Godot and independent standard validator. No change to permissive existing editor loading. Full prior regression and isolated exports.

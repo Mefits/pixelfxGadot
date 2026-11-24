@@ -65,7 +65,7 @@ func _walk(s:Variant,v:Variant,path:String)->void:
             var prefix:Array=s.get("prefixItems",[])
             for i in range(v.size()):
                 if i<prefix.size():_walk(prefix[i],v[i],_child(path,i))
-                elif s.has("items"):_walk(s.items,v[i],_child(path,i))
+                elif s.has("items"):_walk(s["items"],v[i],_child(path,i))
     if v is Dictionary:
         var props:Dictionary=s.get("properties",{})
         for key in s.get("required",[]):
@@ -73,12 +73,12 @@ func _walk(s:Variant,v:Variant,path:String)->void:
         for key in v:
             if props.has(key):_walk(props[key],v[key],_child(path,key))
             elif s.has("additionalProperties"):
-                if s.additionalProperties==false:_issue(_child(path,key),"schema.unknown","Unknown field; check spelling")
+                if s.additionalProperties is bool and not s.additionalProperties:_issue(_child(path,key),"schema.unknown","Unknown field; check spelling")
                 elif s.additionalProperties is Dictionary:_walk(s.additionalProperties,v[key],_child(path,key))
     for part in s.get("allOf",[]):_walk(part,v,path)
     if s.has("if"):
         if _matches(s["if"],v):
-            if s.has("then"):_walk(s.then,v,path)
+            if s.has("then"):_walk(s["then"],v,path)
         elif s.has("else"):_walk(s["else"],v,path)
     if s.has("not") and _matches(s["not"],v):_issue(path,"schema.forbidden","Conflicting field for selected type")
 
