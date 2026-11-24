@@ -1,4 +1,4 @@
-# Creature & PixelFX SDK 0.31 — authoring contract
+# Creature & PixelFX SDK 0.35 — authoring contract
 
 Godot 4.4.1 · data schema 1 · portable GDScript runtime.
 
@@ -71,4 +71,22 @@ Host target contract: shared dictionary {id:String,p:Vector2,r:float,hp:int}; gr
 4. Render real frames (native two-buffer surface for VFX, skin or body debug geometry for creatures). Inspect timing, silhouettes, clipping and visual endpoints. Measure performance in the real target project; CI alone cannot demonstrate frame rate or quality.
 5. Deliver the JSON entry, runtime version, relevant code, actual tests, preview captures and limitations. Use existing exporter for independent example ZIP; preserve licenses. Source runtime in minimal export is GDScript only.
 
-CLI authoring, batch captures, agent-specific skills and independent-agent acceptance are separate planned milestones. This document describes current API, not capabilities that have yet to be built.
+## 6. Agent CLI (full SDK)
+Run from full archive after Godot import. Python 3 and Godot 4.4.1 required; Pillow only for media. CLI uses JSON on stdout and exit 0 success, 1 validation/simulation failure, 2 operational/usage error. Output paths are relative to caller via wrapper; output files/directories must be new. Examples:
+```sh
+python tools/creature_sdk.py list creature
+python tools/creature_sdk.py show creature_tentacled
+python tools/creature_sdk.py clone creature_tentacled mutant.json
+python tools/creature_sdk.py patch mutant.json changes.json mutant_v2.json
+python tools/creature_sdk.py validate mutant_v2.json
+python tools/creature_sdk.py compat mutant_v2.json physical_grab
+python tools/creature_sdk.py simulate mutant_v2.json physical_grab 600
+python tools/creature_sdk.py clone physical_grab grab.json
+python tools/creature_sdk.py --xvfb render grab.json frames 15 45 mutant_v2.json
+python tools/creature_sdk.py media frames
+python tools/creature_sdk.py export grab.json grab.zip
+```
+Omit --xvfb on a graphical desktop. Patch implements JSON Merge Patch (null removes fields, arrays replaced); schema validates before writing. simulate uses 120Hz ticks, floor and synthetic target, no custom gameplay; inspect hits, target_moved, target_hp, tail_delta separately from ok. render uses actual Godot viewport and runtime, 320x180, 15/30/60 fps, 2..180 frames, optional paired anatomy; PNG hashes, report.json and diagnostics. GIF/contact sheet via Pillow. Not real-time performance measurement. The CLI is not in minimal exported runtime.
+
+## 7. Agent workflow
+Use skills/creature-sdk/SKILL.md in full archive; specialized references cover anatomy, animation/VFX and integration. sdk_acceptance/BRIEF.md defines a clean-room agent task; tools/test_creature_sdk.py is a black-box automated reference, not an independent AI run or visual acceptance. Give brief and verified SDK to a fresh agent for that separate test.

@@ -23,3 +23,6 @@ Godot 4.4.1, Windows/Linux x86-64, build f8a812f; 244 original effects and 73 au
 
 ## Creature SDK authoring (0.31)
 For anatomy, keyed clips, composer presets and ability templates, first read godot/addons/creature/SDK.md and template.schema.json beside it (or addons/creature/ in an exported package). Use sdk_validate.gd.validate / validate_file and compatibility before running simulations. Do not confuse strict authoring with legacy import. Use the existing kit_api.gd and runtime rather than introducing a parallel engine. Automated rendering and CLI are not yet provided by this milestone.
+
+## Full agent SDK 0.35
+Use skills/creature-sdk/SKILL.md and its references. The full archive includes tools/creature_sdk.py, fixed-tick simulation, real viewport capture and media assembly. See sdk_acceptance/BRIEF.md for independent-agent acceptance; automated reference is not independent agent approval.

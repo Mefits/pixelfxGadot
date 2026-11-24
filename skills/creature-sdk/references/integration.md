@@ -1,0 +1,3 @@
+# Integration
+
+Export creates one standalone example ZIP with the selected data and shared GDScript runtime. Full SDK is required for CLI authoring; exported ZIP is runtime-only. For a creature plus physical ability, export each; copy the creature template to content/creature.json in the ability example and run Godot with -- --anatomy res://content/creature.json. In a real game use kit_api.create_creature and attach_ability, host collision Rect2 list, fixed-step advance and explicit target adapter. Do not copy example project.godot over an existing game. Use source comparison when dependencies already exist. Keep licenses and record SDK version. The exported example is a test scene, not a complete gameplay system.

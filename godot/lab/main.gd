@@ -1,7 +1,7 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.31"
+const VERSION="0.35"
 const EXP=preload("res://addons/creature/kit_export.gd")
 const CAT=preload("res://addons/creature/catalog.gd")
 const PREVIEW=preload("res://lab/catalog_preview.gd")

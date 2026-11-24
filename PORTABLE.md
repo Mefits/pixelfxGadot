@@ -17,3 +17,6 @@ Full catalog smoke coverage is not exhaustive visual parity. Expensive effects s
 
 ## Selected template export (v0.30)
 Select a template in the unified library and use Export to game (ZIP). The checked runtime archive is bundled under godot/portable/runtime.zip by tools/build_creature_runtime.py; the source-only ZIP contains a standalone example Godot project, template.json and runtime API, without the lab. Copy addons and data into an existing project only after comparing dependencies. Native acceleration, original JS catalog, and graphical authoring tools are not part of the minimal export. Existing ZIPs are not overwritten. See the exported README.md.
+
+## Full SDK 0.35
+Use tools/creature_sdk.py, skills/creature-sdk/SKILL.md and godot/addons/creature/SDK.md. The complete archive includes CLI and render scripts, acceptance brief and tests. Minimal template ZIPs are runtime-only. Python 3 plus Godot 4.4.1 required; optional Pillow for media, graphical driver or Xvfb for capture.

@@ -18,3 +18,5 @@ Read README.md, docs/ROADMAP.md and original/pixelfx/skills/pixelfx/SKILL.md fir
 - Verified baseline f8a812f: both original-runtime and native tests passed Windows/Linux. Read the latest section of docs/STATUS.md rather than older pending entries. Choose backend by gameplay budget and interaction requirements; use the original-runtime catalog for direct reference, not as a blanket recommendation for live combat. For an original design, artistic comparison is to relevant source techniques, not forced identity to an unrelated original effect. Use the whole portable archive for AI handoffs.
 
 - Creature SDK v0.31: read godot/addons/creature/SDK.md and template.schema.json before authoring anatomy, animations, VFX or abilities. Validate with sdk_validate.gd and check compatibility; then simulate, inspect real render, and report limits. Do not rewrite the engine to bypass data validation.
+
+- SDK 0.35: use tools/creature_sdk.py and skills/creature-sdk/SKILL.md. Inspect actual PNGs and machine reports; do not modify runtime merely to bypass validation. Run the black-box acceptance harness for regression, not as a substitute for independent agent or human review.
