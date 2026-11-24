@@ -78,22 +78,22 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
     var hand: Vector2=e.world_anchor
     var chest: Vector2=dst.point("chest")
     var direction: int=e.direction
-    var forward: bool=(chest.x-hand.x)*direction>=-5
+    # Test direction from the attacker, not an already extended limb.
+    # Reach remains measured at the authored contact anchor.
+    var forward: bool=(chest.x-float(e.world_chest.x))*direction>=0
     var amount: int=0
     match e.kind:
         "charge":
             flashes.append({"kind":"charge","a":hand,"b":hand,"age":0.0,"life":.3,"owner":src,"anchor":e.anchor})
         "strike":
             flashes.append({"kind":"strike","a":hand,"b":hand+Vector2(direction*9,-3),"age":0.0,"life":.15})
-            var melee_forward: bool=(chest.x-float(e.world_chest.x))*direction>=0 if e.attack_kind=="heavy" else forward
-            if melee_forward and hand.distance_to(chest)<=19 and dst.hp>0:
+            if forward and hand.distance_to(chest)<=19 and dst.hp>0:
                 amount=25 if e.attack_kind=="heavy" else (17 if e.attack_kind=="kick" else (15 if e.attack_kind=="air_strike" else 13))
         "cast":
             var target: Vector2=hand+Vector2(direction*104,0)
             # Point-blank targets may be between chest and extended casting hand.
             # Direction is relative to the caster, not the end of the arm.
-            var cast_forward: bool=(chest.x-float(e.world_chest.x))*direction>=0
-            if cast_forward and absf(chest.x-hand.x)<=104 and absf(chest.y-hand.y)<=26 and dst.hp>0:
+            if forward and absf(chest.x-hand.x)<=104 and absf(chest.y-hand.y)<=26 and dst.hp>0:
                 target=chest
                 amount=20
             flashes.append({"kind":"cast","a":hand,"b":target,"age":0.0,"life":.21})

@@ -5,12 +5,50 @@ var failures:int=0
 func _initialize()->void:call_deferred("_run")
 func check(ok:bool,msg:String)->void:
     if not ok:failures+=1;push_error(msg)
+# Independent contact regression: the authored limb can extend past the target,
+# but never grant hits behind the attacker or outside the original radius.
+func _check_contact_direction(bank: Dictionary)->void:
+    for side in [1,-1]:
+        for kind in ["strike","cross","heavy","kick","air_strike"]:
+            var w=W.new(bank)
+            w.a.pos.x=160
+            w.a.facing=side
+            w.b.pos.x=160+side*18
+            w.b.facing=-side
+            var target: Vector2=w.b.point("chest")
+            var anchor: Vector2=target+Vector2(side*12,0)
+            var event: Dictionary={"kind":"strike","anchor":"foot_near" if kind=="kick" else "hand_near","world_anchor":anchor,"world_chest":w.a.point("chest"),"direction":side,"attack_kind":kind,"attack_time":.2,"chain":1}
+            var outcomes: Array=[]
+            w._event(w.a,w.b,event,outcomes)
+            check(outcomes.size()==1,"Point-blank "+kind+" side "+str(side))
+            w.b.guard=true
+            outcomes.clear()
+            w._event(w.a,w.b,event,outcomes)
+            check(outcomes.size()==1 and outcomes[0].blocked,"Guard contact "+kind)
+            w.b.pos.x=160-side*8
+            event.world_anchor=w.b.point("chest")
+            outcomes.clear()
+            w._event(w.a,w.b,event,outcomes)
+            check(outcomes.is_empty(),"No rear hit "+kind)
+            w.b.pos.x=160+side*70
+            event.world_anchor=w.a.point("chest")
+            outcomes.clear()
+            w._event(w.a,w.b,event,outcomes)
+            check(outcomes.is_empty(),"No distant hit "+kind)
+
 func _run()->void:
     var bank:Dictionary=C.defaults()
     check(C.valid(bank) and bank.size()==12,"Extended bank valid")
     var old:Dictionary=bank.duplicate(true)
     for name in ["cross","heavy","kick","air_strike","hurt_heavy"]:old.erase(name)
-    check(C.valid(old) and C.complete(old).size()==12,"Old bank migrated")
+    var migrated: Dictionary=C.complete(old)
+    check(C.valid(old) and migrated.size()==12,"Old bank migrated")
+    for name in C.REQUIRED:
+        check(migrated[name]==old[name],"Migration preserves "+name)
+    var edited: Dictionary=migrated.duplicate(true)
+    edited.cross.events=[]
+    check(C.complete(edited).cross.events.is_empty(),"Migration preserves custom cross")
+    _check_contact_direction(bank)
     check(C.save_bank(old,"user://legacy_combat_bank.json"),"Save old bank")
     var loaded:Dictionary=C.load_bank("user://legacy_combat_bank.json")
     check(loaded.size()==12 and loaded.strike.keys.size()==old.strike.keys.size(),"Load old bank")
