@@ -69,6 +69,50 @@ func _run()->void:
     for i in range(240):w.tick({"move":1,"run":true},{})
     check(w.b.pos.x-w.a.pos.x>=37.99,"No crossing on ground")
     check(w.a.facing==1 and w.b.facing==-1,"Face opponent")
+    # Separate repeated steady locomotion, backward movement, and a Shift change mid-step.
+    for mode in ["walk","run","back"]:
+        var motion=W.new()
+        var origin:float=motion.a.pos.x
+        var peak:float=0
+        var lift:float=0
+        for i in range(150):
+            var prior:Array[Vector2]=motion.a.feet.duplicate()
+            var old_swing:int=motion.a.swing
+            motion.tick({"move":-1 if mode=="back" else 1,"run":mode=="run" or mode=="back"},{})
+            peak=maxf(peak,absf(motion.a.velocity.x))
+            if motion.a.swing>=0:lift=maxf(lift,M.FLOOR-motion.a.feet[motion.a.swing].y)
+            if motion.b.pos.x-motion.a.pos.x>40 and motion.a.pos.x>49:
+                for idx in range(2):
+                    if idx!=old_swing and idx!=motion.a.swing:
+                        check(prior[idx].distance_to(motion.a.feet[idx])<.001,"Fixed support "+mode)
+                    var side:String="near" if idx==0 else "far"
+                    if motion.a.swing!=idx:
+                        check(motion.rig_a.points["foot_"+side].distance_to(motion.a.feet[idx]-Vector2(0,2))<.5,"Support reach "+mode)
+        check(peak>90 and motion.a.steps>3,"Motion "+mode)
+        if mode=="run":check(peak>200 and lift>18,"Running cadence and lift")
+        if mode=="back":check(motion.a.pos.x<origin-80 and motion.a.facing==1 and peak<100,"Backpedal preserves guard")
+    var transition=W.new()
+    for i in range(35):transition.tick({"move":1},{})
+    var duration:float=transition.a.swing_duration
+    var active:int=transition.a.swing
+    transition.tick({"move":1,"run":true},{})
+    if active>=0 and transition.a.swing==active:check(transition.a.swing_duration==duration,"No swing duration snap")
+    for i in range(60):transition.tick({"move":-1},{})
+    for i in range(100):transition.tick({},{})
+    check(transition.a.swing==-1 and transition.a.velocity.length()<.001,"Reversal settles")
+    var leap=W.new()
+    var touched:bool=false
+    var compression:float=0
+    for i in range(150):
+        leap.tick({"jump":i==0},{})
+        if leap.a.grounded and i>30:
+            touched=true
+            compression=maxf(compression,leap.a.land)
+        for side in ["near","far"]:
+            var p:Dictionary=leap.rig_a.points
+            check(p["foot_"+side].y<=M.FLOOR+.01,"Air and landing no penetration")
+            check(absf(p["knee_"+side].distance_to(p["foot_"+side])-R.LOWER_LEG)<.001,"Air limb length")
+    check(touched and compression>.8,"Landing compression")
     var x=W.new()
     var y=W.new()
     for i in range(60):x.advance(1.0/60,{"move":1},{})

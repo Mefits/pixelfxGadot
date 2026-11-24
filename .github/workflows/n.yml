@@ -31,12 +31,16 @@ jobs:
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-import.log; then exit 1; fi
           timeout 30s godot --headless --script res://tests/locomotion.gd 2>&1 | tee /tmp/n-tests.log
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-tests.log; then exit 1; fi
-          timeout 30s xvfb-run -a godot --resolution 960x540 --script res://tests/visual.gd 2>&1 | tee /tmp/n-visual.log
+          timeout 90s xvfb-run -a godot --resolution 960x540 --script res://tests/visual.gd 2>&1 | tee /tmp/n-visual.log
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-visual.log; then exit 1; fi
           test -f reports/stance.png
           test -f reports/running.png
           test -f reports/jump.png
           test "$(find reports/guard -name '*.png' | wc -l)" -eq 24
+          test "$(find reports/walk -name '*.png' | wc -l)" -eq 32
+          test "$(find reports/run -name '*.png' | wc -l)" -eq 36
+          test "$(find reports/back -name '*.png' | wc -l)" -eq 32
+          test "$(find reports/leap -name '*.png' | wc -l)" -eq 30
           rm -rf .godot
           find . -name '*.import' -delete
           printf '%s\n' "$GITHUB_SHA" > REVISION.txt
@@ -47,7 +51,7 @@ jobs:
           path: /tmp/n-*.log
       - uses: actions/upload-artifact@v4
         with:
-          name: N-0.02-Godot
+          name: N-0.03-Godot
           path: |
             project.godot
             game/

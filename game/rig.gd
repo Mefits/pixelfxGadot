@@ -2,6 +2,7 @@ extends RefCounted
 ## Analytic two-link IK with an explicit bend side in facing-right space.
 ## The actual render rig is also the future physics attachment contract.
 const GUARD=preload("res://game/guard_pose.gd")
+const MOTION=preload("res://game/motion_pose.gd")
 const TORSO=34.0
 const NECK=22.0
 const UPPER_LEG=30.0
@@ -24,9 +25,19 @@ func sample(m)->Dictionary:
     var relative:float=m.velocity.x*direction
     var g:Dictionary=GUARD.sample(m.guard_phase)
     var moving:float=clampf(m.gait,0,1) if m.grounded else 1.0
-    var lean:float=lerpf(float(g.torso),clampf(relative/215.0,-1,1)*16,moving)
+    var fast:float=m.run_mix
+    var backward:bool=relative<-.1
+    var travel_lean:float=3.0 if backward else lerpf(8.0,23.0,fast)
+    var lean:float=lerpf(float(g.torso),travel_lean,moving)
     var hip_x:float=lerpf(float(g.hip.x),0,moving)
-    var hip_y:float=lerpf(float(g.hip.y),-50,moving)+4*m.land
+    var step_u:float=m.swing_t/m.swing_duration if m.swing>=0 else 0.0
+    var bounce:float=sin(step_u*PI)*lerpf(2.0,5.0,fast)*moving
+    var hip_y:float=lerpf(float(g.hip.y),-51.0-bounce,moving)+9*m.land
+    lean+=12*m.land
+    if not m.grounded:
+        var ap:Dictionary=MOTION.air(m,0)
+        lean=float(ap.lean)
+        hip_y=float(ap.hip_y)
     if m.grounded:
         # Keep BOTH target feet within the reach envelope while grounded.
         for i in range(2):
@@ -47,15 +58,16 @@ func sample(m)->Dictionary:
         if m.grounded:
             foot=Vector2((m.feet[i].x-m.pos.x)*direction,m.feet[i].y-m.pos.y-2)
         else:
-            var rising:float=clampf(-m.velocity.y/395.0,0,1)
-            foot=hip+Vector2(side_sign*(12+9*rising),38-13*rising)
+            foot=MOTION.air(m,i).foot
         # A planted leg bends toward the opponent; the elbow bends downward.
         var leg:Array[Vector2]=chain(thigh,foot,UPPER_LEG,LOWER_LEG,-1)
         var stride:float=clampf((foot.x-hip.x)/24,-1,1)
         var guard:Vector2=g.lead if i==0 else g.rear
-        var travel:Vector2=Vector2(-stride*15,25-absf(stride)*4)
-        var hand_goal:Vector2=shoulder+guard.lerp(travel,moving*.75)
-        if not m.grounded:hand_goal=shoulder+Vector2(12*side_sign,10)
+        var travel:Vector2=MOTION.arm_target(stride,fast,i)
+        var blend:float=moving*(.28 if backward else lerpf(.55,1.0,fast))
+        var hand_goal:Vector2=shoulder+guard.lerp(travel,blend)
+        if m.grounded:hand_goal+=Vector2(4*m.land,8*m.land)
+        else:hand_goal=shoulder+Vector2(MOTION.air(m,i).hand)
         var arm:Array[Vector2]=chain(shoulder,hand_goal,UPPER_ARM,LOWER_ARM,1)
         local["shoulder_"+side]=shoulder
         local["elbow_"+side]=arm[0]

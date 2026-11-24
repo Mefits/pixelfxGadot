@@ -5,3 +5,6 @@ Explicit screen-coordinate perpendicular for IK; test knee direction and actual 
 
 ## 0.02
 Guard retarget, fixed support, mirrored pose loop, constant limb lengths; capture 24 real frames at 20 fps. Retain previous locomotion tests. No combat or VFX added.
+
+## 0.03
+Reference-based locomotion posture, velocity-predicted step targets, fixed swing durations, guard backpedal, airborne tuck/extension and landing compression. Regression of mirrored stance and support; real 20 FPS capture sequences for walk/run/back/jump. No combat changes.

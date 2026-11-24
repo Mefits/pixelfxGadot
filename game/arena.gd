@@ -60,7 +60,7 @@ func _physics_process(dt:float)->void:
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl")+"\nN  /  0.02  /  Боевая стойка   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl")+"\nN  /  0.03  /  Движение и опора   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)
@@ -69,7 +69,9 @@ func _limbs(p:Dictionary,side:String,c:Color,face:int)->void:
     _segment(p["thigh_"+side],p["knee_"+side],13,c.darkened(.15))
     _segment(p["knee_"+side],p["foot_"+side],10,c)
     var foot:Vector2=p["foot_"+side]
-    draw_line(foot-Vector2(5*face,0),foot+Vector2(9*face,0),Color("#151c28"),6,true)
+    var foot_axis:=Vector2(float(face),0)
+    draw_line(foot-foot_axis*5,foot+foot_axis*9,Color("#151c28"),4,true)
+    draw_line(foot-foot_axis*4,foot+foot_axis*8,c.darkened(.25),2,true)
     _segment(p["shoulder_"+side],p["elbow_"+side],10,c)
     _segment(p["elbow_"+side],p["hand_"+side],8,c.lightened(.14))
     draw_circle(p["hand_"+side],6,Color("#17202b"))
