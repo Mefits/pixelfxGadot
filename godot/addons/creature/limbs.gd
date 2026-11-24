@@ -19,6 +19,8 @@ var current_height: float=18
 var override_leg: int=-1
 var rear_height_offset: float=0
 var front_height_offset: float=0
+var adaptive_gait: bool=true
+var foot_lift: float=6
 
 func setup(body) -> void:
     legs.clear()
@@ -85,13 +87,16 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
             continue
         var hip: Vector2=body.nodes[l.parent].p
         var bias: float=(4.0 if l.parent==0 else -4.0)*direction+float(l.side)*2
-        var desired: float=hip.x+bias+axis*stride
+        var speed: float=body.nodes[l.parent].v.x
+        var lead: float=axis*stride
+        if adaptive_gait:lead=clampf(speed*.10,-stride,stride) if absf(axis)>.05 else 0.0
+        var desired: float=hip.x+bias+lead
         if l.planted and (hip.distance_to(l.foot)>max_reach or _blocked(hip,l.foot,body.obstacles)):
             l.planted=false
         if l.swing:
             l.age+=dt
-            var u: float=clampf(float(l.age)/swing_time,0,1)
-            l.foot=Vector2(l.start).lerp(l.target,u*u*(3-2*u))+Vector2(0,-sin(u*PI)*6)
+            var u: float=clampf(float(l.age)/float(l.get("swing_duration",swing_time)),0,1)
+            l.foot=Vector2(l.start).lerp(l.target,u*u*(3-2*u))+Vector2(0,-sin(u*PI)*foot_lift)
             if u>=1:
                 l.swing=false
                 l.planted=hip.distance_to(l.target)<=max_reach and not _blocked(hip,l.target,body.obstacles)
@@ -103,7 +108,7 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
             if not candidate.is_empty():
                 l.foot=candidate.foot
                 l.planted=true
-        elif absf(axis)>.1 and l.group==phase and absf(float(l.foot.x)-desired)>10:
+        elif (absf(axis)>.1 or (adaptive_gait and absf(speed)<15)) and l.group==phase and absf(float(l.foot.x)-desired)>(8 if adaptive_gait else 10):
             var candidate: Dictionary=find_support(hip,desired,body.obstacles)
             if not candidate.is_empty() and Vector2(l.foot).distance_to(candidate.foot)>5:
                 l.start=l.foot
@@ -111,6 +116,7 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
                 l.planted=false
                 l.swing=true
                 l.age=0.0
+                l.swing_duration=clampf(.14-absf(speed)*.00035,.09,.14) if adaptive_gait else swing_time
         if l.planted:support_count+=1
     # A planted foot is an actual support: spring-damper lifts its parent.
     # Divide by number of supporting legs on the same body chunk.

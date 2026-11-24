@@ -23,9 +23,17 @@ var grip: bool=false
 var grip_index: int=-1
 var grip_target:=Vector2.ZERO
 var grip_radius: float=20
-var acceleration: float=680
-var max_speed: float=94
-var jump_speed: float=146
+var acceleration: float=1050
+var max_speed: float=126
+var jump_speed: float=230
+var jump_buffer: float=0
+var jump_held: bool=true
+var jump_cut: bool=false
+var airborne_jump: bool=false
+var turn_progress: float=1
+var turn_from: float=1
+var smooth_motion: bool=true
+var previous_direction: float=1
 var tail_count: int=2
 var mass_scale: float=1
 var grounded: bool=false
@@ -34,6 +42,8 @@ var grip_count: int=0
 
 func _init(at: Vector2,boxes: Array[Rect2],tail: int=2,mass: float=1,with_limbs: bool=true,initial_direction: float=1) -> void:
     direction=-1.0 if initial_direction<0 else 1.0
+    previous_direction=direction
+    turn_from=direction
     tail_count=clampi(tail,0,12)
     mass_scale=clampf(mass,.5,3)
     body.obstacles.assign(boxes)
@@ -52,10 +62,13 @@ func _init(at: Vector2,boxes: Array[Rect2],tail: int=2,mass: float=1,with_limbs:
     limbs.enabled=with_limbs
     limbs.setup(body)
 
-func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: float=0,strike: bool=false) -> void:
+func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: float=0,strike: bool=false,held: bool=true) -> void:
     input_axis=clampf(axis,-1,1)
     climb_axis=clampf(climb,-1,1)
-    if jump:jump_requested=true
+    jump_held=held
+    if jump:
+        jump_requested=true
+        jump_buffer=.12
     if strike:attack_requested=true
     body.advance(dt,_control,_after_step)
     limbs.update_geometry(body,dt,direction)
@@ -76,6 +89,8 @@ func _control(dt: float) -> void:
     grip_cooldown=maxf(0,grip_cooldown-dt)
     surface.cooldown=maxf(0,surface.cooldown-dt)
     jump_cooldown=maxf(0,jump_cooldown-dt)
+    jump_buffer=maxf(0,jump_buffer-dt)
+    jump_requested=jump_buffer>0
     if grip_index<0 and limbs.enabled and jump_cooldown<=0 and not jump_requested and not attack.active:
         if surface.try_attach(body,input_axis,climb_axis):
             direction=-surface.normal.x
@@ -84,10 +99,13 @@ func _control(dt: float) -> void:
         var top: Dictionary=surface.top_goal(body,climb_axis)
         if jump_requested:
             for i in range(body.nodes.size()):
-                body.impulse(i,Vector2(surface.normal.x*115,-jump_speed*.8)/sqrt(mass_scale))
+                body.impulse(i,Vector2(surface.normal.x*115,-(jump_speed if smooth_motion else 146.0)*.8)/sqrt(mass_scale))
             surface.detach()
             limbs.release_all()
             jump_requested=false
+            jump_buffer=0
+            airborne_jump=true
+            jump_cut=false
             jump_cooldown=.24
             coyote=0
             jump_count+=1
@@ -109,12 +127,21 @@ func _control(dt: float) -> void:
             return
         else:
             surface.detach()
-    limbs.step(body,dt,input_axis,direction,jump_cooldown<=0 and grip_index<0 and not jump_requested)
+    # Evaluate support before consuming a buffered jump, not after disabling feet.
+    var rising: bool=(float(body.nodes[0].v.y)+float(body.nodes[1].v.y))*.5 < -12
+    var allow_feet: bool=jump_cooldown<=0 and grip_index<0 and (not airborne_jump or not rising)
+    limbs.step(body,dt,input_axis,direction,allow_feet)
     grounded=body.nodes[0].ground or body.nodes[1].ground or limbs.support_count>0
-    coyote=.09 if grounded else maxf(0,coyote-dt)
+    if grounded and jump_cooldown<=0:airborne_jump=false
+    coyote=.12 if grounded else maxf(0,coyote-dt)
     if attack.active:direction=attack.facing
     elif absf(input_axis)>.05:direction=signf(input_axis)
-    if not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1:
+    if direction!=previous_direction:
+        turn_from=previous_direction
+        turn_progress=0
+        previous_direction=direction
+    turn_progress=minf(1,turn_progress+dt/.19)
+    if not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1 and not jump_requested:
         _find_grip()
     if grip_index>=0:
         grip_age+=dt
@@ -133,34 +160,66 @@ func _control(dt: float) -> void:
             body.force(1,Vector2(0,-700)/float(body.nodes[1].inv))
     if jump_requested:
         if (coyote>0 or grip_index>=0) and jump_cooldown<=0:
+            var speed: float=(jump_speed if smooth_motion else 146.0)/pow(mass_scale,.35 if smooth_motion else .5)
             for i in range(body.nodes.size()):
-                body.impulse(i,Vector2(input_axis*16,-jump_speed*(1.0 if i<2 else .66)/sqrt(mass_scale)))
+                var n: Dictionary=body.nodes[i]
+                var desired_y: float=-speed*(1.0 if i<2 else .86)
+                body.impulse(i,Vector2(input_axis*18,desired_y-minf(0,float(n.v.y))))
             grip_index=-1
             grip_cooldown=.24
             limbs.release_all()
             coyote=0
-            jump_cooldown=.20
+            jump_cooldown=.18
             jump_count+=1
+            jump_buffer=0
+            airborne_jump=true
+            jump_cut=false
+            grounded=false
         jump_requested=false
+    if smooth_motion and airborne_jump and not jump_held and not jump_cut:
+        for i in range(body.nodes.size()):
+            var vy: float=body.nodes[i].v.y
+            if vy< -65:body.impulse(i,Vector2(0,vy*-.55))
+        jump_cut=true
     for i in range(2):
         var n: Dictionary=body.nodes[i]
-        var target: float=float(intent.get("speed",0))*direction if attack.active else input_axis*max_speed
-        var power: float=acceleration*(1.6 if attack.active else 1.0)*(1.0 if grounded else .48)
-        var ax: float=clampf((target-float(n.v.x))*9,-power,power)
+        var target: float=float(intent.get("speed",0))*direction if attack.active else input_axis*(max_speed if smooth_motion else 94.0)
+        var power: float=680*1.6*(1.0 if grounded else .48) if attack.active else (acceleration if smooth_motion else 680.0)*(1.0 if grounded else .65)
+        var gain: float=9
+        if smooth_motion and not attack.active:
+            gain=18 if absf(input_axis)<.05 and grounded else (14 if grounded else 8)
+            if grounded and absf(input_axis)<.05:power*=1.25
+            if grounded and target*float(n.v.x)<0:power*=1.2
+        var ax: float=clampf((target-float(n.v.x))*gain,-power,power)
         body.force(i,Vector2(ax/float(n.inv),0))
     # A limited muscular orientation force steers the front/rear axis.
     # It is not a transform animation: external contacts can override it.
     var front: Vector2=body.nodes[0].p
     var rear: Vector2=body.nodes[1].p
     var goal:=Vector2(direction*16,-2)
+    if smooth_motion and turn_progress<1 and not attack.active and grip_index<0:
+        var theta: float=PI*turn_progress
+        goal=Vector2(turn_from*cos(theta)*16,-2-sin(theta)*14)
     if attack.active:
         var trunk: float=body.links[0].length
         var tilt: float=float(intent.tilt)
         goal=Vector2(direction*cos(tilt),sin(tilt))*trunk
-    var correction: Vector2=(goal-(front-rear))*(115 if attack.active else 30)
-    correction=correction.limit_length(1100 if attack.active else 360)
+    var correction: Vector2=(goal-(front-rear))*(115 if attack.active else (85 if smooth_motion else 30))
+    if smooth_motion and not attack.active:
+        correction-=(Vector2(body.nodes[0].v)-Vector2(body.nodes[1].v))*4.0
+    correction=correction.limit_length(1100 if attack.active else (780 if smooth_motion else 360))
     body.force(0,correction)
     body.force(1,-correction)
+    # Soft tail muscles resist folding and damp relative velocity; no rigid animation.
+    if smooth_motion:
+        for i in range(2,body.nodes.size()):
+            var n: Dictionary=body.nodes[i]
+            var parent: Dictionary=body.nodes[i-1]
+            var axis: Vector2=(Vector2(parent.p)-Vector2(body.nodes[i-2].p)).normalized()
+            var goal_tail: Vector2=Vector2(parent.p)+axis*float(body.links[i-1].length)
+            var f: Vector2=((goal_tail-Vector2(n.p))*9-(Vector2(n.v)-Vector2(parent.v))*1.8).limit_length(26)
+            body.force(i,f)
+            body.force(i-1,-f)
     # Automatic pull is limited to reachable top corners in the movement direction.
 
 func _find_grip() -> void:

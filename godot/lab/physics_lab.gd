@@ -16,7 +16,9 @@ var boxes: Array[Rect2]=[
     Rect2(60,320,145,18),Rect2(250,225,160,18),Rect2(530,180,220,18),
     Rect2(836,414,124,56)]
 var creature
-var debug: bool=true
+var debug: bool=false
+var motion_on: bool=true
+var motion_label: Label
 var paused: bool=false
 var slow: bool=false
 var tail: int=2
@@ -58,6 +60,10 @@ func _ready() -> void:
     mutation_label.position=Vector2(18,482)
     mutation_label.add_theme_font_size_override("font_size",12)
     layer.add_child(mutation_label)
+    motion_label=Label.new()
+    motion_label.position=Vector2(18,62)
+    motion_label.add_theme_font_size_override("font_size",13)
+    layer.add_child(motion_label)
     _reset()
 
 func _reset() -> void:
@@ -67,6 +73,8 @@ func _reset() -> void:
     creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
     creature.attack.set_track(TRACK.load_track())
     creature.surface.enabled=walls_on
+    creature.smooth_motion=motion_on
+    creature.limbs.adaptive_gait=motion_on
     dummy={"id":"training","p":Vector2(183,446),"r":10.0,"hp":100}
     creature.attack.targets.append(dummy)
     trail.clear()
@@ -94,7 +102,7 @@ func _physics_process(dt: float) -> void:
             jump=false
             climb=0
             strike=false
-        creature.advance(dt*(.25 if slow else 1),axis,jump,false,climb,strike)
+        creature.advance(dt*(.25 if slow else 1),axis,jump,false,climb,strike,pressed)
         step_ms=(Time.get_ticks_usec()-start)/1000.0
         track_clock+=dt
         if track_clock>.035:
@@ -108,6 +116,8 @@ func _update_hud() -> void:
     hud.text="Тело %d | опоры %d/%d | масса ×%.1f | %s | ошибка %.2f px | пересеч. %.3f | %.2f мс | %s | стены %s"%[
         creature.body.nodes.size(),creature.limbs.support_count,creature.limbs.legs.size(),creature.mass_scale,("СТЕНА" if creature.surface.active else ("ЗЕМЛЯ" if creature.grounded else "ВОЗДУХ")),creature.body.max_error,creature.body.penetration(),step_ms,"ПАУЗА" if paused else ("МЕДЛЕННО" if slow else "120 Гц"),"вкл." if walls_on else "выкл."]
     hud.text+=" | атака: %s | цель %d"%[UI.label(creature.attack.phase()),dummy.get("hp",100)]
+    var vel: Vector2=(Vector2(creature.body.nodes[0].v)+Vector2(creature.body.nodes[1].v))*.5
+    motion_label.text="Скорость %.0f px/с | прыжки %d | B: %s | короткое / длинное нажатие прыжка"%[vel.x,creature.jump_count,"новое движение" if motion_on else "старые настройки"]
     mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · X медленно"%[creature.tail_count,creature.limb_scale,creature.mutations]
     if Time.get_ticks_msec()<notice_until:mutation_label.text=notice
 
@@ -203,6 +213,10 @@ func _unhandled_input(e: InputEvent) -> void:
                 legs_on=not legs_on
                 creature.limbs.enabled=legs_on
                 creature.limbs.release_all()
+            KEY_B:
+                motion_on=not motion_on
+                creature.smooth_motion=motion_on
+                creature.limbs.adaptive_gait=motion_on
             KEY_V:debug=not debug
             KEY_G:
                 dummy.p=get_global_mouse_position()
