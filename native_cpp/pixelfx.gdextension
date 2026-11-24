@@ -1,0 +1,8 @@
+[configuration]
+entry_symbol = "pixelfx_init"
+compatibility_minimum = "4.4"
+reloadable = false
+
+[libraries]
+linux.x86_64 = "res://addons/pixelfx/bin/libpixelfx.linux.x86_64.so"
+windows.x86_64 = "res://addons/pixelfx/bin/pixelfx.windows.x86_64.dll"

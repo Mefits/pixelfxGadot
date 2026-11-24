@@ -8,6 +8,24 @@ const VOLT = ["#120a33","#2a1b78","#4630c0","#5a62f0","#58a6ff","#9ed8ff","#e4f6
 const CROSS = [[1,0],[-1,0],[0,1],[0,-1]]
 var grid := PackedByteArray()
 var hits := PackedInt32Array()
+var accelerator: Object
+
+func enable_acceleration(enabled: bool=true) -> bool:
+    accelerator=null
+    if enabled and ClassDB.class_exists("PixelFXRaster"):
+        accelerator=ClassDB.instantiate("PixelFXRaster")
+    return accelerator!=null
+
+func _fast(p,paths: Array,k: float,c: Array,s: float,o: Dictionary,thin: bool) -> bool:
+    if accelerator==null:
+        return false
+    var cfg:=PackedFloat64Array([p.width,p.height,p.ox,p.oy,p.tx,p.ty,p.mirror,p.cs,p.sn,p.fade,p.light_k])
+    var buffers: Array=accelerator.render_bolt(p.color,p.light,cfg,paths,c,k,s,o,thin)
+    if buffers.size()!=2:
+        return false
+    p.color=buffers[0]
+    p.light=buffers[1]
+    return true
 
 func _init() -> void:
     grid.resize(N*N)
@@ -94,6 +112,8 @@ func _flush(p,cols: Array,alphas: Array) -> void:
 func stroke(p,paths: Array,k: float,c: Array,s: float=1.0,o: Dictionary={}) -> void:
     if k<=0.02:
         return
+    if _fast(p,paths,k,c,s,o,false):
+        return
     var lk: float=o.get("light",0.5)
     for q in paths:
         var trunk: bool=float(q["w"])>=1.0
@@ -130,6 +150,8 @@ func stroke(p,paths: Array,k: float,c: Array,s: float=1.0,o: Dictionary={}) -> v
 
 func crackle(p,paths: Array,k: float,c: Array,glow_k: float=0.5,a: float=1.0) -> void:
     if k<=0.02:
+        return
+    if _fast(p,paths,k,c,1.0,{"light":glow_k,"a":a},true):
         return
     for q in paths:
         var thick: bool=float(q["w"])>=1.0

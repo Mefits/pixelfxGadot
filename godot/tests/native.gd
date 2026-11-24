@@ -53,6 +53,12 @@ func _run() -> void:
     _compare(p.color,data["painter"]["color"],"Painter color")
     _compare(p.light,data["painter"]["light"],"Painter light")
     var lightning=LIGHTNING.new()
+    if OS.get_cmdline_user_args().has("--cpp"):
+        if not lightning.enable_acceleration():
+            push_error("C++ accelerator missing")
+            quit(1)
+            return
+        print("Testing C++ raster against original JS")
     for item in data["bolts"]:
         var r=RNG.new(int(item["seed"]))
         var f=PAINTER.new(128,96)

@@ -5,3 +5,10 @@ reports/
 
 dist/
 godot/tests/fixtures/
+
+native_cpp/godot-cpp/
+native_cpp/.sconsign.dblite
+native_cpp/*.os
+native_cpp/*.obj
+godot/addons/pixelfx/bin/
+godot/addons/pixelfx/pixelfx.gdextension

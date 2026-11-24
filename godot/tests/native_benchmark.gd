@@ -12,6 +12,12 @@ func _run() -> void:
     var p=PAINTER.new(160,112)
     p.place(20,56)
     var l=LIGHTNING.new()
+    var cpp: bool=OS.get_cmdline_user_args().has("--cpp")
+    if cpp and not l.enable_acceleration():
+        push_error("C++ accelerator missing")
+        quit(1)
+        return
+    print("Benchmark backend: ","C++" if cpp else "GDScript")
     var c: Array=PAL.fit(LIGHTNING.VOLT,8)
     var rng=RNG.new(301)
     var ps=PS.new(312)
