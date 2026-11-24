@@ -1,4 +1,5 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
 const FX=preload("res://addons/pixelfx/effects/ball_lightning.gd")
 var fx=FX.new()
@@ -29,11 +30,11 @@ func _draw() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        if event.keycode==KEY_ESCAPE:
+        if UI.physical_key(event)==KEY_ESCAPE:
             get_tree().change_scene_to_file("res://lab/main.tscn")
-        elif event.keycode==KEY_A:
+        elif UI.physical_key(event)==KEY_A:
             cpp=fx.enable_acceleration(not cpp)
-        elif event.keycode==KEY_SPACE:
+        elif UI.physical_key(event)==KEY_SPACE:
             time=0.0
             shown_frame=-1
 
@@ -47,4 +48,4 @@ func _process(delta: float) -> void:
     surface.painter.clear()
     fx.draw(surface.painter,float(index)/30.0)
     surface.present()
-    label.text="BALL LIGHTNING / ORIGINAL NATIVE PORT | %s | %.2f ms | A backend | SPACE reset | ESC back" % ["C++" if cpp else "GDScript",(Time.get_ticks_usec()-start)/1000.0]
+    label.text="ШАРОВАЯ МОЛНИЯ | %s | %.2f мс | A движок · пробел повтор · Esc меню" % ["C++" if cpp else "GDScript",(Time.get_ticks_usec()-start)/1000.0]

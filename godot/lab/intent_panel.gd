@@ -1,4 +1,5 @@
 extends PanelContainer
+const UI=preload("res://lab/ui_ru.gd")
 ## Compact editor for the physical attack track, using the actual lab for playback.
 const TRACK=preload("res://addons/creature/motion_track.gd")
 var creature
@@ -35,12 +36,12 @@ func _ready() -> void:
     col.add_theme_constant_override("separation",2)
     scroll.add_child(col)
     var title:=Label.new()
-    title.text="CLAW / MOTION INTENT"
+    title.text="АТАКА / параметры движения"
     col.add_child(title)
     keys=OptionButton.new()
     col.add_child(keys)
     keys.item_selected.connect(func(i:int):chosen=i;_refresh())
-    for spec in [["t","Key time",0.0,3.0,.01],["x","Reach X",-1.5,1.5,.05],["y","Reach Y",-1.5,1.5,.05],["tilt","Trunk tilt (rad)",-1.5,1.5,.05],["speed","Motor speed",-250.0,250.0,5.0],["rear","Rear lift",-8.0,8.0,.5],["duration","Duration",.2,3.0,.01],["active_from","Hit starts",0.0,3.0,.01],["active_to","Hit ends",0.0,3.0,.01]]:
+    for spec in [["t","Время ключа, с",0.0,3.0,.01],["x","Вылет X",-1.5,1.5,.05],["y","Вылет Y",-1.5,1.5,.05],["tilt","Наклон, рад",-1.5,1.5,.05],["speed","Скорость рывка",-250.0,250.0,5.0],["rear","Высота таза",-8.0,8.0,.5],["duration","Длительность",.2,3.0,.01],["active_from","Начало удара",0.0,3.0,.01],["active_to","Конец удара",0.0,3.0,.01]]:
         var row:=HBoxContainer.new()
         col.add_child(row)
         var label:=Label.new()
@@ -58,20 +59,22 @@ func _ready() -> void:
         spin.value_changed.connect(func(v:float):_edit(key,v))
     var row:=HBoxContainer.new()
     col.add_child(row)
-    _button(row,"+ Key",_insert)
-    _button(row,"- Key",_remove)
-    _button(row,"Preview",preview)
+    _button(row,"+ Ключ",_insert)
+    _button(row,"− Ключ",_remove)
+    _button(row,"Проверить",preview)
     var row2:=HBoxContainer.new()
     col.add_child(row2)
-    _button(row2,"Save",_save)
-    _button(row2,"Load",func():draft=TRACK.load_track();chosen=0;_refresh())
-    _button(row2,"Reset",func():draft=TRACK.defaults();chosen=0;_refresh())
-    _button(row2,"Close",queue_free)
+    _button(row2,"Сохранить",_save)
+    _button(row2,"Загрузить",func():draft=TRACK.load_track();chosen=0;_refresh())
+    _button(row2,"Сброс",func():draft=TRACK.defaults();chosen=0;_refresh())
+    var row3:=HBoxContainer.new()
+    col.add_child(row3)
+    _button(row3,"Закрыть",queue_free)
     status=Label.new()
     status.add_theme_font_size_override("font_size",12)
     status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     col.add_child(status)
-    status.text="X/Y relative to reach. Preview applies to live body."
+    status.text="X/Y — доли длины лапы. Проверка запускает настоящую атаку."
     _refresh()
 
 func _button(row: Control,label: String,cb: Callable) -> void:
@@ -83,7 +86,7 @@ func _button(row: Control,label: String,cb: Callable) -> void:
 func _refresh() -> void:
     sync=true
     keys.clear()
-    for k in draft.keys:keys.add_item("Key %.2f s"%k.t)
+    for k in draft.keys:keys.add_item("Ключ %.2f с"%k.t)
     chosen=clampi(chosen,0,draft.keys.size()-1)
     keys.select(chosen)
     for name in fields:
@@ -124,16 +127,16 @@ func _remove() -> void:
 
 func preview() -> void:
     if not creature.attack.set_track(draft):
-        status.text="Invalid timing or attack still active."
+        status.text="Неверное время или атака ещё идёт."
         return
     if creature.surface.active or creature.grip_index>=0 or not creature.limbs.enabled:
-        status.text="Stand on floor with limbs enabled."
+        status.text="Встань на пол, включи лапы."
         return
     creature.attack_requested=true
-    status.text="Playing actual physical attack."
+    status.text="Запущена физическая атака."
 
 func _save() -> void:
     if TRACK.save_track(draft):
         var applied: bool=creature.attack.set_track(draft)
-        status.text="Saved and applied." if applied else "Saved. Preview after current attack."
-    else:status.text="Invalid track. Check hit window."
+        status.text="Сохранено и применено." if applied else "Сохранено. Проверь после текущей атаки."
+    else:status.text="Неверные параметры. Проверь интервал попадания."

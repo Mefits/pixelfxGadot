@@ -1,4 +1,5 @@
 extends Control
+const UI=preload("res://lab/ui_ru.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const COMBAT=preload("res://addons/creature/combat.gd")
 const CANVAS=preload("res://lab/combat_canvas.gd")
@@ -48,8 +49,8 @@ func _ready() -> void:
     hud.position=Vector2(24,50)
     add_child(hud)
     var info:=Label.new()
-    info.position=Vector2(24,503)
-    info.text="P1 A/D W jump F strike G cast S guard | P2 arrows K strike L cast Down guard | B bot R reset Tab editor V joints"
+    info.position=Vector2(24,492)
+    info.text="Игрок 1: A/D ходьба, W прыжок, F удар, G магия, S блок\nИгрок 2: стрелки, K удар, L магия | B бот · R сброс · Tab редактор · V скелет · Esc меню"
     info.add_theme_font_size_override("font_size",13)
     add_child(info)
     _reset()
@@ -103,7 +104,7 @@ func _physics_process(dt: float) -> void:
 func _update_hud() -> void:
     hp1.value=world.a.hp
     hp2.value=world.b.hp
-    hud.text="COMBAT LAB | %s | %d : %d HP | %d hits | %.2f ms VFX | %s"%["BOT" if bot else "2 PLAYERS",world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
+    hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["БОТ" if bot else "2 ИГРОКА",world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:
     var start: int=Time.get_ticks_usec()
@@ -135,7 +136,7 @@ func _vfx() -> void:
 
 func _unhandled_input(e: InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
-        match e.keycode:
+        match UI.physical_key(e):
             KEY_B:bot=not bot
             KEY_R:_reset()
             KEY_V:debug=not debug

@@ -1,4 +1,5 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 const R=preload("res://addons/pixelfx/original_runtime.gd")
 const S=preload("res://addons/pixelfx/native/surface.gd")
 var runtime=R.new()
@@ -27,14 +28,14 @@ func _ready() -> void:
     menu.size=Vector2(390,38)
     ui.add_child(menu)
     mode_button=CheckButton.new()
-    mode_button.text="Original choreography"
+    mode_button.text="Оригинальная постановка"
     mode_button.position=Vector2(434,50)
     ui.add_child(mode_button)
     status=Label.new()
     status.position=Vector2(24,102)
     ui.add_child(status)
     var title:=Label.new()
-    title.text="PIXELFX / ORIGINAL JS CATALOG | Space: replay/step | A: acceleration | B: background | Esc: back"
+    title.text="КАТАЛОГ PIXELFX | Пробел: повтор/кадр · A ускорение · B фон · Esc меню"
     title.position=Vector2(24,16)
     ui.add_child(title)
     if not runtime.open():
@@ -88,7 +89,7 @@ func _select(i:int) -> void:
     if handle==0:
         status.text=runtime.error
     elif reference_only:
-        status.text="Weather reference only: Space renders one frame; cold preparation can be slow. Use offline clips in gameplay."
+        status.text="Погода: пробел — следующий кадр. Первый расчёт долгий. В игре используй атласы."
 func _process(delta:float) -> void:
     if handle==0 or reference_only:
         return
@@ -115,7 +116,7 @@ func _process(delta:float) -> void:
         return
     surface.present()
     surface.position=base_position+Vector2(float(state.shake[0]),float(state.shake[1]))*surface.scale
-    status.text="%d originals | %s | %.2f ms render+upload | t %.2f | %s"%[entries.size(),entries[selected].id,(Time.get_ticks_usec()-start)/1000.0,float(state.t),"hit stop" if state.frozen else ""]
+    status.text="%d эффектов | %s | %.2f мс отрисовка | t %.2f | %s"%[entries.size(),entries[selected].id,(Time.get_ticks_usec()-start)/1000.0,float(state.t),"пауза удара" if state.frozen else ""]
     if not runtime.update(handle,dt):
         status.text=runtime.error
         runtime.destroy(handle)
@@ -130,12 +131,12 @@ func _reference_step() -> void:
         return
     first_reference=false
     surface.present()
-    status.text="Weather reference | %.2f ms | Space: next frame"%[(Time.get_ticks_usec()-start)/1000.0]
+    status.text="Погода | %.2f мс | пробел: следующий кадр"%[(Time.get_ticks_usec()-start)/1000.0]
     runtime.update(handle,1.0/fps)
 
 func _unhandled_input(e:InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
-        match e.keycode:
+        match UI.physical_key(e):
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_SPACE:
                 if reference_only:
@@ -145,7 +146,7 @@ func _unhandled_input(e:InputEvent) -> void:
             KEY_A:
                 if runtime.set_acceleration(not accelerated):
                     accelerated=not accelerated
-                    status.text="Original Painter acceleration: "+str(accelerated)
+                    status.text="Ускорение отрисовки: "+str(accelerated)
             KEY_B:
                 bright=not bright
                 queue_redraw()

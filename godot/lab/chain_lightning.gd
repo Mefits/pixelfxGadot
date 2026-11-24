@@ -1,4 +1,5 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 const FX=preload("res://addons/pixelfx/effects/chain_lightning.gd")
 const RUN=preload("res://addons/pixelfx/native/runtime.gd")
 const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
@@ -30,7 +31,7 @@ func _draw() -> void:
     draw_rect(Rect2(108,360,744,66),Color("#293547"))
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        match event.keycode:
+        match UI.physical_key(event):
             KEY_ESCAPE: get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_SPACE: _restart()
             KEY_A: cpp=fx.impl.enable_acceleration(not cpp)
@@ -54,5 +55,5 @@ func _process(delta: float) -> void:
         ACTOR.draw_stock(p,actor)
     fx.draw(p,"front")
     surface.present()
-    label.text="CHAIN LIGHTNING / native effect + static original actors | %s | %.2f ms | A / Space / Esc"%["C++" if cpp else "GDScript",(Time.get_ticks_usec()-start)/1000.0]
+    label.text="ЦЕПНАЯ МОЛНИЯ | %s | %.2f мс | A движок · пробел повтор · Esc меню"%["C++" if cpp else "GDScript",(Time.get_ticks_usec()-start)/1000.0]
     fx.update(1.0/30)

@@ -1,4 +1,5 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 const CREATURE=preload("res://addons/creature/physical_creature.gd")
 const INTENT=preload("res://lab/intent_panel.gd")
 const TRACK=preload("res://addons/creature/motion_track.gd")
@@ -41,20 +42,21 @@ func _ready() -> void:
     ui_layer=layer
     var title:=Label.new()
     title.position=Vector2(18,10)
-    title.text="PHYSICS LAB / independent physical body"
+    title.text="ФИЗИКА И ЭВОЛЮЦИЯ / физическое тело"
     title.add_theme_font_size_override("font_size",22)
     layer.add_child(title)
     hud=Label.new()
     hud.position=Vector2(18,42)
+    hud.add_theme_font_size_override("font_size",13)
     layer.add_child(hud)
     info=Label.new()
     info.position=Vector2(18,505)
-    info.text="A/D move | W/Space jump | F claw | Arrows climb | H edit attack | M course | G target | R reset | Esc"
-    info.add_theme_font_size_override("font_size",14)
+    info.text="A/D ходьба · W/пробел прыжок · F удар · ↑↓ лазание · H атака · M комната · G мишень · R сброс · Esc меню"
+    info.add_theme_font_size_override("font_size",13)
     layer.add_child(info)
     mutation_label=Label.new()
     mutation_label.position=Vector2(18,482)
-    mutation_label.add_theme_font_size_override("font_size",14)
+    mutation_label.add_theme_font_size_override("font_size",12)
     layer.add_child(mutation_label)
     _reset()
 
@@ -103,11 +105,11 @@ func _physics_process(dt: float) -> void:
     queue_redraw()
 
 func _update_hud() -> void:
-    hud.text="Segments %d | feet %d/%d | mass x%.1f | %s | err %.2f px | pen %.3f | %.2f ms CPU | %s | walls %s"%[
-        creature.body.nodes.size(),creature.limbs.support_count,creature.limbs.legs.size(),creature.mass_scale,("WALL" if creature.surface.active else ("GROUND" if creature.grounded else "AIR")),creature.body.max_error,creature.body.penetration(),step_ms,"PAUSED" if paused else ("SLOW" if slow else "120 Hz"),"ON" if walls_on else "OFF"]
-    hud.text+=" | claw %s | HP %d"%[creature.attack.phase(),dummy.get("hp",100)]
-    mutation_label.text="LIVE: 1/2 tail (%d) | 3/4 mass | 5/6 legs | 7/8 reach (x%.2f) | mutations %d | Q legs C walls V debug X slow"%[creature.tail_count,creature.limb_scale,creature.mutations]
-    if Time.get_ticks_msec()<notice_until:mutation_label.text=notice+" | "+mutation_label.text
+    hud.text="Тело %d | опоры %d/%d | масса ×%.1f | %s | ошибка %.2f px | пересеч. %.3f | %.2f мс | %s | стены %s"%[
+        creature.body.nodes.size(),creature.limbs.support_count,creature.limbs.legs.size(),creature.mass_scale,("СТЕНА" if creature.surface.active else ("ЗЕМЛЯ" if creature.grounded else "ВОЗДУХ")),creature.body.max_error,creature.body.penetration(),step_ms,"ПАУЗА" if paused else ("МЕДЛЕННО" if slow else "120 Гц"),"вкл." if walls_on else "выкл."]
+    hud.text+=" | атака: %s | цель %d"%[UI.label(creature.attack.phase()),dummy.get("hp",100)]
+    mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · X медленно"%[creature.tail_count,creature.limb_scale,creature.mutations]
+    if Time.get_ticks_msec()<notice_until:mutation_label.text=notice
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))
@@ -180,7 +182,7 @@ func _draw() -> void:
 
 func _unhandled_input(e: InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
-        match e.keycode:
+        match UI.physical_key(e):
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_R:_reset()
             KEY_H:
@@ -233,5 +235,5 @@ func _set_course() -> void:
         boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70)])
 
 func _mutation(ok: bool) -> void:
-    notice="Mutation applied" if ok else "Unavailable (busy, blocked or limit)"
+    notice="Мутация применена" if ok else "Недоступно: занят, нет места или достигнут предел"
     notice_until=Time.get_ticks_msec()+1800

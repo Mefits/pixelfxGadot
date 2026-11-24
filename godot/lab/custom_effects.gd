@@ -1,7 +1,8 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 const FX=preload("res://addons/pixelfx/effects/custom/rift_collapse.gd")
 const PLAYER=preload("res://addons/pixelfx/native/effect_player.gd")
-const NAMES=["Violet fracture","Ion implosion","Solar shear"]
+const NAMES=["Фиолетовый разлом","Ионное схлопывание","Солнечный разрез"]
 var fx
 var player
 var label: Label
@@ -24,12 +25,12 @@ func _ready() -> void:
     add_child(layer)
     var title:=Label.new()
     title.position=Vector2(24,16)
-    title.text="ORIGINAL WORKSHOP / RIFT COLLAPSE"
+    title.text="МАСТЕРСКАЯ РАЗЛОМОВ"
     title.add_theme_font_size_override("font_size",22)
     layer.add_child(title)
     var help:=Label.new()
     help.position=Vector2(24,50)
-    help.text="1/2/3: direction | Space: replay | P: pause | A: backend | B: background | N: seed | Esc: back"
+    help.text="1/2/3 вариант · пробел повтор · P пауза · A движок · B фон · N случайность · Esc меню"
     layer.add_child(help)
     label=Label.new()
     label.position=Vector2(24,78)
@@ -67,9 +68,9 @@ func _draw() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        match event.keycode:
+        match UI.physical_key(event):
             KEY_1,KEY_2,KEY_3:
-                preset=event.keycode-KEY_1
+                preset=UI.physical_key(event)-KEY_1
                 _select()
             KEY_SPACE:
                 auto_repeat=true
@@ -100,4 +101,4 @@ func _process(delta: float) -> void:
     adjusting=true
     slider.value=player.time
     adjusting=false
-    label.text="%s | %s | %.2f ms update | %.2f s | seed %d" % [NAMES[preset],"C++" if cpp else "GDScript",player.update_ms,player.time,seed_value]
+    label.text="%s | %s | %.2f мс расчёт | %.2f с | seed %d" % [NAMES[preset],"C++" if cpp else "GDScript",player.update_ms,player.time,seed_value]

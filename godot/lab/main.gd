@@ -1,23 +1,24 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.8"
+const VERSION="0.9"
 const SECTIONS=[
-    {"label":"EFFECTS / AUTHORING","color":"#79b9d4","items":[
-        ["Y","VFX Workshop","Create layered effects, edit and save presets.","vfx_workshop"],
-        ["J","Original catalogue","Explore the original PixelFX effects.","original_catalog"],
-        ["K","Rift workshop","Three experimental fracture effects.","custom_effects"],
-        ["A","Atlas playback","Baked effects and stress testing.","atlas_lab"]
+    {"label":"СПЕЦЭФФЕКТЫ","color":"#79b9d4","items":[
+        ["Y","Конструктор эффектов","Слои, параметры и свои пресеты.","vfx_workshop"],
+        ["J","Каталог PixelFX","Оригинальные эффекты и постановки.","original_catalog"],
+        ["K","Мастерская разломов","Три экспериментальных эффекта.","custom_effects"],
+        ["A","Тест атласов","Готовые кадры и тест нагрузки.","atlas_lab"]
     ]},
-    {"label":"ANIMATION / CREATURES","color":"#92c6af","items":[
-        ["U","Pose Workshop","Edit skeletal poses and animation keys.","pose_workshop"],
-        ["T","Combat Lab","Test two fighters and combat events.","combat_lab"],
-        ["I","Physics & Evolution","Physical motion, hybrid attacks and live anatomy.","physics_lab"]
+    {"label":"АНИМАЦИЯ И СУЩЕСТВА","color":"#92c6af","items":[
+        ["U","Редактор анимаций","Позы скелета и ключевые кадры.","pose_workshop"],
+        ["T","Боевая лаборатория","Два бойца и проверка атак.","combat_lab"],
+        ["I","Физика и эволюция","Физика, атаки, изменение анатомии.","physics_lab"]
     ]},
-    {"label":"LOW-LEVEL EFFECT TESTS","color":"#c3a682","items":[
-        ["L","Lightning","Live procedural bolt.","live_lightning"],
-        ["H","Chain","Native chain lightning.","chain_lightning"],
-        ["E","Electrified","Body-bound electric effect.","electrified"],
-        ["O","Ball lightning","Native orb effect.","ball_lightning"]
+    {"label":"ТЕСТОВЫЕ СЦЕНЫ","color":"#c3a682","items":[
+        ["L","Молния","Процедурный разряд в реальном времени.","live_lightning"],
+        ["H","Цепная молния","Разряды между целями.","chain_lightning"],
+        ["E","Электризация","Разряды по контуру персонажа.","electrified"],
+        ["O","Шаровая молния","Процедурная энергетическая сфера.","ball_lightning"]
     ]}
 ]
 var routes: Dictionary={}
@@ -33,8 +34,8 @@ func _ready() -> void:
     root.size=Vector2(960,540)
     layer.add_child(root)
     _label(root,"CREATURE & PIXELFX",Vector2(28,20),28,Color("#e5edf4"))
-    _label(root,"DEVELOPMENT TOOLKIT    /    "+VERSION,Vector2(30,56),13,Color("#91a5b9"))
-    _label(root,"Choose a workspace",Vector2(30,92),16,Color("#c4d0db"))
+    _label(root,"ИНСТРУМЕНТАРИЙ РАЗРАБОТКИ    /    "+VERSION,Vector2(30,56),13,Color("#91a5b9"))
+    _label(root,"Выбери рабочее пространство",Vector2(30,92),16,Color("#c4d0db"))
     for i in range(SECTIONS.size()):
         var section: Dictionary=SECTIONS[i]
         var x: float=28+float(i)*306
@@ -54,7 +55,7 @@ func _ready() -> void:
             root.add_child(button)
             buttons.append(button)
             button.pressed.connect(func():_open(path))
-            var name_label: Label=_label(button,spec[1],Vector2(12,8),17,Color("#e3ebf1"))
+            var name_label: Label=_label(button,spec[1],Vector2(12,8),16,Color("#e3ebf1"))
             name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
             var key_label: Label=_label(button,spec[0],Vector2(264,9),13,Color(section.color))
             key_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -62,7 +63,7 @@ func _ready() -> void:
             detail.size=Vector2(262,30)
             detail.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
             detail.mouse_filter=Control.MOUSE_FILTER_IGNORE
-    status=_label(root,"Choose an instrument with the mouse or its shortcut. Esc returns from a lab.",Vector2(28,501),13,Color("#91a5b9"))
+    status=_label(root,"Выбор мышью или клавишей. Esc — вернуться в главное меню.",Vector2(28,501),13,Color("#91a5b9"))
 
 func _label(parent: Control,value: String,at: Vector2,font_size: int,color: Color) -> Label:
     var l:=Label.new()
@@ -89,12 +90,12 @@ func _draw() -> void:
 
 func _open(path: String) -> void:
     if not ResourceLoader.exists(path):
-        status.text="Workspace unavailable: "+path
+        status.text="Инструмент недоступен: "+path
         return
     var err: Error=get_tree().change_scene_to_file(path)
-    if err!=OK:status.text="Could not open workspace: "+str(err)
+    if err!=OK:status.text="Ошибка открытия: "+str(err)
 
 func _unhandled_input(e: InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
-        var key: String=OS.get_keycode_string(e.keycode)
+        var key: String=OS.get_keycode_string(UI.physical_key(e))
         if routes.has(key):_open(routes[key])

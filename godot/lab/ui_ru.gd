@@ -1,0 +1,51 @@
+extends RefCounted
+## Display names only. Stable English identifiers stay in saved data.
+const LABELS={
+    "idle": "Стойка",
+    "walk": "Ходьба",
+    "jump": "Прыжок",
+    "strike": "Удар",
+    "cast": "Магия",
+    "guard": "Блок",
+    "hurt": "Получение урона",
+    "charge": "Заряд",
+    "hips": "Таз",
+    "chest": "Грудь",
+    "head": "Голова",
+    "shoulder_far": "Плечо (дальнее)",
+    "shoulder_near": "Плечо (ближнее)",
+    "elbow_far": "Локоть (дальний)",
+    "elbow_near": "Локоть (ближний)",
+    "hand_far": "Кисть (дальняя)",
+    "hand_near": "Кисть (ближняя)",
+    "thigh_far": "Бедро (дальнее)",
+    "thigh_near": "Бедро (ближнее)",
+    "knee_far": "Колено (дальнее)",
+    "knee_near": "Колено (ближнее)",
+    "foot_far": "Стопа (дальняя)",
+    "foot_near": "Стопа (ближняя)",
+    "lightning": "Молния",
+    "sparks": "Искры",
+    "glow": "Свечение",
+    "ring": "Кольцо",
+    "slash": "Дуга удара",
+    "droplets": "Капли",
+    "smoke": "Дым",
+    "origin": "Центр",
+    "hand": "Рука",
+    "target": "Цель",
+    "linear": "Линейная",
+    "ease in": "Разгон",
+    "ease out": "Торможение",
+    "smooth": "Плавная",
+    "windup": "замах",
+    "recover": "возврат",
+    "Electric burst": "Электроразряд",
+    "Acid impact": "Кислота",
+    "Claw slash": "Удар когтем",
+    "Fire burst": "Вспышка огня"
+}
+static func label(id: String) -> String:
+    return LABELS.get(id,id)
+static func physical_key(e: InputEventKey) -> Key:
+    return e.physical_keycode if e.physical_keycode!=0 else e.keycode

@@ -1,4 +1,5 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 ## Experimental interactive composition. Native source primitives are direct ports;
 ## the moving endpoint choreography is custom, not the original Chain Lightning effect.
 const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
@@ -58,12 +59,12 @@ func _ready() -> void:
     add_child(layer)
     hud=Label.new()
     hud.position=Vector2(24,18)
-    hud.text="PIXELFX / LIVE NATIVE LIGHTNING"
+    hud.text="PIXELFX / ПРОЦЕДУРНАЯ МОЛНИЯ"
     hud.add_theme_font_size_override("font_size",22)
     layer.add_child(hud)
     var help:=Label.new()
     help.position=Vector2(24,56)
-    help.text="Hold LMB | 1: stroke | 2: crackle | A: backend | B: background | Esc: export lab"
+    help.text="Удерживай ЛКМ · 1 разряд · 2 треск · A движок · B фон · Esc меню"
     layer.add_child(help)
     stats=Label.new()
     stats.position=Vector2(24,82)
@@ -83,7 +84,7 @@ func _draw() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        match event.keycode:
+        match UI.physical_key(event):
             KEY_1: crackle=false
             KEY_2: crackle=true
             KEY_A:
@@ -154,6 +155,6 @@ func _process(delta: float) -> void:
         sample_times.sort()
         var n: int=sample_times.size()
         var p95: float=sample_times[clampi(int(ceil(n*0.95))-1,0,n-1)] if n>0 else 0.0
-        stats.text="FPS %d | native update p95 %.2f ms | %d sparks | %s | %s" % [Engine.get_frames_per_second(),p95,particles.list.size(),"crackle" if crackle else "stroke","C++" if lightning.accelerator!=null else "GDScript"]
+        stats.text="FPS %d | p95 %.2f мс | искр %d | %s | %s" % [Engine.get_frames_per_second(),p95,particles.list.size(),"треск" if crackle else "разряд","C++" if lightning.accelerator!=null else "GDScript"]
         sample_times.clear()
         stat_clock=0.0

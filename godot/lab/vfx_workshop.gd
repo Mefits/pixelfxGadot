@@ -1,4 +1,5 @@
 extends Control
+const UI=preload("res://lab/ui_ru.gd")
 const P=preload("res://addons/pixelfx/composer/preset.gd")
 const R=preload("res://addons/pixelfx/composer/renderer.gd")
 const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
@@ -39,13 +40,13 @@ func _button(parent: Control,value: String,cb: Callable) -> Button:
     return b
 func _option(parent: Control,values: Array,cb: Callable) -> OptionButton:
     var o:=OptionButton.new()
-    for v in values:o.add_item(str(v))
+    for v in values:o.add_item(UI.label(str(v)))
     parent.add_child(o)
     o.item_selected.connect(cb)
     return o
 func _ready() -> void:
     var theme0:=Theme.new()
-    theme0.default_font_size=14
+    theme0.default_font_size=13
     theme=theme0
     var bg:=ColorRect.new()
     bg.color=Color("#101722")
@@ -53,7 +54,7 @@ func _ready() -> void:
     bg.mouse_filter=Control.MOUSE_FILTER_IGNORE
     add_child(bg)
     var title:=Label.new()
-    title.text="VFX WORKSHOP / layered PixelFX"
+    title.text="КОНСТРУКТОР ЭФФЕКТОВ / PixelFX"
     title.position=Vector2(12,8)
     title.add_theme_font_size_override("font_size",22)
     add_child(title)
@@ -61,19 +62,19 @@ func _ready() -> void:
     left.position=Vector2(12,44)
     left.size=Vector2(172,475)
     add_child(left)
-    _label(left,"PRESETS")
-    var demos=_option(left,["Electric burst","Acid impact","Claw slash","Fire burst"],func(i:int):preset=P.demo(i);selected=0;_refresh())
+    _label(left,"ПРЕСЕТЫ")
+    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня"],func(i:int):preset=P.demo(i);selected=0;_refresh())
     name_edit=LineEdit.new()
-    name_edit.placeholder_text="Effect name"
+    name_edit.placeholder_text="Имя эффекта"
     left.add_child(name_edit)
     name_edit.text_changed.connect(func(v:String):preset.name=v)
     var io:=HBoxContainer.new()
     left.add_child(io)
-    _button(io,"Save",_save)
-    _button(io,"Load",_load)
+    _button(io,"Сохранить",_save)
+    _button(io,"Загрузить",_load)
     library=OptionButton.new()
     left.add_child(library)
-    _label(left,"LAYERS (draw order)")
+    _label(left,"СЛОИ (порядок)")
     list=ItemList.new()
     list.custom_minimum_size=Vector2(166,185)
     left.add_child(list)
@@ -81,14 +82,14 @@ func _ready() -> void:
     kind=_option(left,P.TYPES,func(_i:int):pass)
     var addrow:=HBoxContainer.new()
     left.add_child(addrow)
-    _button(addrow,"Add",_add_layer)
-    _button(addrow,"Copy",_copy_layer)
-    _button(addrow,"Del",_delete_layer)
+    _button(addrow,"+ Слой",_add_layer)
+    _button(addrow,"Копия",_copy_layer)
+    _button(addrow,"−",_delete_layer)
     var order:=HBoxContainer.new()
     left.add_child(order)
-    _button(order,"Up",func():_move_layer(-1))
-    _button(order,"Down",func():_move_layer(1))
-    _button(order,"Exit",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
+    _button(order,"↑",func():_move_layer(-1))
+    _button(order,"↓",func():_move_layer(1))
+    _button(order,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
     status=_label(left,"")
     status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     var viewport:=SubViewport.new()
@@ -110,11 +111,11 @@ func _ready() -> void:
     var controls:=HBoxContainer.new()
     controls.position=Vector2(194,370)
     add_child(controls)
-    play_button=_button(controls,"Pause",_toggle_play)
-    _button(controls,"Replay",func():time=0;playing=true;dirty=true)
-    _button(controls,"Loop",func():loop=not loop;status.text="Loop "+str(loop))
-    _button(controls,"Move",func():stage.moving=not stage.moving;dirty=true)
-    _button(controls,"BG",func():stage.bright=not stage.bright;dirty=true)
+    play_button=_button(controls,"Пауза",_toggle_play)
+    _button(controls,"Сначала",func():time=0;playing=true;dirty=true)
+    _button(controls,"Цикл",func():loop=not loop;status.text="Цикл: "+str(loop))
+    _button(controls,"Движение",func():stage.moving=not stage.moving;dirty=true)
+    _button(controls,"Фон",func():stage.bright=not stage.bright;dirty=true)
     _button(controls,"Seed",func():preset.seed=int(preset.seed)+1;dirty=true)
     _button(controls,"C++",func():renderer.enable_acceleration(not renderer.accelerated);dirty=true)
     perf=Label.new()
@@ -140,8 +141,8 @@ func _ready() -> void:
     var right:=VBoxContainer.new()
     right.size_flags_horizontal=Control.SIZE_EXPAND_FILL
     scroll.add_child(right)
-    _label(right,"SELECTED LAYER")
-    for spec in [["type","Type",P.TYPES],["anchor","Anchor",P.ANCHORS],["curve","Curve",P.CURVES]]:
+    _label(right,"ПАРАМЕТРЫ СЛОЯ")
+    for spec in [["type","Тип",P.TYPES],["anchor","Привязка",P.ANCHORS],["curve","Кривая",P.CURVES]]:
         var row:=HBoxContainer.new()
         right.add_child(row)
         var label=_label(row,spec[1])
@@ -149,7 +150,7 @@ func _ready() -> void:
         var key: String=spec[0]
         var options: Array=spec[2]
         fields[key]=_option(row,options,func(i:int):_change(key,options[i]))
-    for spec in [["enabled","Visible"],["follow","Follow anchor"],["collision","Floor collision"]]:
+    for spec in [["enabled","Видимость"],["follow","Следовать за точкой"],["collision","Столкновение с полом"]]:
         var check:=CheckButton.new()
         check.text=spec[1]
         right.add_child(check)
@@ -162,7 +163,7 @@ func _ready() -> void:
     right.add_child(color)
     fields.color=color
     color.color_changed.connect(func(c:Color):_change("color","#"+c.to_html(false)))
-    for spec in [["start","Start (s)",0,5,.01],["duration","Life (s)",.05,5,.01],["size","Size start",.5,80,.5],["end_size","Size end",.5,80,.5],["alpha","Opacity start",0,1,.05],["end_alpha","Opacity end",0,1,.05],["speed","Speed start",0,200,1],["end_speed","Speed end",0,200,1],["count","Count",1,64,1],["spread","Spread (deg)",0,360,1],["angle","Angle (deg)",-180,180,1],["gravity","Gravity",-200,300,5],["glow","Glow",0,1,.05],["x","Offset X",-100,100,1],["y","Offset Y",-100,100,1]]:
+    for spec in [["start","Начало, с",0,5,.01],["duration","Время жизни, с",.05,5,.01],["size","Размер: начало",.5,80,.5],["end_size","Размер: конец",.5,80,.5],["alpha","Непрозр.: начало",0,1,.05],["end_alpha","Непрозр.: конец",0,1,.05],["speed","Скорость: начало",0,200,1],["end_speed","Скорость: конец",0,200,1],["count","Количество",1,64,1],["spread","Разброс, °",0,360,1],["angle","Угол, °",-180,180,1],["gravity","Гравитация",-200,300,5],["glow","Свечение",0,1,.05],["x","Смещение X",-100,100,1],["y","Смещение Y",-100,100,1]]:
         var row:=HBoxContainer.new()
         right.add_child(row)
         var label=_label(row,spec[1])
@@ -195,10 +196,10 @@ func _refresh() -> void:
     list.clear()
     for i in range(preset.layers.size()):
         var l: Dictionary=preset.layers[i]
-        list.add_item("%d  %s %s"%[i+1,l.type,"" if l.enabled else "(off)"])
+        list.add_item("%d  %s %s"%[i+1,UI.label(l.type),"" if l.enabled else "(выкл.)"])
     selected=clampi(selected,0,preset.layers.size()-1)
     list.select(selected)
-    name_edit.text=preset.name
+    name_edit.text=UI.label(preset.name)
     _sync_fields()
 func _sync_fields() -> void:
     syncing=true
@@ -243,12 +244,12 @@ func _library() -> void:
     for f in dir.get_files():
         if f.ends_with(".json"):library.add_item(f)
 func _save() -> void:
-    status.text="Saved in user://vfx_presets" if P.save_preset(preset) else "Invalid preset"
+    status.text="Сохранено в user://vfx_presets" if P.save_preset(preset) else "Неверный пресет"
     _library()
 func _load() -> void:
     if library.selected<0:return
     var value: Dictionary=P.load_preset(P.FOLDER.path_join(library.get_item_text(library.selected)))
-    if value.is_empty():status.text="Invalid file";return
+    if value.is_empty():status.text="Неверный файл";return
     preset=value
     selected=0
     _refresh()
@@ -277,8 +278,8 @@ func _process(dt: float) -> void:
         seek.max_value=P.duration(preset)
         seek.value=time
         syncing=false
-        perf.text="%.2f s | %d layers | %d particles | %.2f ms CPU | %s"%[time,renderer.active_layers,renderer.particles,renderer.render_ms,"C++" if renderer.accelerated else "GDScript"]
+        perf.text="%.2f с | слоёв %d | частиц %d | %.2f мс | %s"%[time,renderer.active_layers,renderer.particles,renderer.render_ms,"C++" if renderer.accelerated else "GDScript"]
         dirty=false
-    play_button.text="Pause" if playing else "Play"
+    play_button.text="Пауза" if playing else "Пуск"
 func _unhandled_input(e: InputEvent) -> void:
-    if e is InputEventKey and e.pressed and not e.echo and e.keycode==KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
+    if e is InputEventKey and e.pressed and not e.echo and UI.physical_key(e)==KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")

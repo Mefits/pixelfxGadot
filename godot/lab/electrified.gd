@@ -1,4 +1,5 @@
 extends Node2D
+const UI=preload("res://lab/ui_ru.gd")
 const FX=preload("res://addons/pixelfx/effects/electrified.gd")
 const SURFACE=preload("res://addons/pixelfx/native/surface.gd")
 const A=preload("res://addons/pixelfx/native/actor.gd")
@@ -25,11 +26,11 @@ func _draw() -> void:
     draw_rect(Rect2(264,404,432,64),Color("#293547"))
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
-        match event.keycode:
+        match UI.physical_key(event):
             KEY_ESCAPE: get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_A: cpp=fx.enable_acceleration(not cpp)
             KEY_1,KEY_2:
-                actor=A.stock(1 if event.keycode==KEY_1 else 2)
+                actor=A.stock(1 if UI.physical_key(event)==KEY_1 else 2)
                 fx.set_actor(actor)
                 last=-1
 func _process(delta: float) -> void:
@@ -45,4 +46,4 @@ func _process(delta: float) -> void:
     A.draw_stock(p,actor)
     fx.draw(p,float(f)/30)
     surface.present()
-    label.text="ELECTRIFIED / native silhouette | 1/2 actor size | A backend | %.2f ms | %s | ESC"%[(Time.get_ticks_usec()-start)/1000.0,"C++" if cpp else "GDScript"]
+    label.text="ЭЛЕКТРИЗАЦИЯ | 1/2 размер · A движок | %.2f мс | %s | Esc меню"%[(Time.get_ticks_usec()-start)/1000.0,"C++" if cpp else "GDScript"]
