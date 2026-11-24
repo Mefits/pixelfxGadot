@@ -25,10 +25,11 @@ jobs:
         run: |
           test -f /tmp/complete/godot/project.godot
           cp -a godot/addons/creature /tmp/complete/godot/addons/
-          cp -a godot/lab/{pose_workshop,combat_lab,combat_canvas,creature_preview,physics_lab,intent_panel,main}.gd /tmp/complete/godot/lab/
-          cp -a godot/lab/{pose_workshop,combat_lab,physics_lab}.tscn /tmp/complete/godot/lab/
+          cp -a godot/addons/pixelfx/composer /tmp/complete/godot/addons/pixelfx/
+          cp -a godot/lab/{pose_workshop,combat_lab,combat_canvas,creature_preview,physics_lab,intent_panel,vfx_stage,vfx_timeline,vfx_workshop,main}.gd /tmp/complete/godot/lab/
+          cp -a godot/lab/{pose_workshop,combat_lab,physics_lab,vfx_workshop}.tscn /tmp/complete/godot/lab/
           cp godot/tests/creature*.gd /tmp/complete/godot/tests/
-          cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md /tmp/complete/docs/
+          cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md docs/VFX_WORKSHOP.md /tmp/complete/docs/
           cp SKILL.md AGENTS.md PORTABLE.md /tmp/complete/
           printf '%s\n' "$GITHUB_SHA" > /tmp/complete/CREATURE_REVISION.txt
       - name: Install Godot
@@ -52,7 +53,9 @@ jobs:
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/hybrid.log
           timeout 30s godot --headless --script res://tests/creature_evolution.gd 2>&1 | tee /tmp/evolution.log
           ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/evolution.log
-          for scene in pose_workshop combat_lab physics_lab; do
+          timeout 30s godot --headless --script res://tests/creature_vfx.gd 2>&1 | tee /tmp/vfx.log
+          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/vfx.log
+          for scene in pose_workshop combat_lab physics_lab vfx_workshop; do
             godot --headless res://lab/$scene.tscn --quit-after 120 2>&1 | tee /tmp/$scene.log
             ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/$scene.log
           done
