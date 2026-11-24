@@ -12,7 +12,7 @@ const hashes={};
 mkdirSync(join(addon,'bin'),{recursive:true});
 for(const [platform,name] of bins){
  const dir=join(source,'pixelfx-cpp-'+platform);
- if(!readFileSync(join(dir,'pixelfx.gdextension')).equals(descriptor))throw Error('Descriptor mismatch '+platform);
+ if(readFileSync(join(dir,'pixelfx.gdextension'),'utf8').replace(/\r\n/g,'\n')!==descriptor.toString('utf8').replace(/\r\n/g,'\n'))throw Error('Descriptor mismatch '+platform);
  const path=join(dir,'bin',name),data=readFileSync(path);
  if(data.length<1024||(platform==='Windows'?data.subarray(0,2).toString()!=='MZ':data.subarray(0,4).toString('hex')!=='7f454c46'))throw Error('Invalid binary '+platform);
  copyFileSync(path,join(addon,'bin',name));hashes[name]=createHash('sha256').update(data).digest('hex');
