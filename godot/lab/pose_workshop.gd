@@ -51,6 +51,8 @@ func _spin(parent: Control,lo: float,hi: float,step: float,fn: Callable) -> Spin
     s.min_value=lo
     s.max_value=hi
     s.step=step
+    s.custom_minimum_size.x=0
+    s.get_line_edit().custom_minimum_size.x=43
     parent.add_child(s)
     s.value_changed.connect(fn)
     return s
@@ -67,7 +69,7 @@ func _ready() -> void:
     title.add_theme_font_size_override("font_size",21)
     add_child(title)
     var view:=SubViewport.new()
-    view.size=Vector2i(192,144)
+    view.size=Vector2i(144,108)
     view.render_target_update_mode=SubViewport.UPDATE_ALWAYS
     add_child(view)
     preview=PREVIEW.new()
@@ -82,8 +84,11 @@ func _ready() -> void:
     add_child(picture)
     picture.gui_input.connect(_drag)
     var side:=VBoxContainer.new()
-    side.position=Vector2(608,44)
-    side.size=Vector2(336,428)
+    side.position=Vector2(604,44)
+    side.size=Vector2(340,428)
+    var compact:=Theme.new()
+    compact.default_font_size=14
+    side.theme=compact
     side.add_theme_constant_override("separation",3)
     add_child(side)
     var top:=HBoxContainer.new()
@@ -98,19 +103,19 @@ func _ready() -> void:
     var choose_fighter:=HBoxContainer.new()
     side.add_child(choose_fighter)
     fighter_select=OptionButton.new()
-    fighter_select.add_item("Fighter 1 / Azure")
-    fighter_select.add_item("Fighter 2 / Ember")
+    fighter_select.add_item("1 / Azure")
+    fighter_select.add_item("2 / Ember")
     fighter_select.size_flags_horizontal=Control.SIZE_EXPAND_FILL
     choose_fighter.add_child(fighter_select)
     fighter_select.item_selected.connect(_switch_fighter)
-    _button(choose_fighter,"Copy pose",func():copied_pose=pose.duplicate(true))
+    _button(choose_fighter,"Copy",func():copied_pose=pose.duplicate(true))
     _button(choose_fighter,"Paste",func():
         if not copied_pose.is_empty():pose=copied_pose.duplicate(true);_edit())
     var timings:=HBoxContainer.new()
     side.add_child(timings)
     _label(timings,"Seconds")
-    duration=_spin(timings,.1,10,.05,_set_duration)
-    _label(timings,"Rate")
+    duration=_spin(timings,.1,10,.01,_set_duration)
+    _label(timings,"Preview FPS")
     rate=_spin(timings,1,60,1,func(_v:float):pass)
     rate.value=30
     var toggles:=HBoxContainer.new()
@@ -220,7 +225,7 @@ func _drag(e: InputEvent) -> void:
     if e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT:
         dragging=e.pressed
         if dragging:
-            var target: Vector2=e.position/3-preview.origin
+            var target: Vector2=e.position/4-preview.origin
             var nearest: float=7
             for j in rig.joints:
                 var d: float=rig.point(j.id).distance_to(target)
@@ -229,7 +234,7 @@ func _drag(e: InputEvent) -> void:
                     selected=j.id
             _sync()
     elif e is InputEventMouseMotion and dragging:
-        pose=rig.solve_ik(pose,selected,e.position/3-preview.origin)
+        pose=rig.solve_ik(pose,selected,e.position/4-preview.origin)
         _edit()
 
 func _key() -> void:

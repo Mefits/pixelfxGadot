@@ -29,6 +29,9 @@ func _run() -> void:
     ed._add_event()
     check(ed.bank.strike.events.size()==2,"Editor event insert")
     ed._seek(.2)
+    await process_frame
+    check(ed.fighter_select.get_global_rect().end.x<=960,"Fighter chooser inside viewport")
+    check(ed.root_y.get_global_rect().end.x<=960,"Root controls inside viewport")
     await capture(dir.path_join("pose-workshop.png"))
     ed.dirty=false
     root.remove_child(ed)
@@ -43,6 +46,7 @@ func _run() -> void:
         arena.world.step(1.0/60,{"cast":i==0},{})
     arena.canvas.queue_redraw()
     arena._vfx()
+    arena._update_hud()
     check(arena.world.b.hp==80,"Arena spell marker")
     check(arena.bolt.accelerated_calls>0,"Arena used PixelFX C++")
     await capture(dir.path_join("combat-lab.png"))

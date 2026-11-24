@@ -61,6 +61,12 @@ func _bar(at: Vector2) -> ProgressBar:
     b.max_value=100
     b.value=100
     b.show_percentage=false
+    var bg:=StyleBoxFlat.new()
+    bg.bg_color=Color("#29394a")
+    var fill:=StyleBoxFlat.new()
+    fill.bg_color=Color("#5aafdc") if at.x<300 else Color("#ce775f")
+    b.add_theme_stylebox_override("background",bg)
+    b.add_theme_stylebox_override("fill",fill)
     add_child(b)
     return b
 
@@ -92,6 +98,11 @@ func _physics_process(dt: float) -> void:
     if charge_tick>=1.0/30:
         charge_tick=fmod(charge_tick,1.0/30)
         _vfx()
+    _update_hud()
+
+func _update_hud() -> void:
+    hp1.value=world.a.hp
+    hp2.value=world.b.hp
     hud.text="COMBAT LAB | %s | %d : %d HP | %d hits | %.2f ms VFX | %s"%["BOT" if bot else "2 PLAYERS",world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:
