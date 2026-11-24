@@ -119,8 +119,8 @@ func _physics_process(dt: float) -> void:
 func _update_hud() -> void:
     hp1.value=world.a.hp
     hp2.value=world.b.hp
-    detail.text="Динамика: %s · %s · серия %d (макс. %d) · блоков %d · F→F / F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
-    hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["БОТ" if bot else "2 ИГРОКА",world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
+    detail.text="Динамика: %s · %s · посл. серия %d (макс. %d) · блоков %d · F→F / F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
+    hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["ТРЕНИРОВКА" if training else ("БОТ" if bot else "2 ИГРОКА"),world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:
     var start: int=Time.get_ticks_usec()

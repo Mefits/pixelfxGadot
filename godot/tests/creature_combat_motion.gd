@@ -21,6 +21,24 @@ func _run()->void:
         combo_world.step(1.0/60,{"strike":pressed},{})
     print("Combo: hits ",combo_world.hits," best ",combo_world.best_combo," starts ",combo_world.a.attacks_started)
     check(combo_world.best_combo>=2 and combo_world.hits>=2,"Confirmed combo followup")
+    var mixed=make_world()
+    for i in range(130):
+        mixed.step(1.0/60,{"strike":i==0 or i==15,"cast":i==34},{})
+    print("Mixed chain: hits ",mixed.hits," best ",mixed.best_combo," HP ",mixed.b.hp)
+    check(mixed.best_combo==3 and mixed.hits==3 and mixed.b.hp==54,"Three-hit mixed combo")
+    var frozen=make_world()
+    for i in range(40):
+        frozen.step(W.DT,{"strike":i==0},{})
+        if frozen.hitstop>0:break
+    check(frozen.hitstop>0,"Freeze triggered")
+    var p: Vector2=frozen.a.pos
+    var frame: float=frozen.a.t
+    var steps: int=frozen.sim_steps
+    frozen.step(W.DT,{"strike":true},{})
+    check(frozen.a.pos==p and frozen.a.t==frame and frozen.sim_steps==steps,"Actual frozen simulation")
+    check(frozen.a.queued=="strike","Input retained during freeze")
+    for i in range(100):frozen.step(W.DT,{},{})
+    check(frozen.best_combo>=2,"Buffered freeze input executes")
     var miss=make_world()
     miss.b.pos.x=280
     for i in range(24):miss.step(1.0/60,{"strike":i==0 or i==15},{})

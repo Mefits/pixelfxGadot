@@ -129,5 +129,18 @@ func _run() -> void:
     check(arena.world.b.hp==80,"Arena spell marker")
     check(arena.bolt.accelerated_calls>0,"Arena used PixelFX C++")
     await capture(dir.path_join("combat-lab.png"))
+    arena.training=true
+    arena._reset()
+    for i in range(75):arena.world.step(1.0/60,{"strike":i==0 or i==15,"cast":i==34},{})
+    arena.canvas.queue_redraw()
+    arena._vfx()
+    arena._update_hud()
+    check(arena.world.best_combo>=2 and arena.detail.text.contains("тренировка"),"Training arena combo and HUD")
+    check(arena.detail.get_global_rect().end.x<=960,"Combat detail fits viewport")
+    await capture(dir.path_join("combat-combo.png"))
+    arena.effects_on=false
+    arena._vfx()
+    check(arena.surface.painter.color.count(0)==arena.surface.painter.color.size(),"Disable effect layer")
+    check(arena.world.best_combo>=2,"VFX toggle does not change simulation")
     print("Workshop interaction and actual GL preview failures: ",failures)
     quit(0 if failures==0 else 1)
