@@ -21,3 +21,6 @@ Use lightning.enable_acceleration(true) to select the tested optional backend. I
 
 ## Ordered Painter batch (development)
 Batch.gd records the unchanged particle, debris and light draw calls in order; a single C++ call handles dot/blend/line/glow/circle/disc. Physics, color logic and ordering stay in the reference implementation. Use var draw=batch.begin(painter); particles.draw(draw); lights.draw(draw); batch.finish(). Do not alter painter transform/fade or draw directly to painter while recording. Unsupported binaries return the original Painter; rejected batches replay the exact commands. Test counts ensure benchmarks actually use C++. Verification pending.
+
+## First full authored effect (development)
+Native effects/ball_lightning.gd is a direct port of original lightning/ball-lightning.js, including deterministic loop, wake, cycle motes, skin arcs, floor zap and physical spark flight. No actor required. Lab O opens it, A toggles backend. Golden fixture checks 120 frames of both color and light against actual upstream. CI verification pending.

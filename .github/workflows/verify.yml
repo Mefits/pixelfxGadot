@@ -23,6 +23,7 @@ jobs:
       - run: node tools/make_native_fixture.mjs
       - run: node tools/make_particles_fixture.mjs
       - run: node tools/make_bits_fixture.mjs
+      - run: node tools/make_ball_fixture.mjs
       - run: node tools/package.mjs
       - name: Validate portable snapshot and regenerate one clip offline
         run: |
@@ -53,6 +54,8 @@ jobs:
         run: godot --headless --path godot --script res://tests/particles.gd
       - name: Native debris parity
         run: godot --headless --path godot --script res://tests/bits.gd
+      - name: Full native Ball Lightning parity
+        run: godot --headless --path godot --script res://tests/ball.gd
       - name: Native CPU reference benchmark
         run: godot --headless --path godot --script res://tests/native_benchmark.gd
       - name: Live scene smoke

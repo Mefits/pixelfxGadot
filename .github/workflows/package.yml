@@ -1,14 +1,5 @@
 name: Unified toolkit package
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/package.yml'
-      - 'tools/bundle_accelerators.mjs'
-  workflow_run:
-    workflows: ["Optional C++ raster"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       cpp_run:
@@ -20,16 +11,15 @@ permissions:
   actions: read
 jobs:
   package:
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      CPP_RUN: ${{ github.event.workflow_run.id || inputs.cpp_run || '45385382698' }}
+      CPP_RUN: ${{ inputs.cpp_run }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
           submodules: recursive
           fetch-depth: 0
       - name: Verify binary provenance

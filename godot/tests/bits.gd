@@ -1,5 +1,6 @@
 extends SceneTree
 const BITS=preload("res://addons/pixelfx/native/bits.gd")
+const BATCH=preload("res://addons/pixelfx/native/batch.gd")
 const PAINTER=preload("res://addons/pixelfx/native/painter.gd")
 
 func _initialize() -> void:
@@ -11,6 +12,11 @@ func _ground(_x: float) -> float:
 func _run() -> void:
     var d: Variant=JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/bits.json"))
     if not d is Dictionary:
+        quit(1)
+        return
+    var batch=BATCH.new()
+    var cpp: bool=OS.get_cmdline_user_args().has("--cpp")
+    if cpp and not batch.enable_acceleration():
         quit(1)
         return
     var bits=BITS.new(_ground)
@@ -33,12 +39,16 @@ func _run() -> void:
                 failures+=1
         var p=PAINTER.new(128,96)
         p.place(64,72)
-        bits.draw(p)
+        bits.draw(batch.begin(p))
+        batch.finish()
         var bad: int=0
         for i in range(p.color.size()):
             if (p.color[i]&0xffffffff)!=int(sample["color"][i]):
                 bad+=1
         print("Bits step ",step," count ",bits.list.size()," mismatched pixels ",bad)
         failures+=bad
+    if cpp and (batch.accelerated_calls==0 or batch.rejected_calls!=0):
+        failures+=1
+    print("Bits batch calls ",batch.accelerated_calls," rejected ",batch.rejected_calls)
     print("Bits parity failures: ",failures)
     quit(0 if failures==0 else 1)

@@ -38,3 +38,6 @@ Build instructions: [native_cpp/README.md](native_cpp/README.md). The live light
 
 ## Единый архив (рекомендуемый)
 [Unified toolkit package — последние сборки](https://github.com/Mefits/pixelfxGadot/actions/workflows/package.yml). Артефакт **PixelFX-Godot-Toolkit-Complete** содержит готовые Windows DLL и Linux SO, дескриптор расширения, исходники, семь клипов и лабораторию. Распакуй и открой godot/project.godot в Godot 4.4.1 (x86-64). Ручное копирование DLL не требуется. C++ включается автоматически в live lab. Для неподдерживаемых платформ удалите дескриптор pixelfx.gdextension, чтобы использовать GDScript. Отдельные архивы выше оставлены для разработчиков.
+
+## Unified packages
+The first verified complete package is [here](https://github.com/Mefits/pixelfxGadot/actions/runs/45389604977/artifacts/14918625502). New C++ workflow packages both binaries after the two platform jobs pass; [latest builds](https://github.com/Mefits/pixelfxGadot/actions/workflows/cpp.yml). O in lab opens the experimental full native Ball Lightning port; all 120 frames are compared in CI.
