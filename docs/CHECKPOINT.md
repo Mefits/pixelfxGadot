@@ -8,3 +8,5 @@ Guard retarget, fixed support, mirrored pose loop, constant limb lengths; captur
 
 ## 0.03
 Reference-based locomotion posture, velocity-predicted step targets, fixed swing durations, guard backpedal, airborne tuck/extension and landing compression. Regression of mirrored stance and support; real 20 FPS capture sequences for walk/run/back/jump. No combat changes.
+
+Final 0.03 checkpoint: initial regression passed; repeat after correcting opposing arm swing and adding its test.
