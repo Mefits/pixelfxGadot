@@ -30,5 +30,21 @@ func _run() -> void:
     if root.get_texture().get_image().save_png(dir.path_join("physics-lab.png"))!=OK:
         quit(1)
         return
-    print("Physics Lab GL jump capture passed")
+    lab.course=1
+    lab._set_course()
+    lab._reset()
+    lab.creature=preload("res://addons/creature/physical_creature.gd").new(Vector2(263,390),lab.boxes,5,1,true)
+    for i in range(75):lab.creature.advance(1.0/60,0,false,false,-1)
+    if not lab.creature.surface.active or lab.creature.body.point("front").y>=340:
+        push_error("Physics lab wall ascent failed")
+        quit(1)
+        return
+    lab._update_hud()
+    lab.queue_redraw()
+    await process_frame
+    await RenderingServer.frame_post_draw
+    if root.get_texture().get_image().save_png(dir.path_join("physics-wall.png"))!=OK:
+        quit(1)
+        return
+    print("Physics Lab GL jump and wall captures passed")
     quit(0)

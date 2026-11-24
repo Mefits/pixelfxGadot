@@ -97,5 +97,26 @@ func _run() -> void:
     for i in range(150):top.advance(1.0/60,0,false,false,-1)
     print("Wall top transition: grips ",top.grip_count," front ",top.body.point("front"))
     check(top.grip_count>0 and top.body.point("front").x>160,"Wall to ledge transition")
+    var mirrored=C.new(Vector2(227,150),climb_boxes,0,1,true)
+    for i in range(60):mirrored.advance(1.0/60,0,false,false,-1)
+    check(mirrored.surface.active and mirrored.surface.normal.x>0 and mirrored.body.point("front").y<115,"Mirrored wall ascent")
+    mirrored.advance(1.0/60,1,false,false,0)
+    check(not mirrored.surface.active,"Move away releases wall")
+    var disabled=C.new(Vector2(143,150),climb_boxes,0,1,true)
+    disabled.surface.enabled=false
+    for i in range(60):disabled.advance(1.0/60,0,false,false,-1)
+    check(disabled.surface.attachments==0,"Wall toggle prevents adhesion")
+    var tunnel_boxes: Array[Rect2]=[floor_box,Rect2(80,148,120,32)]
+    var tunnel=C.new(Vector2(40,170),tunnel_boxes,3,1,true)
+    for i in range(120):tunnel.advance(1.0/60,0,false)
+    var min_height: float=INF
+    var max_penetration: float=0
+    for i in range(240):
+        tunnel.advance(1.0/60,1,false)
+        var p: Vector2=tunnel.body.point("front")
+        if p.x>90 and p.x<190:min_height=minf(min_height,200-p.y)
+        max_penetration=maxf(max_penetration,tunnel.body.penetration())
+    print("Tunnel passage: front ",tunnel.body.point("front")," minimum height ",min_height," max penetration ",max_penetration)
+    check(tunnel.body.point("front").x>207 and min_height<15 and max_penetration<.05,"Crouch under 20 px clearance")
     print("Physical body tests: failures ",failures,"; stress constraint ",a.body.max_error," px; penetration ",a.body.penetration())
     quit(0 if failures==0 else 1)
