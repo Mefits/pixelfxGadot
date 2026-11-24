@@ -14,13 +14,21 @@ func _run()->void:
         var l:Vector2=a[id]-w.a.pos
         var r:Vector2=b[id]-w.b.pos
         check(l.distance_to(Vector2(-r.x,r.y))<.001,"Mirrored joint "+id)
+    check(a.knee_near.x>a.thigh_near.x and b.knee_near.x<b.thigh_near.x,"Knees bend toward opponent")
     for i in range(120):
+        var previous:Array[Vector2]=w.a.feet.duplicate()
+        var old_swing:int=w.a.swing
         w.tick({"move":1},{})
+        for j in range(2):
+            if j!=old_swing and j!=w.a.swing:
+                check(w.a.feet[j].distance_to(previous[j])<.001,"Planted foot remains fixed")
         var p:Dictionary=w.rig_a.points
         for side in ["near","far"]:
             check(absf(p["thigh_"+side].distance_to(p["knee_"+side])-R.UPPER_LEG)<.001,"Upper leg")
             check(absf(p["knee_"+side].distance_to(p["foot_"+side])-R.LOWER_LEG)<.001,"Lower leg")
             check(p["foot_"+side].y<=M.FLOOR+.01,"No floor penetration")
+            var index:int=0 if side=="near" else 1
+            if w.a.swing!=index:check(p["foot_"+side].distance_to(w.a.feet[index]-Vector2(0,2))<.5,"IK reaches support")
     check(w.a.pos.x>400 and w.a.steps>2,"Walk and foot steps")
     var before:float=w.a.pos.x
     for i in range(100):w.tick({}, {})

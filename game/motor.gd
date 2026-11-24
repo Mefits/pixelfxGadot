@@ -37,7 +37,7 @@ func _plant()->void:
 func _begin_step(index:int,axis:float)->void:
     swing=index
     swing_from=feet[index]
-    var ahead:float=signf(axis)*(25 if sprint else 22)
+    var ahead:float=signf(axis)*(29 if sprint else 22)
     if absf(axis)<.01:ahead=(14 if index==0 else -14)*facing
     swing_to=Vector2(clampf(pos.x+ahead,32,928),FLOOR)
     swing_t=0
@@ -72,8 +72,9 @@ func tick(input:Dictionary,opponent_x:float)->void:
         return
     gait=move_toward(gait,clampf(absf(velocity.x)/WALK,0,1),DT*8)
     if swing>=0:
-        swing_t=minf(STEP_TIME,swing_t+DT)
-        var u:float=swing_t/STEP_TIME
+        var duration:float=.12 if sprint else STEP_TIME
+        swing_t=minf(duration,swing_t+DT)
+        var u:float=swing_t/duration
         var eased:float=u*u*(3-2*u)
         feet[swing]=swing_from.lerp(swing_to,eased)
         feet[swing].y-=sin(u*PI)*(15 if sprint else 10)

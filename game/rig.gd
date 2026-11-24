@@ -13,7 +13,7 @@ static func chain(a:Vector2,target:Vector2,l1:float,l2:float,bend:float)->Array[
     var along:float=(l1*l1-l2*l2+d*d)/(2*d)
     var height:float=sqrt(maxf(0,l1*l1-along*along))
     var end:Vector2=a+direction*d
-    var joint:Vector2=a+direction*along+direction.orthogonal()*height*bend
+    var joint:Vector2=a+direction*along+Vector2(-direction.y,direction.x)*height*bend
     return [joint,end]
 func sample(m)->Dictionary:
     var direction:float=float(m.facing)
@@ -23,10 +23,11 @@ func sample(m)->Dictionary:
     var hip_y:float=-50+4*m.land
     if m.grounded:
         # Keep BOTH target feet within the reach envelope while grounded.
-        for foot in m.feet:
-            var dx:float=absf(foot.x-m.pos.x)
+        for i in range(2):
+            var foot:Vector2=m.feet[i]
+            var dx:float=absf((foot.x-m.pos.x)*direction-(2 if i==0 else -2))
             var max_height:float=sqrt(maxf(4,59.7*59.7-minf(dx,58)*minf(dx,58)))
-            hip_y=maxf(hip_y,foot.y-m.pos.y-max_height)
+            hip_y=maxf(hip_y,foot.y-m.pos.y-2-max_height)
     var hip:=Vector2(0,hip_y)
     var chest:=hip+Vector2(lean,-30)
     var head:=chest+Vector2(lean*.25,-18)

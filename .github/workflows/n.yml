@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: n-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   foundation:
     runs-on: ubuntu-latest
