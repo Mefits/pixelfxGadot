@@ -158,6 +158,7 @@ jobs:
           "$GODOT" --headless --path "$PROJECT" --script res://tests/electrified.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" --script res://tests/custom.gd -- --cpp
           "$GODOT" --headless --path "$PROJECT" res://lab/custom_effects.tscn --quit-after 120
+          "$GODOT" --headless --path "$PROJECT" --script res://tests/original_accel.gd
           "$GODOT" --headless --path "$PROJECT" --script res://tests/original.gd
           "$GODOT" --headless --path "$PROJECT" res://lab/original_catalog.tscn --quit-after 120
           "$GODOT" --headless --path "$PROJECT" --script res://tests/smoke.gd

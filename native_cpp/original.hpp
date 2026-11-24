@@ -41,8 +41,8 @@ class PixelFXOriginal : public RefCounted {
     }
     JSValue jsstr(const String &v){CharString s=v.utf8();return JS_NewStringLen(ctx,s.get_data(),s.length());}
     JSValue integer(int v){return JS_NewInt32(ctx,v);}
-    JSValue call(const char* name,std::vector<JSValue> args={}){
-        budget(std::strcmp(name,"create")==0?20:2);error=String();
+    JSValue call(const char* name,std::vector<JSValue> args={},int timeout_seconds=2){
+        budget(std::strcmp(name,"create")==0?20:timeout_seconds);error=String();
         JSValue fn=JS_GetPropertyStr(ctx,api,name);
         JSValue result=JS_Call(ctx,fn,api,int(args.size()),args.data());
         JS_FreeValue(ctx,fn);for(auto a:args)JS_FreeValue(ctx,a);
@@ -72,7 +72,7 @@ protected:
         ClassDB::bind_method(D_METHOD("stop_effect","handle"),&PixelFXOriginal::stop_effect);
         ClassDB::bind_method(D_METHOD("placement","handle","options_json"),&PixelFXOriginal::placement);
         ClassDB::bind_method(D_METHOD("state_json","handle"),&PixelFXOriginal::state_json);
-        ClassDB::bind_method(D_METHOD("render","handle","width","height","ox","oy","layer","body","target","color","light"),&PixelFXOriginal::render);
+        ClassDB::bind_method(D_METHOD("render","handle","width","height","ox","oy","layer","body","target","color","light","warmup"),&PixelFXOriginal::render,DEFVAL(false));
     }
 public:
     ~PixelFXOriginal(){close();}
@@ -112,13 +112,13 @@ public:
     bool stop_effect(int h){return ctx&&bool_call("stop",{integer(h)});}
     bool placement(int h,String options){return ctx&&bool_call("placement",{integer(h),jsstr(options)});}
     String state_json(int h){return ctx?string_call("state",{integer(h)}):String();}
-    Array render(int handle,int w,int h,int ox,int oy,String layer,bool body,bool target,PackedInt32Array color,PackedInt32Array light){
+    Array render(int handle,int w,int h,int ox,int oy,String layer,bool body,bool target,PackedInt32Array color,PackedInt32Array light,bool warmup=false){
         if(!ctx||w<=0||h<=0||w>2048||h>2048||int64_t(w)*h>1048576||color.size()!=int64_t(w)*h||light.size()!=color.size())return Array();
         size_t bytes=size_t(color.size())*4;
         JSValue c=JS_NewArrayBufferCopy(ctx,reinterpret_cast<const uint8_t*>(color.ptr()),bytes);
         JSValue l=JS_NewArrayBufferCopy(ctx,reinterpret_cast<const uint8_t*>(light.ptr()),bytes);
         if(JS_IsException(c)||JS_IsException(l)){JS_FreeValue(ctx,c);JS_FreeValue(ctx,l);exception();return Array();}
-        JSValue out=call("render",{integer(handle),integer(w),integer(h),integer(ox),integer(oy),jsstr(layer),JS_NewBool(ctx,body),JS_NewBool(ctx,target),c,l});
+        JSValue out=call("render",{integer(handle),integer(w),integer(h),integer(ox),integer(oy),jsstr(layer),JS_NewBool(ctx,body),JS_NewBool(ctx,target),c,l},warmup?20:2);
         Array a;
         if(!JS_IsException(out)){
             size_t n=0;uint8_t* p=JS_GetArrayBuffer(ctx,&n,out);

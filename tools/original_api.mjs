@@ -8,7 +8,8 @@ export function installOriginalAPI(core, modules){
  let accelerated=false;
  const stats={calls:0,fallback:0};
  const invoke=(p,op,x,y,u,v,c,a)=>{
-   if(typeof c!=='number'||typeof a!=='number')return false;
+   // Upstream clip() creates a derived painter with overridden writes. Never bypass that clipping.
+   if(Object.getPrototypeOf(p)!==proto||typeof c!=='number'||typeof a!=='number')return false;
    if(native.call(p,op,x,y,u,v,c,a)){stats.calls++;return true;}
    stats.fallback++;return false;
  };

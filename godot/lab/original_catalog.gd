@@ -14,6 +14,9 @@ var fps:float=30.0
 var bright:bool=false
 var base_position:Vector2
 var idle:float=0.0
+var reference_only:bool=false
+var first_reference:bool=true
+var accelerated:bool=false
 func _ready() -> void:
     surface=S.new()
     add_child(surface)
@@ -31,7 +34,7 @@ func _ready() -> void:
     status.position=Vector2(24,102)
     ui.add_child(status)
     var title:=Label.new()
-    title.text="PIXELFX / ORIGINAL JS CATALOG | Space: replay | B: background | Esc: back"
+    title.text="PIXELFX / ORIGINAL JS CATALOG | Space: replay/step | A: acceleration | B: background | Esc: back"
     title.position=Vector2(24,16)
     ui.add_child(title)
     if not runtime.open():
@@ -56,6 +59,8 @@ func _select(i:int) -> void:
         runtime.destroy(handle)
     selected=i
     var e:Dictionary=entries[i]
+    reference_only=str(e.id).begins_with("weather/")
+    first_reference=true
     var m:Dictionary=e.meta
     var act:bool=mode_button.button_pressed and e.act
     var w:int=int(m.size[0])
@@ -82,8 +87,10 @@ func _select(i:int) -> void:
     idle=0
     if handle==0:
         status.text=runtime.error
+    elif reference_only:
+        status.text="Weather reference only: Space renders one frame; cold preparation can be slow. Use offline clips in gameplay."
 func _process(delta:float) -> void:
-    if handle==0:
+    if handle==0 or reference_only:
         return
     clock+=delta
     if clock<1.0/fps:
@@ -113,13 +120,32 @@ func _process(delta:float) -> void:
         status.text=runtime.error
         runtime.destroy(handle)
         handle=0
+func _reference_step() -> void:
+    if handle==0:
+        return
+    surface.painter.clear()
+    var start:int=Time.get_ticks_usec()
+    if not runtime.draw(handle,surface.painter,"",true,true,first_reference):
+        status.text=runtime.error
+        return
+    first_reference=false
+    surface.present()
+    status.text="Weather reference | %.2f ms | Space: next frame"%[(Time.get_ticks_usec()-start)/1000.0]
+    runtime.update(handle,1.0/fps)
+
 func _unhandled_input(e:InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
         match e.keycode:
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_SPACE:
-                if not entries.is_empty():
+                if reference_only:
+                    _reference_step()
+                elif not entries.is_empty():
                     _select(selected)
+            KEY_A:
+                if runtime.set_acceleration(not accelerated):
+                    accelerated=not accelerated
+                    status.text="Original Painter acceleration: "+str(accelerated)
             KEY_B:
                 bright=not bright
                 queue_redraw()

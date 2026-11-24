@@ -123,7 +123,8 @@ func _run() -> void:
         var p=P.new(w,h)
         start=Time.get_ticks_usec()
         var stage:String=""
-        if not r.draw(handle,p):
+        var weather:bool=str(e.id).begins_with("weather/")
+        if not r.draw(handle,p,"",false,true,weather):
             stage="first render"
         elif not r.update(handle,0.1):
             stage="update"
@@ -136,7 +137,10 @@ func _run() -> void:
             print(catalog_errors[-1])
             r.destroy(handle)
             continue
-        smoke_max=maxf(smoke_max,(Time.get_ticks_usec()-start)/1000.0)
+        var smoke_ms:float=(Time.get_ticks_usec()-start)/1000.0
+        if weather:
+            print("Weather cold warmup + warm draw ",e.id,": ",smoke_ms," ms")
+        smoke_max=maxf(smoke_max,smoke_ms)
         r.destroy(handle)
         passed+=1
         if e.act:

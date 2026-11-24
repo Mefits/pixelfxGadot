@@ -72,10 +72,10 @@ func pose(value: Dictionary) -> Dictionary:
 func placement(h: int,options: Dictionary) -> bool:
     return backend!=null and backend.placement(h,JSON.stringify(options))
 
-func draw(h: int,p,layer: String="",body: bool=false,target: bool=true) -> bool:
+func draw(h: int,p,layer: String="",body: bool=false,target: bool=true,warmup: bool=false) -> bool:
     if backend==null:
         return false
-    var out: Array=backend.render(h,p.width,p.height,p.ox,p.oy,layer,body,target,p.color,p.light)
+    var out: Array=backend.render(h,p.width,p.height,p.ox,p.oy,layer,body,target,p.color,p.light,warmup)
     if out.size()!=2:
         error=backend.last_error()
         return false
