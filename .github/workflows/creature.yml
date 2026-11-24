@@ -1,7 +1,10 @@
 name: Animation Creature Lab
 on:
   push:
-    branches: [feature/animation-creature-lab]
+    branches: [feature/animation-creature-lab, feature/creature-vfx-integration]
+    paths:
+      - '.github/workflows/creature.yml'
+      - 'docs/CI_CHECKPOINT.md'
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,7 +15,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -42,41 +45,32 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          failed=0
+          verify() {
+            local logfile="$1"; shift
+            if ! "$@" 2>&1 | tee "/tmp/$logfile.log"; then failed=1; fi
+            if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/$logfile.log"; then failed=1; fi
+          }
           cd /tmp/complete/godot
-          godot --headless --editor --import 2>&1 | tee /tmp/import.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log
-          timeout 30s godot --headless --script res://tests/creature.gd 2>&1 | tee /tmp/test.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/test.log
-          timeout 30s godot --headless --script res://tests/creature_combat_motion.gd 2>&1 | tee /tmp/combat_motion.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/combat_motion.log
-          timeout 30s godot --headless --script res://tests/creature_combat_variety.gd 2>&1 | tee /tmp/combat_variety.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/combat_variety.log
-          timeout 30s godot --headless --script res://tests/creature_physics.gd 2>&1 | tee /tmp/physics.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/physics.log
-          timeout 30s godot --headless --script res://tests/creature_motion.gd 2>&1 | tee /tmp/motion.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/motion.log
-          timeout 30s godot --headless --script res://tests/creature_hybrid.gd 2>&1 | tee /tmp/hybrid.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/hybrid.log
-          timeout 30s godot --headless --script res://tests/creature_evolution.gd 2>&1 | tee /tmp/evolution.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/evolution.log
-          timeout 30s godot --headless --script res://tests/creature_vfx.gd 2>&1 | tee /tmp/vfx.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/vfx.log
-          for scene in pose_workshop combat_lab physics_lab vfx_workshop; do
-            godot --headless res://lab/$scene.tscn --quit-after 120 2>&1 | tee /tmp/$scene.log
-            ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/$scene.log
+          verify import godot --headless --editor --import
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+          for test in creature creature_combat_motion creature_combat_variety creature_physics creature_motion creature_hybrid creature_evolution creature_vfx; do
+            verify "$test" timeout 45s godot --headless --script res://tests/$test.gd
           done
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_visual.gd 2>&1 | tee /tmp/visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_physics_visual.gd 2>&1 | tee /tmp/physics_visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/physics_visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_intent_visual.gd 2>&1 | tee /tmp/intent_visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/intent_visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_vfx_visual.gd 2>&1 | tee /tmp/vfx_visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/vfx_visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_launcher.gd 2>&1 | tee /tmp/launcher.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/launcher.log
+          for scene in pose_workshop combat_lab physics_lab vfx_workshop; do
+            verify "$scene" timeout 30s godot --headless res://lab/$scene.tscn --quit-after 120
+          done
+          for test in creature_visual creature_physics_visual creature_intent_visual creature_vfx_visual creature_launcher; do
+            verify "$test" timeout 60s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/$test.gd
+          done
+          if [ "$failed" -ne 0 ]; then exit 1; fi
           rm -rf .godot
           find . -name '*.import' -delete
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Animation-Creature-Test-Logs
+          path: /tmp/*.log
       - uses: actions/upload-artifact@v4
         with:
           name: Animation-Creature-Previews
