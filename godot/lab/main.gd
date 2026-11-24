@@ -68,7 +68,7 @@ func _select(i: int) -> void:
     var clip = CLIP.read_clip(paths[i])
     if clip != null:
         clips[i] = clip
-        status.text = "Ready | Click: play | Space: stress | L: live | O: orb | K: workshop | H: chain | B/M/C"
+        status.text = "Ready | Click: play | Space: stress | L: live | O: orb | K: workshop | H: chain | E: electrified | B/M/C"
     else:
         status.text = "Clip load failed; inspect import and manifest."
 
@@ -86,6 +86,8 @@ func _unhandled_input(event: InputEvent) -> void:
             queue_redraw()
         elif event.keycode == KEY_M:
             mirrored = not mirrored
+        elif event.keycode == KEY_E:
+            get_tree().change_scene_to_file("res://lab/electrified.tscn")
         elif event.keycode == KEY_H:
             get_tree().change_scene_to_file("res://lab/chain_lightning.tscn")
         elif event.keycode == KEY_K:

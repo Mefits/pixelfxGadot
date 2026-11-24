@@ -28,6 +28,7 @@ jobs:
       - run: node tools/make_core_fixture.mjs
       - run: node tools/make_chain_fixture.mjs
       - run: node tools/make_sim_helpers_fixture.mjs
+      - run: node tools/make_electrified_fixture.mjs
       - run: node tools/make_particles_fixture.mjs
       - run: node tools/make_bits_fixture.mjs
       - run: node tools/make_ball_fixture.mjs
@@ -75,6 +76,8 @@ jobs:
         run: godot --headless --path godot --script res://tests/chain.gd
       - name: Native sim helpers parity
         run: godot --headless --path godot --script res://tests/sim_helpers.gd
+      - name: Full Electrified parity
+        run: godot --headless --path godot --script res://tests/electrified.gd
       - name: Native CPU reference benchmark
         run: godot --headless --path godot --script res://tests/native_benchmark.gd
       - name: Live scene smoke

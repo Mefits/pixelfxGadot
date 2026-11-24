@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node tools/make_core_fixture.mjs && node tools/make_chain_fixture.mjs && node tools/make_sim_helpers_fixture.mjs && node tools/make_painter_fixture.mjs
+      - run: node tools/make_core_fixture.mjs && node tools/make_chain_fixture.mjs && node tools/make_sim_helpers_fixture.mjs && node tools/make_painter_fixture.mjs && node tools/make_electrified_fixture.mjs
       - name: Install Godot
         run: |
           curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
@@ -40,3 +40,6 @@ jobs:
         run: timeout 30s godot --headless --path godot --script res://tests/sim_helpers.gd
       - if: always()
         run: timeout 30s godot --headless --path godot --script res://tests/painter_full.gd
+
+      - if: always()
+        run: timeout 30s godot --headless --path godot --script res://tests/electrified.gd

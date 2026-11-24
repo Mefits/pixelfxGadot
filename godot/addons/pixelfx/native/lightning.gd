@@ -214,3 +214,43 @@ static func scorch(p,cx: float,cy: float,rx: float,t0: float,fade: float=1.0,ry:
                     p.glow(x+.5,y,6,c,.18*temp*fade)
             else:
                 p.dot(x,y,soot if d<.5 else soot2,(1.0 if d<.95-n*.3 else 1-d)*fade)
+
+static func bend(paths: Array,fn: Callable) -> Array:
+    var out: Array=[]
+    for q in paths:
+        var pts: Array=[]
+        for v in q["pts"]:
+            pts.append(fn.call(v[0],v[1]))
+        out.append({"w":q["w"],"pts":pts})
+    return out
+
+static func flight(x: float,y: float,vx: float,vy: float,age: float,floor_y: float=INF,g: float=.45,drag: float=2.2,bounce: float=.45) -> Array:
+    const DT: float=1.0/120
+    var s: float=0
+    while s<age:
+        var h: float=minf(DT,age-s)
+        vy+=950*g*h
+        vx-=vx*drag*h
+        vy-=vy*drag*h
+        var ny: float=y+vy*h
+        x+=vx*h
+        if vy>0 and y<=floor_y and ny>=floor_y:
+            vy=-vy*bounce
+            vx*=.7
+            y=floor_y-.25
+        else:
+            y=ny
+        s+=DT
+    return [x,y,vx,vy]
+
+static func spark(p,x: float,y: float,vx: float,vy: float,k: float,s: Array) -> void:
+    var sp: float=sqrt(vx*vx+vy*vy)
+    if sp==0:
+        sp=1
+    var ux: float=vx/sp
+    var uy: float=vy/sp
+    var head: int=s[0] if k>.6 else (s[1] if k>.3 else s[2])
+    var length: float=minf(9,1+sp*.022)
+    p.line(x-ux*length,y-uy*length,x-ux*length*.4,y-uy*length*.4,head if k>.5 else s[-1])
+    p.line(x-ux*length*.45,y-uy*length*.45,x,y,head)
+    p.glow(x,y,3,head,.45*k)
