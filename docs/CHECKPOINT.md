@@ -28,3 +28,6 @@ Graphical CI uses Godot Dummy audio driver because the runner has no sound devic
 
 ## 0.06.2
 Accepted hybrid default restored, smooth continuous limb skin and bent cloth contours; F6 A/B. Verify actual contours over extreme bends and sampled gameplay poses, old regression and real captures. No new combat actions.
+
+## 0.07
+Front kick with rear-foot support and buffered movement transition; validate hit/miss, mirrored contact, single damage, airborne rejection, interruption, lift/reach, leg length, skin contours and real frame captures. Preserve existing regressions.

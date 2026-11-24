@@ -60,6 +60,16 @@ func tick(input:Dictionary,opponent_x:float)->void:
     var axis:float=clampf(float(input.get("move",0)),-1,1)
     sprint=bool(input.get("run",false))
     var jump:bool=bool(input.get("jump",false))
+    if input.get("kick_support",false):
+        # Start only from settled footing. Freeze the root and both motor anchors;
+        # the visible lead ankle is driven by the attack pose, not gait.
+        velocity.x=0
+        jump_latch=jump
+        guard_phase=fposmod(guard_phase+DT,STANCE.DURATION)
+        gait=move_toward(gait,0,DT*8)
+        run_mix=move_toward(run_mix,0,DT*6)
+        land=move_toward(land,0,DT*6)
+        return
     if grounded and not input.get("lock_facing",false) and absf(opponent_x-pos.x)>5:facing=1 if opponent_x>pos.x else -1
     # Backpedal in guard rather than playing a forward sprint backwards.
     var backward:bool=axis*facing<0
@@ -105,6 +115,7 @@ func tick(input:Dictionary,opponent_x:float)->void:
             swing=-1
             steps+=1
     if swing<0:
+        if input.get("settle_kick",false):return
         if absf(velocity.x)>10:
             var trailing:int=0 if (feet[0].x-feet[1].x)*velocity.x<=0 else 1
             if (pos.x-feet[trailing].x)*signf(velocity.x)>8 or absf(feet[0].x-feet[1].x)<12:_begin_step(trailing,velocity.x)

@@ -30,6 +30,7 @@ func _ready()->void:
     _button("Облик [F5]",_toggle_skin)
     _button("Стыки [F6]",_toggle_smooth)
     _button("Дистанция [T]",_close_reset)
+    toolbar.get_child(toolbar.get_child_count()-1).tooltip_text="Сброс на дистанцию 66 px. F/H/J — удары."
     hud=Label.new()
     hud.position=Vector2(24,490)
     hud.add_theme_font_size_override("font_size",15)
@@ -94,13 +95,13 @@ func _unhandled_key_input(e:InputEvent)->void:
 func _held(key:Key)->bool:return Input.is_physical_key_pressed(key)
 func _physics_process(dt:float)->void:
     if paused:return
-    var left:Dictionary={"move":float(_held(KEY_D))-float(_held(KEY_A)),"jump":_held(KEY_W),"run":_held(KEY_SHIFT),"jab":_held(KEY_F),"heavy":_held(KEY_H)}
-    var right:Dictionary={} if single_player else {"move":float(_held(KEY_RIGHT))-float(_held(KEY_LEFT)),"jump":_held(KEY_UP),"run":_held(KEY_CTRL),"jab":_held(KEY_K),"heavy":_held(KEY_L)}
+    var left:Dictionary={"move":float(_held(KEY_D))-float(_held(KEY_A)),"jump":_held(KEY_W),"run":_held(KEY_SHIFT),"jab":_held(KEY_F),"heavy":_held(KEY_H),"kick":_held(KEY_J)}
+    var right:Dictionary={} if single_player else {"move":float(_held(KEY_RIGHT))-float(_held(KEY_LEFT)),"jump":_held(KEY_UP),"run":_held(KEY_CTRL),"jab":_held(KEY_K),"heavy":_held(KEY_L),"kick":_held(KEY_SEMICOLON)}
     world.advance(dt,left,right)
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег · F — быстрый · H — тяжёлый   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl · K/L")+"\nN  /  0.06.2  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · попаданий "+str(world.hits)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег · F/H — рукой · J — ногой   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl · K/L/;")+"\nN  /  0.07  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · попаданий "+str(world.hits)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)

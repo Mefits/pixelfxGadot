@@ -1,6 +1,7 @@
 extends RefCounted
-## Two authored attacks and optional bounded spring reaction. Fixed 120 Hz.
+## Three authored attacks and optional bounded spring reaction. Fixed 120 Hz.
 const REACTION=preload("res://game/impact_reaction.gd")
+const KICK=preload("res://game/kick_pose.gd")
 const HEAVY_DURATION=80
 const HEAVY_ACTIVE_FROM=24
 const HEAVY_ACTIVE_TO=36
@@ -40,6 +41,8 @@ const HEAVY_KEYS=[
 var reaction=REACTION.new()
 var kind:String="jab"
 var heavy_latch:bool=false
+var kick_latch:bool=false
+var kick_pending:int=0
 var queued_kind:String="jab"
 var hurt_total:int=HURT_TICKS
 var hurt_heavy:bool=false
@@ -50,8 +53,11 @@ var attacks:int=0
 var connected:bool=false
 var latch:bool=false
 var queued:bool=false
-func capture(pressed:bool,heavy:bool=false)->void:
-    if heavy and not heavy_latch:
+func capture(pressed:bool,heavy:bool=false,kick:bool=false)->void:
+    if kick and not kick_latch:
+        queued=true
+        queued_kind="kick"
+    elif heavy and not heavy_latch:
         queued=true
         queued_kind="heavy"
     elif pressed and not latch:
@@ -59,9 +65,21 @@ func capture(pressed:bool,heavy:bool=false)->void:
         queued_kind="jab"
     latch=pressed
     heavy_latch=heavy
-func duration()->int:return HEAVY_DURATION if kind=="heavy" else DURATION
-func fist()->String:return "hand_far" if kind=="heavy" else "hand_near"
+    kick_latch=kick
+func duration()->int:
+    if kind=="kick":return KICK.DURATION
+    return HEAVY_DURATION if kind=="heavy" else DURATION
+func fist()->String:
+    if kind=="kick":return "foot_near"
+    return "hand_far" if kind=="heavy" else "hand_near"
+func contact_point(rig,face:int)->Vector2:
+    var p:Vector2=rig.points[fist()]
+    # Kick reaches the visible forefoot, rather than the ankle joint alone.
+    if kind=="kick":p.x+=9*face
+    return p
+func kicking()->bool:return kind=="kick" and age>=0
 func profile()->Dictionary:
+    if kind=="kick":return {"damage":KICK.DAMAGE,"knockback":KICK.KNOCKBACK,"hurt":KICK.HURT,"freeze":KICK.HITSTOP,"strength":1.6,"heavy":true}
     return {"damage":HEAVY_DAMAGE,"knockback":HEAVY_KNOCKBACK,"hurt":HEAVY_HURT,"freeze":HEAVY_HITSTOP,"strength":2.0,"heavy":true} if kind=="heavy" else {"damage":DAMAGE,"knockback":KNOCKBACK,"hurt":HURT_TICKS,"freeze":HITSTOP,"strength":1.0,"heavy":false}
 func tick(m)->void:
     reaction.step()
@@ -69,14 +87,26 @@ func tick(m)->void:
     if age>=0:
         age+=1
         if age>=duration():age=-1
+    if kick_pending>0:kick_pending-=1
+    if not m.grounded or hurt>0 or hp<=0:kick_pending=0
     if queued and hp>0 and hurt==0 and age<0 and m.grounded:
+        if queued_kind=="kick":kick_pending=48
+        else:
+            kick_pending=0
+            age=0
+            kind=queued_kind
+            connected=false
+            attacks+=1
+    if kick_pending>0 and age<0 and m.grounded and m.swing<0 and absf(m.velocity.x)<=20:
         age=0
-        kind=queued_kind
+        kind="kick"
         connected=false
         attacks+=1
+        kick_pending=0
     queued=false
 func locked()->bool:return age>=0 or hurt>0 or hp<=0
 func active()->bool:
+    if kind=="kick":return age>=KICK.ACTIVE_FROM and age<=KICK.ACTIVE_TO and not connected
     return age>=(HEAVY_ACTIVE_FROM if kind=="heavy" else ACTIVE_FROM) and age<=(HEAVY_ACTIVE_TO if kind=="heavy" else ACTIVE_TO) and not connected
 func receive(m,direction:int,attack:Dictionary,lever:float)->void:
     hp=maxi(0,hp-int(attack.damage))
@@ -85,6 +115,7 @@ func receive(m,direction:int,attack:Dictionary,lever:float)->void:
     hurt_total=hurt
     hurt_heavy=bool(attack.heavy)
     queued=false
+    kick_pending=0
     m.velocity.x=float(attack.knockback)*direction
     reaction.impulse(float(attack.strength),lever,float(direction*m.facing))
 func pose(hybrid:bool=false)->Dictionary:
@@ -95,6 +126,7 @@ func pose(hybrid:bool=false)->Dictionary:
             return {"weight":u*.55,"hip":Vector2(-2,-45 if hurt_heavy else -48),"lean":-5.0,"lead":Vector2(16,8),"rear":Vector2(6,12)}
         return {"weight":u,"hip":Vector2(-5,-44) if hurt_heavy else Vector2(-3,-47),"lean":-36.0 if hurt_heavy else -24.0,"lead":Vector2(8,19),"rear":Vector2(-6,20)}
     if age<0:return {}
+    if kind=="kick":return KICK.pose(age)
     var keys:Array=HEAVY_KEYS if kind=="heavy" else KEYS
     var a:Array=keys[0]
     var b:Array=keys[1]

@@ -38,6 +38,24 @@ func impact_sequence(scene,name:String,hybrid:bool,heavy:bool)->void:
         scene.queue_redraw()
         await capture(name+"/frame_%03d"%frame)
     if scene.world.hits!=1:push_error("Impact capture missed: "+name);quit(1)
+func kick_sequence(scene,name:String,hit:bool,mirror:bool=false)->void:
+    scene.world=W.new()
+    scene.world.a.separate(150)
+    scene.world.b.separate(scene.world.a.pos.x+(72 if hit else 130)-scene.world.b.pos.x)
+    scene.world.rig_a.sample(scene.world.a)
+    scene.world.rig_b.sample(scene.world.b)
+    scene.artistic=true
+    scene.smooth_skin=true
+    scene.debug=false
+    DirAccess.make_dir_recursive_absolute("res://reports/"+name)
+    for frame in range(45):
+        for i in range(4):
+            var input:Dictionary={"kick":frame==3 and i==0}
+            scene.world.tick({} if mirror else input,input if mirror else {})
+        scene._hud()
+        scene.queue_redraw()
+        await capture(name+"/frame_%03d"%frame)
+    if scene.world.hits!=(1 if hit else 0):push_error("Kick capture contact mismatch "+name);quit(1)
 func check_skin(scene,state:Dictionary,tick0:int)->void:
     if scene.world.ticks!=tick0 or scene.world.rig_a.points!=state:
         push_error("Skin altered simulation")
@@ -93,6 +111,9 @@ func _run()->void:
     scene.artistic=false
     await impact_sequence(scene,"heavy_mannequin",false,true)
     scene.artistic=true
+    await kick_sequence(scene,"kick_hit",true)
+    await kick_sequence(scene,"kick_miss",false)
+    await kick_sequence(scene,"kick_mirror",true,true)
     var state:Dictionary=scene.world.rig_a.points.duplicate(true)
     var tick0:int=scene.world.ticks
     scene._toggle_skin()

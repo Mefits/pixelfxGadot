@@ -26,8 +26,8 @@ func advance(dt:float,left:Dictionary,right:Dictionary)->void:
         tick(left,right)
         accumulator=maxf(0,accumulator-M.DT)
 func tick(left:Dictionary,right:Dictionary)->void:
-    jab_a.capture(bool(left.get("jab",false)),bool(left.get("heavy",false)))
-    jab_b.capture(bool(right.get("jab",false)),bool(right.get("heavy",false)))
+    jab_a.capture(bool(left.get("jab",false)),bool(left.get("heavy",false)),bool(left.get("kick",false)))
+    jab_b.capture(bool(right.get("jab",false)),bool(right.get("heavy",false)),bool(right.get("kick",false)))
     if freeze>0:
         freeze-=1
         frozen_ticks+=1
@@ -35,8 +35,8 @@ func tick(left:Dictionary,right:Dictionary)->void:
         return
     jab_a.tick(a)
     jab_b.tick(b)
-    var prev_a:Vector2=rig_a.points[jab_a.fist()]
-    var prev_b:Vector2=rig_b.points[jab_b.fist()]
+    var prev_a:Vector2=jab_a.contact_point(rig_a,a.facing)
+    var prev_b:Vector2=jab_b.contact_point(rig_b,b.facing)
     var ax:float=a.pos.x
     var bx:float=b.pos.x
     a.tick(_motor_input(left,jab_a),bx)
@@ -76,14 +76,16 @@ func tick(left:Dictionary,right:Dictionary)->void:
     ticks+=1
 
 func _motor_input(input:Dictionary,j)->Dictionary:
+    if j.kicking():return {"lock_facing":true,"kick_support":true}
+    if j.kick_pending>0:return {"settle_kick":true,"lock_facing":true}
     if not j.locked():return input
     return {"lock_facing":true,"hurt":j.hurt>0 or j.hp<=0}
 
 func _contact(src,dst,attack,defender,previous:Vector2,source_rig,target_rig)->Dictionary:
     if not attack.active() or defender.hp<=0:return {}
     if (dst.pos.x-src.pos.x)*src.facing<=0:return {}
-    var p:Vector2=source_rig.points[attack.fist()]
-    # Sweep the visible fist against torso capsule sampled at three points.
+    var p:Vector2=attack.contact_point(source_rig,src.facing)
+    # Sweep the visible striking extremity against sampled torso capsule.
     # No hit from an arbitrary root distance. Ground/air targets use the same geometry.
     var upper:Vector2=target_rig.points.chest
     var lower:Vector2=target_rig.points.hips

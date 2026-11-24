@@ -46,6 +46,7 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
     if m.grounded:
         # Keep BOTH target feet within the reach envelope while grounded.
         for i in range(2):
+            if i==0 and action.has("kick_foot") and weight>0:continue
             var foot:Vector2=m.feet[i]
             var dx:float=absf((foot.x-m.pos.x)*direction-hip_x-(2 if i==0 else -2))
             var max_height:float=sqrt(maxf(4,59.7*59.7-minf(dx,58)*minf(dx,58)))
@@ -65,6 +66,8 @@ func sample(m,action:Dictionary={},reaction:Vector4=Vector4.ZERO)->Dictionary:
             foot=Vector2((m.feet[i].x-m.pos.x)*direction,m.feet[i].y-m.pos.y-2)
         else:
             foot=MOTION.air(m,i).foot
+        if i==0 and action.has("kick_foot"):
+            foot=foot.lerp(Vector2(action.kick_foot),weight)
         # A planted leg bends toward the opponent; the elbow bends downward.
         var leg:Array[Vector2]=chain(thigh,foot,UPPER_LEG,LOWER_LEG,-1)
         var stride:float=clampf((foot.x-hip.x)/24,-1,1)
