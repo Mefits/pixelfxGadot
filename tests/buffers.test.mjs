@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {splitFrame,reconstruct,packPages} from '../tools/buffers.mjs';
+const raw=new Uint32Array([0x80643214,0xff030201,0]),light=new Uint32Array([0x000a141e,0x00ff0000,0x00090807]);
+test('channels and straight alpha',()=>{const f=splitFrame(raw,light);assert.deepEqual([...f.color],[20,50,100,128,1,2,3,255,0,0,0,0]);assert.deepEqual([...f.glow],[30,20,10,255,0,0,255,255,7,8,9,255]);});
+test('add light after alpha over opaque background',()=>{const f=splitFrame(raw,light);assert.deepEqual([...reconstruct(f.color,f.glow,[10,20,30])],[45,55,75,255,1,2,255,255,17,28,39,255]);});
+test('page packing preserves pixels and order',()=>{const f={raw:new Uint32Array([0xff0000ff]),light:new Uint32Array([0x00000102])};const g={raw:new Uint32Array([0xff00ff00]),light:new Uint32Array([0x00030405])};const [p]=packPages([f,g],1,1,4);assert.deepEqual(p.rects,[[0,0,1,1],[1,0,1,1]]);assert.deepEqual([...p.color],[255,0,0,255,0,255,0,255]);assert.deepEqual([...p.glow],[2,1,0,255,5,4,3,255]);});
+test('multiple pages preserve offsets',()=>{const f={raw:new Uint32Array(4),light:new Uint32Array(4)};const p=[...packPages(Array(5).fill(f),2,2,4)];assert.deepEqual(p.map(x=>x.offset),[0,4]);assert.deepEqual(p.map(x=>x.rects.length),[4,1]);});
+test('reject invalid sizes',()=>{assert.throws(()=>splitFrame(new Uint32Array(1),new Uint32Array(2)));assert.throws(()=>[...packPages([{raw,light}],5,1,4)]);});
+test('tall frames never exceed page height',()=>{const f={raw:new Uint32Array(12),light:new Uint32Array(12)};const p=[...packPages(Array(8).fill(f),2,6,8)];assert.equal(p.length,2);for(const a of p)assert.ok(a.aw<=8&&a.ah<=8);});
