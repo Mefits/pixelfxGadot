@@ -1,6 +1,7 @@
 extends RefCounted
 ## Display names only. Stable English identifiers stay in saved data.
 const LABELS={
+    "vfx": "Спецэффект",
     "idle": "Стойка",
     "walk": "Ходьба",
     "jump": "Прыжок",

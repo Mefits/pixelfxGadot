@@ -1,5 +1,7 @@
 extends RefCounted
 ## JSON-safe keyed poses and event markers. No dependency on humanoid joint names in sampling.
+const VFX=preload("res://addons/pixelfx/composer/preset.gd")
+const MAX_VFX_MARKERS=32
 const SAVE_PATH="user://creature_clips.json"
 const SECOND_PATH="user://creature_clips_fighter2.json"
 const REQUIRED=["idle","walk","jump","strike","cast","guard","hurt"]
@@ -67,6 +69,23 @@ static func events_between(clip: Dictionary,previous: float,current: float) -> A
             out.append(e)
     return out
 
+# Visual cues can recur on looping locomotion clips without ever repeating damage.
+static func visual_events_between(clip: Dictionary,previous: float,current: float,wrap_loop: bool=true) -> Array:
+    var result: Array=[]
+    var duration: float=float(clip.duration)
+    for e in clip.events:
+        if e.kind!="vfx":continue
+        var t: float=float(e.t)
+        if clip.loop and wrap_loop:
+            var first: int=maxi(0,int(floor((previous-t)/duration))+1)
+            var last: int=int(floor((current-t)/duration))
+            for cycle in range(first,mini(last+1,first+32)):
+                result.append({"marker":e,"absolute":t+cycle*duration})
+        elif t>previous and t<=current:
+            result.append({"marker":e,"absolute":t})
+    result.sort_custom(func(a,b):return float(a.absolute)<float(b.absolute))
+    return result
+
 static func valid(bank: Variant) -> bool:
     if not bank is Dictionary:
         return false
@@ -85,8 +104,13 @@ static func valid(bank: Variant) -> bool:
             if not p.get("angles") is Dictionary or not p.get("root") is Array or p.root.size()!=2: return false
             for v in p.root+p.angles.values():
                 if not (v is float or v is int) or not is_finite(float(v)) or absf(float(v))>1000: return false
+        var visual_count: int=0
         for e in c.events:
-            if not e is Dictionary or not (e.get("t") is float or e.get("t") is int) or float(e.t)<0 or float(e.t)>float(c.duration) or not e.get("kind") in ["strike","charge","cast"] or not e.get("anchor") is String: return false
+            if not e is Dictionary or not (e.get("t") is float or e.get("t") is int) or float(e.t)<0 or float(e.t)>float(c.duration) or not e.get("kind") in ["strike","charge","cast","vfx"] or not e.get("anchor") is String: return false
+            if not is_finite(float(e.t)):return false
+            if e.kind=="vfx":
+                visual_count+=1
+                if visual_count>MAX_VFX_MARKERS or e.anchor.is_empty() or not VFX.valid(e.get("preset")):return false
     return true
 
 static func save_bank(bank: Dictionary,path: String=SAVE_PATH) -> bool:
@@ -145,7 +169,7 @@ static func followup(original: Dictionary) -> Dictionary:
         k.pose=r.solve_ik(k.pose,"hand_far",aim,24)
     for e in c.events:
         e.t*=.82
-        if e.anchor=="hand_near" and e.kind=="strike":e.anchor="hand_far"
+        if e.anchor=="hand_near" and e.kind in ["strike","vfx"]:e.anchor="hand_far"
     return c
 
 static func complete(bank: Dictionary) -> Dictionary:

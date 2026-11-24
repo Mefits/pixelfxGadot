@@ -2,6 +2,7 @@ extends Control
 const UI=preload("res://lab/ui_ru.gd")
 const RIG=preload("res://addons/creature/rig.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
+const VFX=preload("res://addons/pixelfx/composer/preset.gd")
 const PREVIEW=preload("res://lab/creature_preview.gd")
 var rig=RIG.humanoid()
 var bank: Dictionary=CLIPS.fighter_bank(0)
@@ -38,6 +39,9 @@ var redo_button: Button
 var keys: ItemList
 var event_list: ItemList
 var event_kind: OptionButton
+var vfx_select: OptionButton
+var vfx_choices: Array=[]
+const EVENT_TYPES=["strike","charge","cast","vfx"]
 var status: Label
 var clock_label: Label
 var dragging: bool=false
@@ -215,13 +219,25 @@ func _ready() -> void:
     var erow:=HBoxContainer.new()
     side.add_child(erow)
     event_kind=OptionButton.new()
-    for n in ["strike","charge","cast"]:event_kind.add_item(UI.label(n))
+    for n in EVENT_TYPES:event_kind.add_item(UI.label(n))
     erow.add_child(event_kind)
     _button(erow,"Добавить",_add_event)
     _button(erow,"Удалить",_delete_event)
     event_list=ItemList.new()
     event_list.custom_minimum_size.y=48
     side.add_child(event_list)
+    event_list.item_selected.connect(_event_selected)
+    vfx_select=OptionButton.new()
+    vfx_select.fit_to_longest_item=false
+    vfx_select.clip_text=true
+    vfx_select.tooltip_text="Пресет для нового VFX-маркера"
+    side.add_child(vfx_select)
+    var vfx_actions:=HBoxContainer.new()
+    side.add_child(vfx_actions)
+    _button(vfx_actions,"+ VFX",_add_vfx_event)
+    _button(vfx_actions,"Заменить",_replace_vfx_event)
+    _button(vfx_actions,"Обновить список",_refresh_vfx_library)
+    _refresh_vfx_library()
     var save:=HBoxContainer.new()
     save.position=Vector2(604,9)
     save.theme=compact
@@ -389,10 +405,72 @@ func _set_duration(v: float) -> void:
     _seek(time*scale)
     _refresh_lists()
 
+func _refresh_vfx_library() -> void:
+    vfx_choices.clear()
+    vfx_select.clear()
+    for i in range(12):
+        var p: Dictionary=VFX.demo(i)
+        vfx_choices.append(p)
+        vfx_select.add_item("Демо: "+UI.label(p.name))
+    var dir:=DirAccess.open(VFX.FOLDER)
+    if dir!=null:
+        for file in dir.get_files():
+            if not file.ends_with(".json"):continue
+            var p: Dictionary=VFX.load_preset(VFX.FOLDER.path_join(file))
+            if p.is_empty():continue
+            vfx_choices.append(p)
+            vfx_select.add_item("Свой: "+p.name)
+    if not vfx_choices.is_empty():vfx_select.select(0)
+
+func _event_selected(index: int) -> void:
+    var events: Array=bank[name_id].events
+    if index<0 or index>=events.size():return
+    var e: Dictionary=events[index]
+    selected=e.anchor if rig.ids.has(e.anchor) else selected
+    event_kind.select(EVENT_TYPES.find(e.kind))
+    _seek(float(e.t))
+    if e.kind=="vfx":status.text="VFX: "+str(e.preset.name)+" · "+UI.label(e.anchor)
+
+func _add_vfx_event() -> void:
+    var c: Dictionary=bank[name_id]
+    var count: int=0
+    for e in c.events:
+        if e.kind=="vfx":count+=1
+    if count>=CLIPS.MAX_VFX_MARKERS:
+        status.text="Лимит VFX-маркеров: "+str(CLIPS.MAX_VFX_MARKERS)
+        return
+    if vfx_select.selected<0:return
+    _remember()
+    var marker: Dictionary={"t":time,"kind":"vfx","anchor":selected,"preset":vfx_choices[vfx_select.selected].duplicate(true)}
+    c.events.append(marker)
+    c.events.sort_custom(func(a,b):return float(a.t)<float(b.t))
+    dirty=true
+    _refresh_lists()
+    event_list.select(c.events.find(marker))
+    status.text="VFX добавлен: "+str(marker.preset.name)
+
+func _replace_vfx_event() -> void:
+    var rows: PackedInt32Array=event_list.get_selected_items()
+    if rows.is_empty() or vfx_select.selected<0:return
+    var marker: Dictionary=bank[name_id].events[rows[0]]
+    if marker.kind!="vfx":
+        status.text="Выбери VFX-маркер для замены."
+        return
+    _remember()
+    marker.preset=vfx_choices[vfx_select.selected].duplicate(true)
+    marker.anchor=selected
+    dirty=true
+    _refresh_lists()
+    event_list.select(rows[0])
+    status.text="VFX заменён: "+str(marker.preset.name)
+
 func _add_event() -> void:
+    if EVENT_TYPES[event_kind.selected]=="vfx":
+        _add_vfx_event()
+        return
     _remember()
     var c: Dictionary=bank[name_id]
-    c.events.append({"t":time,"kind":["strike","charge","cast"][event_kind.selected],"anchor":selected})
+    c.events.append({"t":time,"kind":EVENT_TYPES[event_kind.selected],"anchor":selected})
     c.events.sort_custom(func(a,b):return float(a.t)<float(b.t))
     dirty=true
     _refresh_lists()
@@ -411,7 +489,10 @@ func _refresh_lists() -> void:
     for k in bank[name_id].keys:
         keys.add_item("Ключ  %.3f с"%k.t)
         if absf(float(k.t)-time)<.0001:keys.select(keys.item_count-1)
-    for e in bank[name_id].events:event_list.add_item("%.3f  %s @ %s"%[e.t,UI.label(e.kind),UI.label(e.anchor)])
+    for e in bank[name_id].events:
+        var label_text: String=str(e.preset.name) if e.kind=="vfx" else UI.label(e.kind)
+        event_list.add_item("%.3f  %s @ %s"%[e.t,label_text,UI.label(e.anchor)])
+        if e.kind=="vfx":event_list.set_item_custom_fg_color(event_list.item_count-1,Color("#c5a1ff"))
     timeline.clip=bank[name_id]
     timeline.queue_redraw()
     _update_history()

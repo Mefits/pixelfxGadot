@@ -34,7 +34,7 @@ func _draw() -> void:
         draw_colored_polygon(PackedVector2Array([Vector2(x,14),Vector2(x+5,20),Vector2(x,26),Vector2(x-5,20)]),c)
     for event in clip.get("events",[]):
         var x: float=at(event.t)
-        draw_colored_polygon(PackedVector2Array([Vector2(x,28),Vector2(x+5,37),Vector2(x-5,37)]),Color("#e9ad62"))
+        draw_colored_polygon(PackedVector2Array([Vector2(x,28),Vector2(x+5,37),Vector2(x-5,37)]),Color("#bd92f7") if event.kind=="vfx" else Color("#e9ad62"))
     draw_line(Vector2(at(value),0),Vector2(at(value),size.y),Color.WHITE,1)
     if moving_marker:
         var x: float=at(drag_time)

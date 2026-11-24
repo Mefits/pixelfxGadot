@@ -271,7 +271,48 @@ func _bindings() -> void:
     check(saw_custom and frozen and w.hits==vanilla.hits and w.b.hp==vanilla.b.hp,"Visual binding does not alter combat")
     print("Binding integration checks complete")
 
+func _marker_integration() -> void:
+    var C=preload("res://addons/creature/clips.gd")
+    var W=preload("res://addons/creature/combat.gd")
+    var FX=preload("res://addons/creature/vfx_runtime.gd")
+    var bank: Dictionary=C.defaults()
+    var p: Dictionary=P.demo(8)
+    var event: Dictionary={"t":.08,"kind":"vfx","anchor":"hand_far","preset":p.duplicate(true)}
+    bank.strike.events.append(event)
+    bank.strike.events.append({"t":.19,"kind":"vfx","anchor":"foot_near","preset":P.demo(7)})
+    check(C.valid(bank),"Embedded VFX valid")
+    check(C.save_bank(bank,"user://test_vfx_markers.json"),"Save clip markers")
+    var loaded: Dictionary=C.load_bank("user://test_vfx_markers.json")
+    check(loaded.strike.events.size()==3 and loaded.strike.events[1].preset==p,"Embedded preset survives save")
+    var invalid: Dictionary=bank.duplicate(true)
+    invalid.strike.events[1].preset.layers[0].size=-2
+    check(not C.valid(invalid),"Reject invalid embedded preset")
+    var w=W.new(loaded)
+    w.custom_vfx=FX.new()
+    var vanilla=W.new(C.defaults())
+    for world in [w,vanilla]:
+        world.a.pos.x=100
+        world.b.pos.x=125
+    var hand_seen: bool=false
+    var foot_seen: bool=false
+    for i in range(100):
+        var input: Dictionary={"strike":i==0}
+        w.step(W.DT,input,{})
+        vanilla.step(W.DT,input,{})
+        for item in w.custom_vfx.active:
+            if item.anchor=="hand_far":hand_seen=true
+            if item.anchor=="foot_near":foot_seen=true
+    check(hand_seen and foot_seen,"Independent visual cues on two joints")
+    check(w.hits==vanilla.hits and w.b.hp==vanilla.b.hp,"Visual cues do not add damage")
+    var loop_clip: Dictionary=bank.walk.duplicate(true)
+    loop_clip.events=[{"t":0.0,"kind":"vfx","anchor":"foot_near","preset":p},{"t":.3,"kind":"vfx","anchor":"foot_far","preset":p}]
+    check(C.visual_events_between(loop_clip,-.000001,.01).size()==1,"Start cue fires once")
+    check(C.visual_events_between(loop_clip,.59,.61).size()==1,"Loop boundary cue")
+    check(C.visual_events_between(loop_clip,.61,.62).is_empty(),"No repeated boundary")
+    check(C.visual_events_between(loop_clip,.61,.62,false).is_empty(),"Nonloop cue does not repeat")
+
 func _run() -> void:
+    _marker_integration()
     _bindings()
     _fields()
     _organics()

@@ -90,6 +90,10 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
     # Test direction from the attacker, not an already extended limb.
     # Reach remains measured at the authored contact anchor.
     var forward: bool=(chest.x-float(e.world_chest.x))*direction>=0
+    if e.kind=="vfx":
+        if custom_vfx!=null:
+            custom_vfx.spawn_preset(e.preset,src,e.anchor,hand,chest,direction)
+        return
     var amount: int=0
     match e.kind:
         "charge":

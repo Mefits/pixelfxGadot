@@ -142,18 +142,24 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
     var old: float=t if t>0.0 else -0.000001
     t+=dt
     var c: Dictionary=clip()
+    var due: Array=[]
     if state in ATTACKS:
         for marker in CLIPS.events_between(c,old,t):
-            if not rig.ids.has(marker.anchor):continue
-            var e: Dictionary=marker.duplicate(true)
-            rig.evaluate(CLIPS.sample(c,float(marker.t),false))
-            e["world_anchor"]=point(marker.anchor)
-            e["world_chest"]=point("chest")
-            e["direction"]=facing
-            e["attack_time"]=float(marker.t)
-            e["chain"]=chain
-            e["attack_kind"]=state
-            events.append(e)
+            if marker.kind!="vfx":due.append({"marker":marker,"absolute":float(marker.t)})
+    due.append_array(CLIPS.visual_events_between(c,old,t,not state in ATTACKS))
+    due.sort_custom(func(a,b):return float(a.absolute)<float(b.absolute))
+    for entry in due:
+        var marker: Dictionary=entry.marker
+        if not rig.ids.has(marker.anchor):continue
+        var e: Dictionary=marker.duplicate()
+        rig.evaluate(CLIPS.sample(c,float(marker.t),false))
+        e["world_anchor"]=point(marker.anchor)
+        e["world_chest"]=point("chest")
+        e["direction"]=facing
+        e["attack_time"]=float(marker.t)
+        e["chain"]=chain
+        e["attack_kind"]=state
+        events.append(e)
     current_pose=CLIPS.sample(c,t)
     if blend_time>0:
         blend_time=maxf(0,blend_time-dt)

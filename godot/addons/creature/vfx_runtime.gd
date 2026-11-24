@@ -17,11 +17,15 @@ func _init(bindings: Dictionary={}) -> void:
 
 func spawn(role: String,owner,anchor: String,at: Vector2,target: Vector2,facing: int) -> bool:
     if not bank.has(role):return false
+    return spawn_preset(bank[role],owner,anchor,at,target,facing)
+
+# Presets are validated at clip/bank load, not during combat.
+func spawn_preset(preset: Dictionary,owner,anchor: String,at: Vector2,target: Vector2,facing: int) -> bool:
     if active.size()>=MAX_ACTIVE:
         dropped+=1
         return false
     var direction: int=-1 if facing<0 else 1
-    var item: Dictionary={"preset":bank[role],"owner":owner,"anchor":anchor,"base":at,"target":target,"facing":direction,"age":0.0,"samples":PackedVector2Array([Vector2.ZERO])}
+    var item: Dictionary={"preset":preset,"owner":owner,"anchor":anchor,"base":at,"target":target,"facing":direction,"age":0.0,"samples":PackedVector2Array([Vector2.ZERO])}
     active.append(item)
     return true
 
