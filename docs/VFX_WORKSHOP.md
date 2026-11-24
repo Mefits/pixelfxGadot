@@ -19,3 +19,9 @@ Two new types: tendril and organic_mass. Required organic dictionary: arms 1–8
 
 ## 0.20 — geometric energy primitives
 Five field types: shockwave, beam, vortex, orb, rift. Required field dictionary: thickness .5–12 px, length 4–160 px, aspect .15–1, rotation -720–720 deg/s, distortion 0–1, aim bool. Existing size/alpha/glow curves affect the form. Beam length is capped by target distance when aim is enabled; angle is an offset. Shockwave radius grows from size curve, vortex uses rotating spirals, orb uses layered discs and orbiting ellipses, rift has two deformed edges and a dark center. The shared painter is used for all draws, no screen distortion shader and no collision/game damage. Up to 8 arcs and 96 segments per arc; line width capped to 12 raster strokes. Russian inspector and 5 isolated demo presets. Legacy types unchanged; tests and previews authored, not confirmed executed.
+
+## 0.21 — workshop usability
+Three inspector tabs (layer, shape, curves); irrelevant rows hidden, speed curve disabled for non-particles. A/B comparison: remember an independent preset snapshot, show equal-scale 240x160 previews with shared time, background and motion; the timeline range includes both durations. Close comparison restores 2x preview. Wheel zoom (1–8x), middle drag pans, left click selects track or seeks, reset button restores full range. No persistent A/B snapshot yet. Visual regression checks added but not executed here.
+
+## Standalone application roadmap
+Export Windows x86_64 desktop editor with matching Godot export templates. Package native PixelFX GDExtension DLL and required assets alongside executable (or exported PCK as appropriate); preserve portable source/plugin distribution separately. Validate launch on a clean Windows machine without Godot installed, JSON persistence, font/asset availability and C++/GDScript fallback. This is a planned packaging milestone, not a built executable.

@@ -37,6 +37,18 @@ var organic_hint: Label
 var field_panel: VBoxContainer
 var field_parameters: Dictionary={}
 var field_hint: Label
+var inspector: TabContainer
+var field_rows: Dictionary={}
+var curve_selector: OptionButton
+var picture: TextureRect
+var compare_picture: TextureRect
+var compare_surface
+var compare_stage
+var compare_viewport: SubViewport
+var compare_renderer
+var reference: Dictionary={}
+var compare_button: Button
+var compare_labels: HBoxContainer
 var selected: int=0
 var time: float=.3
 var playing: bool=true
@@ -82,6 +94,8 @@ func _ready() -> void:
     add_child(left)
     _label(left,"ПРЕСЕТЫ")
     var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань","Ударная волна","Энергетический луч","Вихрь","Энергетическая сфера","Разлом"],_select_demo)
+    demos.fit_to_longest_item=false
+    demos.clip_text=true
     preset.name=UI.label(preset.name)
     name_edit=LineEdit.new()
     name_edit.placeholder_text="Имя эффекта"
@@ -92,6 +106,8 @@ func _ready() -> void:
     _button(io,"Сохранить",_save)
     _button(io,"Загрузить",_load)
     library=OptionButton.new()
+    library.fit_to_longest_item=false
+    library.clip_text=true
     left.add_child(library)
     _label(left,"СЛОИ (порядок)")
     list=ItemList.new()
@@ -99,6 +115,8 @@ func _ready() -> void:
     left.add_child(list)
     list.item_selected.connect(func(i:int):selected=i;_sync_fields())
     kind=_option(left,P.TYPES,func(_i:int):pass)
+    kind.fit_to_longest_item=false
+    kind.clip_text=true
     var addrow:=HBoxContainer.new()
     left.add_child(addrow)
     _button(addrow,"+ Слой",_add_layer)
@@ -120,7 +138,7 @@ func _ready() -> void:
     surface=SURFACE.new()
     viewport.add_child(surface)
     surface.configure(240,160)
-    var picture:=TextureRect.new()
+    picture=TextureRect.new()
     picture.position=Vector2(194,44)
     picture.size=Vector2(480,320)
     picture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
@@ -138,8 +156,16 @@ func _ready() -> void:
     var variant:=_button(controls,"Вариант",func():preset.seed=int(preset.seed)+1;dirty=true)
     variant.tooltip_text="Новая случайная конфигурация при тех же параметрах"
     _button(controls,"C++",func():renderer.enable_acceleration(not renderer.accelerated);dirty=true)
+    var compare_row:=HBoxContainer.new()
+    compare_row.position=Vector2(194,401)
+    add_child(compare_row)
+    _button(compare_row,"Запомнить A",_capture_reference)
+    compare_button=_button(compare_row,"A / B",_toggle_compare)
+    compare_button.disabled=true
+    _button(compare_row,"Сброс масштаба",func():timeline.reset_view())
     perf=Label.new()
-    perf.position=Vector2(194,401)
+    perf.position=Vector2(194,388)
+    perf.add_theme_font_size_override("font_size",10)
     add_child(perf)
     seek=HSlider.new()
     seek.position=Vector2(194,426)
@@ -153,14 +179,14 @@ func _ready() -> void:
     timeline.size=Vector2(480,81)
     add_child(timeline)
     timeline.seek_requested.connect(_seek)
-    var scroll:=ScrollContainer.new()
-    scroll.position=Vector2(686,44)
-    scroll.size=Vector2(262,483)
-    scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
-    add_child(scroll)
-    var right:=VBoxContainer.new()
-    right.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-    scroll.add_child(right)
+    timeline.layer_requested.connect(_select_layer)
+    inspector=TabContainer.new()
+    inspector.position=Vector2(686,44)
+    inspector.size=Vector2(262,483)
+    add_child(inspector)
+    var right: VBoxContainer=_inspector_page("Слой")
+    var shape_page: VBoxContainer=_inspector_page("Форма")
+    var curve_page: VBoxContainer=_inspector_page("Кривые")
     _label(right,"ПАРАМЕТРЫ СЛОЯ")
     for spec in [["type","Тип",P.TYPES],["anchor","Привязка",P.ANCHORS],["curve","Кривая",P.CURVES]]:
         var row:=HBoxContainer.new()
@@ -170,8 +196,12 @@ func _ready() -> void:
         var key: String=spec[0]
         var options: Array=spec[2]
         fields[key]=_option(row,options,func(i:int):_change(key,options[i]))
+        fields[key].size_flags_horizontal=Control.SIZE_EXPAND_FILL
+        fields[key].fit_to_longest_item=false
+        fields[key].clip_text=true
+        field_rows[key]=row
     emitter_panel=VBoxContainer.new()
-    right.add_child(emitter_panel)
+    shape_page.add_child(emitter_panel)
     _label(emitter_panel,"ИСТОЧНИК ЧАСТИЦ")
     emitter_toggle=CheckButton.new()
     emitter_toggle.text="Непрерывный поток"
@@ -201,7 +231,7 @@ func _ready() -> void:
     emitter_info=_label(emitter_controls,"")
     emitter_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     trail_panel=VBoxContainer.new()
-    right.add_child(trail_panel)
+    shape_page.add_child(trail_panel)
     _label(trail_panel,"ДИНАМИЧЕСКИЙ ШЛЕЙФ")
     for spec in [["life","Жизнь следа, с",.05,1.5,.01],["rate","Проб / с",8,64,1],["break_distance","Разрыв, px",4,120,1],["jitter","Зигзаг, px",0,12,.5]]:
         var row:=HBoxContainer.new()
@@ -225,7 +255,7 @@ func _ready() -> void:
     var trail_hint: Label=_label(trail_panel,"Включи «Движение»: след строится по истории точки. Размер = ширина.")
     trail_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     organic_panel=VBoxContainer.new()
-    right.add_child(organic_panel)
+    shape_page.add_child(organic_panel)
     _label(organic_panel,"ОРГАНИЧЕСКАЯ ДЕФОРМАЦИЯ")
     for spec in [["arms","Отростков",1,8,1],["length","Длина, px",4,96,1],["wave","Амплитуда, px",0,32,.5],["frequency","Частота, Гц",0,6,.1],["taper","Сужение",0,1,.05],["pulse","Пульсация",0,.45,.05],["stretch","Растяжение",0,.65,.05]]:
         var row:=HBoxContainer.new()
@@ -249,7 +279,7 @@ func _ready() -> void:
     organic_hint=_label(organic_panel,"")
     organic_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     field_panel=VBoxContainer.new()
-    right.add_child(field_panel)
+    shape_page.add_child(field_panel)
     _label(field_panel,"ФОРМА ЭФФЕКТА")
     for spec in [["thickness","Толщина, px",.5,12,.5],["length","Длина, px",4,160,1],["aspect","Пропорции",.15,1,.05],["rotation","Вращение, °/с",-720,720,10],["distortion","Искажение",0,1,.05]]:
         var row:=HBoxContainer.new()
@@ -272,21 +302,22 @@ func _ready() -> void:
     field_aim.toggled.connect(func(v:bool):_field_change("aim",v))
     field_hint=_label(field_panel,"")
     field_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    _label(right,"КРИВЫЕ ПАРАМЕТРОВ")
-    _option(right,["Размер","Прозрачность","Скорость","Свечение"],func(i:int):curve_channel=i;_sync_curve())
-    curve_toggle=_button(right,"Своя кривая",_toggle_curve)
+    _label(curve_page,"КРИВЫЕ ПАРАМЕТРОВ")
+    curve_selector=_option(curve_page,["Размер","Прозрачность","Скорость","Свечение"],func(i:int):curve_channel=i;_sync_curve())
+    curve_toggle=_button(curve_page,"Своя кривая",_toggle_curve)
     graph=GRAPH.new()
-    right.add_child(graph)
+    curve_page.add_child(graph)
     graph.points_changed.connect(_curve_changed)
-    curve_status=_label(right,"")
+    curve_status=_label(curve_page,"")
     curve_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    var hint: Label=_label(right,"ЛКМ: добавить / двигать. ПКМ: удалить внутреннюю точку.")
+    var hint: Label=_label(curve_page,"ЛКМ: добавить / двигать. ПКМ: удалить внутреннюю точку.")
     hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     for spec in [["enabled","Видимость"],["follow","Следовать за точкой"],["collision","Столкновение с полом"]]:
         var check:=CheckButton.new()
         check.text=spec[1]
         right.add_child(check)
         fields[spec[0]]=check
+        field_rows[spec[0]]=check
         var key: String=spec[0]
         check.toggled.connect(func(v:bool):_change(key,v))
     var color:=ColorPickerButton.new()
@@ -294,10 +325,12 @@ func _ready() -> void:
     color.edit_alpha=false
     right.add_child(color)
     fields.color=color
+    field_rows.color=color
     color.color_changed.connect(func(c:Color):_change("color","#"+c.to_html(false)))
     for spec in [["start","Начало, с",0,5,.01],["duration","Время жизни, с",.05,5,.01],["size","Размер: начало",.5,80,.5],["end_size","Размер: конец",.5,80,.5],["alpha","Непрозр.: начало",0,1,.05],["end_alpha","Непрозр.: конец",0,1,.05],["speed","Скорость: начало",0,200,1],["end_speed","Скорость: конец",0,200,1],["count","Количество",1,64,1],["spread","Разброс, °",0,360,1],["angle","Угол, °",-180,180,1],["gravity","Гравитация",-200,300,5],["glow","Свечение",0,1,.05],["x","Смещение X",-100,100,1],["y","Смещение Y",-100,100,1]]:
         var row:=HBoxContainer.new()
-        right.add_child(row)
+        var destination: VBoxContainer=shape_page if spec[0] in ["count","spread","angle","gravity","speed","end_speed"] else right
+        destination.add_child(row)
         var label=_label(row,spec[1])
         label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
         var spin:=SpinBox.new()
@@ -308,10 +341,77 @@ func _ready() -> void:
         row.add_child(spin)
         var key: String=spec[0]
         fields[key]=spin
+        field_rows[key]=row
         spin.value_changed.connect(func(v:float):_change(key,v))
+    # The comparison viewport is allocated only when requested.
+    compare_labels=HBoxContainer.new()
+    compare_labels.position=Vector2(194,58)
+    compare_labels.size=Vector2(480,24)
+    add_child(compare_labels)
+    for label_text in ["B — текущий","A — образец"]:
+        var label: Label=_label(compare_labels,label_text)
+        label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+        label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+    compare_labels.hide()
     renderer.enable_acceleration()
     _library()
     _refresh()
+func _inspector_page(label_text: String) -> VBoxContainer:
+    var scroll:=ScrollContainer.new()
+    scroll.name=label_text
+    scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+    inspector.add_child(scroll)
+    var content:=VBoxContainer.new()
+    content.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    scroll.add_child(content)
+    return content
+
+func _select_layer(index: int) -> void:
+    if index<0 or index>=preset.layers.size():return
+    selected=index
+    list.select(index)
+    _sync_fields()
+
+func _capture_reference() -> void:
+    reference=preset.duplicate(true)
+    compare_button.disabled=false
+    status.text="Образец A запомнен."
+    dirty=true
+
+func _make_compare() -> void:
+    if compare_viewport!=null:return
+    compare_viewport=SubViewport.new()
+    compare_viewport.size=Vector2i(240,160)
+    add_child(compare_viewport)
+    compare_stage=STAGE.new()
+    compare_viewport.add_child(compare_stage)
+    compare_surface=SURFACE.new()
+    compare_viewport.add_child(compare_surface)
+    compare_surface.configure(240,160)
+    compare_renderer=R.new()
+    compare_picture=TextureRect.new()
+    compare_picture.position=Vector2(434,112)
+    compare_picture.size=Vector2(240,160)
+    compare_picture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
+    compare_picture.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+    compare_picture.texture=compare_viewport.get_texture()
+    add_child(compare_picture)
+
+func _toggle_compare() -> void:
+    if reference.is_empty():return
+    _make_compare()
+    var show_compare: bool=not compare_labels.visible
+    compare_labels.visible=show_compare
+    compare_picture.visible=show_compare
+    compare_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS if show_compare else SubViewport.UPDATE_DISABLED
+    picture.position=Vector2(194,112) if show_compare else Vector2(194,44)
+    picture.size=Vector2(240,160) if show_compare else Vector2(480,320)
+    compare_button.text="Один вид" if show_compare else "A / B"
+    dirty=true
+
+func _effect_duration() -> float:
+    return maxf(P.duration(preset),P.duration(reference)) if compare_labels!=null and compare_labels.visible else P.duration(preset)
+
 func _select_demo(i: int) -> void:
     preset=P.demo(i)
     preset.name=UI.label(preset.name)
@@ -328,9 +428,9 @@ func _select_demo(i: int) -> void:
 
 func _toggle_play() -> void:
     playing=not playing
-    if playing and time>=P.duration(preset):time=0
+    if playing and time>=_effect_duration():time=0
 func _seek(v: float) -> void:
-    time=clampf(v,0,P.duration(preset))
+    time=clampf(v,0,_effect_duration())
     playing=false
     dirty=true
 func _change(key: String,v: Variant) -> void:
@@ -355,6 +455,7 @@ func _change(key: String,v: Variant) -> void:
         _sync_trail()
         _sync_organic()
         _sync_field()
+        _sync_visibility()
         _sync_curve()
         dirty=true
 func _refresh() -> void:
@@ -382,6 +483,7 @@ func _sync_fields() -> void:
     _sync_trail()
     _sync_organic()
     _sync_field()
+    _sync_visibility()
     _sync_curve()
     dirty=true
 
@@ -412,6 +514,7 @@ func _trail_change(key: String,value: Variant) -> void:
     if l.type!="trail":return
     l.trail[key]=value
     _sync_trail()
+    _sync_visibility()
     dirty=true
 
 func _sync_organic() -> void:
@@ -508,6 +611,7 @@ func _toggle_emitter(enabled: bool) -> void:
         l.emitter.life=float(l.duration) if float(l.duration)<=3.0 else 3.0
     else:l.erase("emitter")
     _sync_emitter()
+    _sync_visibility()
     _sync_curve()
     dirty=true
 
@@ -518,6 +622,31 @@ func _emitter_change(key: String,value: Variant) -> void:
     l.emitter[key]=value
     _emitter_summary()
     dirty=true
+
+func _sync_visibility() -> void:
+    var l: Dictionary=preset.layers[selected]
+    var particle: bool=l.type in P.PARTICLE_TYPES
+    var trail: bool=l.type=="trail"
+    var field: bool=l.type in P.FIELD_TYPES
+    var organic: bool=l.type in P.ORGANIC_TYPES
+    var counts: bool=(particle and not P.is_stream(l)) or l.type=="lightning" or l.type in ["shockwave","vortex","orb"]
+    var directional: bool=particle or l.type in ["lightning","slash","tendril"]
+    for key in ["speed","end_speed","gravity","collision"]:
+        field_rows[key].visible=particle
+    field_rows.count.visible=counts
+    field_rows.spread.visible=directional
+    field_rows.angle.visible=directional or field or organic
+    field_rows.follow.visible=not trail
+    if field:
+        for key in field_parameters:
+            if key!="aim":field_parameters[key].get_parent().visible=field_parameters[key].editable
+    if organic:
+        for key in ["arms","length","taper"]:
+            organic_fields[key].get_parent().visible=l.type=="tendril"
+    if trail:trail_fields.jitter.get_parent().visible=l.trail.style=="electric"
+    if not particle and curve_channel==2:curve_channel=0
+    curve_selector.set_item_disabled(2,not particle)
+    curve_selector.select(curve_channel)
 
 func _sync_curve() -> void:
     if graph==null:return
@@ -619,28 +748,41 @@ func _process(dt: float) -> void:
     clock+=dt
     if playing and clock>=1.0/30:
         time+=clock
-        var end: float=P.duration(preset)
+        var end: float=_effect_duration()
         if time>=end:
             if loop:time=fposmod(time,end)
             else:time=end;playing=false
         dirty=true
     if dirty:
         clock=0
-        time=minf(time,P.duration(preset))
+        time=minf(time,_effect_duration())
         stage.time=time
         stage.queue_redraw()
         renderer.render(surface.painter,preset,time,{},128,stage.anchor)
         surface.present()
+        if compare_labels.visible:
+            compare_stage.moving=stage.moving
+            compare_stage.sweep=stage.sweep
+            compare_stage.bright=stage.bright
+            compare_stage.time=time
+            compare_stage.queue_redraw()
+            if compare_renderer.accelerated!=renderer.accelerated:
+                compare_renderer.enable_acceleration(renderer.accelerated)
+            compare_renderer.render(compare_surface.painter,reference,time,{},128,compare_stage.anchor)
+            compare_surface.present()
         timeline.preset=preset
+        timeline.duration_override=_effect_duration()
         timeline.time=time
         timeline.selected=selected
         timeline.queue_redraw()
         _update_curve_cursor()
         syncing=true
-        seek.max_value=P.duration(preset)
+        seek.max_value=_effect_duration()
         seek.value=time
         syncing=false
         perf.text="%.2f с | слоёв %d | частиц %d | %.2f мс | %s"%[time,renderer.active_layers,renderer.particles,renderer.render_ms,"C++" if renderer.accelerated else "GDScript"]
+        compare_button.tooltip_text=perf.text
+        timeline.tooltip_text="ЛКМ — время и слой. Колесо — масштаб. СКМ — сдвиг. "+perf.text
         dirty=false
     play_button.text="Пауза" if playing else "Пуск"
 func _unhandled_input(e: InputEvent) -> void:

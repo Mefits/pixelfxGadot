@@ -76,5 +76,29 @@ func _run() -> void:
         check(is_equal_approx(float(scene.preset.layers[0].field.thickness),4.0),"Field inspector")
         await RenderingServer.frame_post_draw
         check(root.get_texture().get_image().save_png(dir.path_join("vfx-"+P.FIELD_TYPES[i]+".png"))==OK,"Capture field")
+    scene._select_demo(0)
+    scene._seek(.3)
+    await process_frame
+    await process_frame
+    check(scene.inspector.get_tab_count()==3,"Inspector tabs")
+    check(not scene.field_rows.speed.visible,"Hide irrelevant speed")
+    scene._capture_reference()
+    scene._toggle_compare()
+    scene._change("size",35.0)
+    check(float(scene.reference.layers[0].size)!=35.0,"Independent A snapshot")
+    await process_frame
+    await process_frame
+    check(scene.compare_picture.visible and scene.compare_renderer.active_layers>0,"A/B rendered")
+    check(scene.picture.size==Vector2(240,160) and scene.compare_picture.size==scene.picture.size,"Equal comparison scale")
+    scene.timeline.zoom_at(2.0,220.0)
+    check(scene.timeline.zoom>1 and scene.timeline.span()<scene.timeline.total(),"Timeline zoom")
+    scene.timeline.reset_view()
+    check(is_equal_approx(scene.timeline.time_at(scene.timeline.size.x-4),scene._effect_duration()),"Timeline full extent")
+    scene._select_layer(2)
+    check(scene.selected==2 and scene.list.is_selected(2),"Timeline layer selection")
+    await RenderingServer.frame_post_draw
+    check(root.get_texture().get_image().save_png(dir.path_join("vfx-compare.png"))==OK,"Capture comparison")
+    scene._toggle_compare()
+    check(scene.picture.size==Vector2(480,320) and not scene.compare_picture.visible,"Restore full preview")
     print("VFX workshop GL failures: ",failures)
     quit(0 if failures==0 else 1)
