@@ -9,8 +9,13 @@ const BATCH=preload("res://addons/pixelfx/native/batch.gd")
 const PAL=preload("res://addons/pixelfx/native/palette.gd")
 const RNG=preload("res://addons/pixelfx/native/rng.gd")
 const FX=preload("res://addons/creature/vfx_runtime.gd")
+const ABILITY=preload("res://addons/creature/ability.gd")
+const ABILITY_EDITOR=preload("res://lab/ability_dialog.gd")
 const BINDINGS=preload("res://addons/creature/vfx_bindings.gd")
 var world
+var ability_editor
+var phase_label: Label
+var ability_profile: Dictionary={}
 var canvas
 var surface
 var bolt=L.new()
@@ -65,6 +70,19 @@ func _ready() -> void:
     info.text="Игрок 1: A/D ходьба · W прыжок · F удар / в воздухе · H тяжёлый · J ногой · G магия · S блок\nИгрок 2: стрелки · K удар · L магия · O тяжёлый · P ногой | B бот · N динамика · X медл. · C эффекты · M трен. · R сброс · Tab редактор · Esc"
     info.add_theme_font_size_override("font_size",13)
     add_child(info)
+    ability_profile=ABILITY.load_profile()
+    phase_label=Label.new()
+    phase_label.position=Vector2(24,90)
+    phase_label.add_theme_font_size_override("font_size",13)
+    add_child(phase_label)
+    ability_editor=ABILITY_EDITOR.new()
+    add_child(ability_editor)
+    ability_editor.applied.connect(_apply_ability)
+    _reset()
+
+func _apply_ability(profile: Dictionary) -> void:
+    if not ABILITY.save_profile(profile):return
+    ability_profile=profile
     _reset()
 
 func _bar(at: Vector2) -> ProgressBar:
@@ -87,6 +105,7 @@ func _reset() -> void:
     world=COMBAT.new(CLIPS.fighter_bank(0),CLIPS.fighter_bank(1))
     world.custom_vfx=FX.new(BINDINGS.load_bank())
     world.custom_vfx.renderer.enable_acceleration(cpp)
+    world.a.set_ability(ability_profile)
     canvas.world=world
     world.modern=modern
     if training:
@@ -99,7 +118,8 @@ func _pressed(code: Key) -> bool:
 
 func _physics_process(dt: float) -> void:
     if world==null:return
-    var left: Dictionary={"move":float(_pressed(KEY_D))-float(_pressed(KEY_A)),"jump":_pressed(KEY_W),"strike":_pressed(KEY_F),"cast":_pressed(KEY_G),"heavy":_pressed(KEY_H),"kick":_pressed(KEY_J),"guard":_pressed(KEY_S)}
+    if ability_editor!=null and ability_editor.visible:return
+    var left: Dictionary={"move":float(_pressed(KEY_D))-float(_pressed(KEY_A)),"jump":_pressed(KEY_W),"strike":_pressed(KEY_F),"cast":_pressed(KEY_G),"heavy":_pressed(KEY_H),"kick":_pressed(KEY_J),"ability":_pressed(KEY_E),"guard":_pressed(KEY_S)}
     var right: Dictionary={"move":float(_pressed(KEY_RIGHT))-float(_pressed(KEY_LEFT)),"jump":_pressed(KEY_UP),"strike":_pressed(KEY_K),"cast":_pressed(KEY_L),"heavy":_pressed(KEY_O),"kick":_pressed(KEY_P),"guard":_pressed(KEY_DOWN)}
     if training:right={}
     elif bot:
@@ -124,6 +144,8 @@ func _update_hud() -> void:
     hp1.value=world.a.hp
     hp2.value=world.b.hp
     detail.text="Динамика: %s · %s · посл. серия %d (макс. %d) · блоков %d · F→F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
+    var phase: String=ABILITY.phase_at(world.a.ability,world.a.t) if world.a.state=="ability" else ""
+    phase_label.text="E — способность · Q — настройка | "+str({"charge":"Заряд","dash":"Рывок","contact":"Контакт","recovery":"Восстановление","done":"Конец"}.get(phase,"Готова"))
     hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["ТРЕНИРОВКА" if training else ("БОТ" if bot else "2 ИГРОКА"),world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:
@@ -173,6 +195,7 @@ func _vfx() -> void:
 func _unhandled_input(e: InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
         match UI.physical_key(e):
+            KEY_Q:ability_editor.open_for(ability_profile)
             KEY_B:bot=not bot
             KEY_R:_reset()
             KEY_V:debug=not debug

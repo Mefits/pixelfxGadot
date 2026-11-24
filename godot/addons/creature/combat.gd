@@ -73,7 +73,10 @@ func _tick(left: Dictionary,right: Dictionary) -> void:
             impact_time=.18
             last_impact=h.p
             var role: String="block" if h.blocked else "impact"
-            var custom: bool=_custom(role,null,"",h.p,h.p,h.direction)
+            var custom: bool=false
+            if not h.blocked and custom_vfx!=null and not h.get("ability_impact",{}).is_empty():
+                custom=custom_vfx.spawn_preset(h.ability_impact,null,"",h.p,h.p,h.direction)
+            if not custom:custom=_custom(role,null,"",h.p,h.p,h.direction)
             flashes.append({"kind":role,"a":h.p,"b":h.p,"age":0.0,"life":.16,"direction":h.direction,"custom":custom})
     for i in range(flashes.size()-1,-1,-1):
         flashes[i].age+=DT
@@ -100,8 +103,8 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
             flashes.append({"kind":"charge","a":hand,"b":hand,"age":0.0,"life":.3,"owner":src,"anchor":e.anchor,"custom":_custom("charge",src,e.anchor,hand,chest,direction)})
         "strike":
             flashes.append({"kind":"strike","a":hand,"b":hand+Vector2(direction*9,-3),"age":0.0,"life":.15,"custom":_custom(e.attack_kind,src,e.anchor,hand,chest,direction)})
-            if forward and hand.distance_to(chest)<=19 and dst.hp>0:
-                amount=25 if e.attack_kind=="heavy" else (17 if e.attack_kind=="kick" else (15 if e.attack_kind=="air_strike" else 13))
+            if forward and hand.distance_to(chest)<=float(e.get("ability_reach",19.0)) and dst.hp>0:
+                amount=int(e.get("ability_damage",25 if e.attack_kind=="heavy" else (17 if e.attack_kind=="kick" else (15 if e.attack_kind=="air_strike" else 13))))
         "cast":
             var target: Vector2=hand+Vector2(direction*104,0)
             # Point-blank targets may be between chest and extended casting hand.
@@ -111,4 +114,4 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
                 amount=20
             flashes.append({"kind":"cast","a":hand,"b":target,"age":0.0,"life":.21,"custom":_custom("cast",src,e.anchor,hand,target,direction)})
     if amount>0:
-        outcomes.append({"src":src,"dst":dst,"amount":amount,"direction":direction,"blocked":dst.guard and direction==-dst.facing,"time":e.attack_time,"chain":e.chain,"p":chest})
+        outcomes.append({"src":src,"dst":dst,"amount":amount,"direction":direction,"blocked":dst.guard and direction==-dst.facing,"time":e.attack_time,"chain":e.chain,"p":chest,"ability_impact":e.get("ability_impact",{})})

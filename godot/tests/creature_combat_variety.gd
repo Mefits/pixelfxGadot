@@ -36,7 +36,60 @@ func _check_contact_direction(bank: Dictionary)->void:
             w._event(w.a,w.b,event,outcomes)
             check(outcomes.is_empty(),"No distant hit "+kind)
 
+func _ability_regression()->void:
+    var A=preload("res://addons/creature/ability.gd")
+    var FX=preload("res://addons/creature/vfx_runtime.gd")
+    var profile: Dictionary=A.defaults()
+    check(A.valid(profile),"Ability profile valid")
+    var clip: Dictionary=A.compile(profile)
+    check(clip.keys.size()==5 and clip.events.size()==3,"Ability compilation")
+    check(is_equal_approx(float(clip.duration),1.02),"Phase total duration")
+    check(A.phase_at(profile,.1)=="charge" and A.phase_at(profile,.4)=="dash" and A.phase_at(profile,.7)=="contact" and A.phase_at(profile,.8)=="recovery","Phase transitions")
+    var altered: Dictionary=profile.duplicate(true)
+    altered.phases[0].duration=.5
+    check(is_equal_approx(float(A.compile(altered).duration),1.2),"Retimed ability")
+    check(A.save_profile(altered,"user://test_ability.json"),"Save ability profile")
+    check(is_equal_approx(float(A.load_profile("user://test_ability.json").phases[0].duration),.5),"Load ability profile")
+    altered.damage=61
+    check(not A.valid(altered) and A.compile(altered).is_empty(),"Reject invalid ability")
+    for side in [1,-1]:
+        var w=W.new(C.defaults())
+        w.custom_vfx=FX.new()
+        check(w.a.set_ability(profile),"Install ability")
+        w.a.pos.x=160-side*25
+        w.b.pos.x=160+side*25
+        var seen: Dictionary={}
+        var initial: float=w.a.pos.x
+        var moved: bool=false
+        var passed: bool=false
+        var visual: bool=false
+        for i in range(210):
+            w.step(W.DT,{"ability":true},{})
+            if w.a.state=="ability":seen[A.phase_at(profile,w.a.t)]=true
+            if (w.a.pos.x-initial)*side>10:moved=true
+            if (w.b.pos.x-w.a.pos.x)*side<0:passed=true
+            if not w.custom_vfx.active.is_empty():visual=true
+        check(seen.has("charge") and seen.has("dash") and seen.has("contact") and seen.has("recovery"),"All four phases")
+        check(moved and not passed,"Dash moves toward but not through target")
+        check(w.a.attacks_started==1,"Held key does not repeat ability")
+        check(w.hits<=1,"Single contact marker")
+        check(visual,"Phase VFX emitted")
+    # Exact contact outcome independent of the pose/motor test.
+    var direct=W.new(C.defaults())
+    direct.a.pos.x=100
+    direct.b.pos.x=125
+    var at: Vector2=direct.b.point("chest")
+    var e: Dictionary={"kind":"strike","world_anchor":at,"world_chest":direct.a.point("chest"),"direction":1,"anchor":"hand_near","attack_kind":"ability","attack_time":.74,"chain":1,"ability_damage":24,"ability_reach":19.0,"ability_impact":profile.impact}
+    var outcomes: Array=[]
+    direct._event(direct.a,direct.b,e,outcomes)
+    check(outcomes.size()==1 and outcomes[0].amount==24,"Ability contact damage")
+    outcomes.clear()
+    e.world_anchor=at+Vector2(50,0)
+    direct._event(direct.a,direct.b,e,outcomes)
+    check(outcomes.is_empty(),"Ability misses outside reach")
+
 func _run()->void:
+    _ability_regression()
     var bank:Dictionary=C.defaults()
     check(C.valid(bank) and bank.size()==12,"Extended bank valid")
     var old:Dictionary=bank.duplicate(true)
