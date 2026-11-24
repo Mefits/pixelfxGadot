@@ -33,6 +33,14 @@ var info:Label
 func _ready()->void:
     smoke=not manual and "--smoke" in OS.get_cmdline_user_args()
     if entry.is_empty():entry=API.read("res://content/template.json")
+    if not manual:
+        var args:PackedStringArray=OS.get_cmdline_user_args()
+        var index:int=args.find("--anatomy")
+        if index>=0:
+            if index+1>=args.size():push_error("Missing --anatomy path");get_tree().quit(1);return
+            var selected:Dictionary=API.read(args[index+1])
+            if selected.is_empty() or selected.kind!="creature":push_error("Invalid anatomy override");get_tree().quit(1);return
+            anatomy_override=selected.payload
     if entry.is_empty():push_error("Invalid exported template");get_tree().quit(1);return
     surface=SURFACE.new()
     add_child(surface)
@@ -89,7 +97,7 @@ func advance_frame(dt:float,axis:float=0,trigger:bool=false,jump:bool=false)->vo
         if entry.kind=="creature":
             if smoke:axis=1
         elif not attempted and (trigger or (smoke and creature.grounded)):
-            if manual:
+            if manual or (smoke and not anatomy_override.is_empty()):
                 var head:Vector2=creature.body.point("front")
                 var distance:float=29 if entry.payload.type=="grab" else (22 if entry.payload.type=="claw" else 35)
                 target.p=head+Vector2(distance,0)
@@ -118,6 +126,7 @@ func advance_frame(dt:float,axis:float=0,trigger:bool=false,jump:bool=false)->vo
         if creature!=null:ok=creature.body.finite() and creature.body.penetration()<.1
         if entry.kind=="ability":ok=ok and (attempted if creature!=null else world.a.attacks_started==1)
         if not ok:push_error("DEMO_SMOKE_FAILED");get_tree().quit(1);return
+        print("DEMO_DIAGNOSTICS ",JSON.stringify(diagnostics(),"",true,true))
         print("DEMO_SMOKE_OK ",entry.kind," ",entry.get("id",""))
         get_tree().quit()
 func _unhandled_input(e:InputEvent)->void:

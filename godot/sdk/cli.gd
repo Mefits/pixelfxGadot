@@ -112,6 +112,7 @@ func _simulate(e:Dictionary,ability:Dictionary,with_ability:bool,ticks:int)->voi
     var c=API.create_creature(e,Vector2(100,150),boxes)
     var target:Dictionary={}
     var start:Vector2=c.body.point("front")
+    var target_start:=Vector2.ZERO
     var started:bool=false
     var events:Array=[]
     var max_pen:float=0
@@ -125,6 +126,7 @@ func _simulate(e:Dictionary,ability:Dictionary,with_ability:bool,ticks:int)->voi
             var front:Vector2=c.body.point("front")
             var distance:float=29 if ability.payload.type=="grab" else (22 if ability.payload.type=="claw" else 35)
             target={"id":"sdk","p":front+Vector2(distance,0),"r":8.0,"hp":100}
+            target_start=target.p
             c.attack.targets.assign([target])
             started=c.special.begin(c,target)
         var axis:float=0.0 if with_ability or i<120 else 1.0
@@ -141,4 +143,4 @@ func _simulate(e:Dictionary,ability:Dictionary,with_ability:bool,ticks:int)->voi
         max_support=maxi(max_support,c.limbs.support_count)
     var end:Vector2=c.body.point("front")
     var ok:bool=finite and max_pen<.1 and (started if with_ability else end.x>start.x+10)
-    _reply(ok,{"ticks":ticks,"finite":finite,"max_penetration":max_pen,"max_constraint_error":max_error,"max_support":max_support,"displacement":[end.x-start.x,end.y-start.y],"ability_started":started,"hits":c.special.hits+c.attack.hit_count,"target_hp":target.get("hp",100),"tail_delta":c.tail_count-old_tail,"events":events,"anatomy":c.anatomy_snapshot()})
+    _reply(ok,{"ticks":ticks,"finite":finite,"max_penetration":max_pen,"max_constraint_error":max_error,"max_support":max_support,"displacement":[end.x-start.x,end.y-start.y],"ability_started":started,"hits":c.special.hits+c.attack.hit_count,"target_hp":target.get("hp",100),"target_moved":Vector2(target.get("p",Vector2.ZERO)).distance_to(target_start),"tail_delta":c.tail_count-old_tail,"events":events,"anatomy":c.anatomy_snapshot()})

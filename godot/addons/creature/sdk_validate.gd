@@ -3,7 +3,7 @@ extends RefCounted
 ## Does not replace the permissive legacy loader. Paths are JSON Pointers.
 const API=preload("res://addons/creature/kit_api.gd")
 const PATH="res://addons/creature/template.schema.json"
-const VERSION="0.31"
+const VERSION="0.35"
 const LIMIT=64
 var errors:Array=[]
 var warnings:Array=[]
