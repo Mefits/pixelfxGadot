@@ -69,7 +69,8 @@ static func curve(u: float,kind: String) -> float:
 static func filename(name: String) -> String:
     var clean: String=""
     for ch in name:
-        if ch.is_valid_identifier() or ch.is_valid_int() or ch in ["-"," "]:clean+=ch
+        var code: int=ch.unicode_at(0)
+        if ch.is_valid_identifier() or ch.is_valid_int() or ch in ["-"," "] or (code>=0x0400 and code<=0x052f):clean+=ch
     clean=clean.strip_edges().replace(" ","_").left(60)
     return clean if not clean.is_empty() else "effect"
 static func save_preset(p: Dictionary,path: String="") -> bool:

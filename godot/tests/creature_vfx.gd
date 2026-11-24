@@ -41,6 +41,11 @@ func _run() -> void:
             var original: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
             renderer.render(paint,loaded,t,anchors,128)
             check(original==paint.rgba_bytes()+paint.rgba_bytes(true),"Roundtrip pixel equality")
+    var ru: Dictionary=P.demo()
+    ru.name="Молния синяя"
+    check(P.filename(ru.name)=="Молния_синяя","Cyrillic filename")
+    check(P.save_preset(ru),"Save Russian preset")
+    check(P.load_preset(P.FOLDER.path_join("Молния_синяя.json")).get("name")=="Молния синяя","Russian name roundtrip")
     p.layers[0].duration=-1
     check(not P.valid(p),"Reject invalid data")
     var q: Dictionary={"schema":1,"name":"anchor","seed":1,"layers":[P.layer("glow")]}

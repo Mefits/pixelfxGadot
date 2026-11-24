@@ -23,10 +23,14 @@ func _run() -> void:
     change_scene_to_file("res://lab/main.tscn")
     await process_frame
     await process_frame
-    current_scene._open("res://lab/vfx_workshop.tscn")
+    var russian_key:=InputEventKey.new()
+    russian_key.keycode=0x43D
+    russian_key.physical_keycode=KEY_Y
+    russian_key.pressed=true
+    current_scene._unhandled_input(russian_key)
     await process_frame
     await process_frame
-    check(current_scene.scene_file_path=="res://lab/vfx_workshop.tscn","Launch VFX from menu")
+    check(current_scene.scene_file_path=="res://lab/vfx_workshop.tscn","Launch VFX using physical Y on Russian layout")
     change_scene_to_file("res://lab/main.tscn")
     await process_frame
     await process_frame

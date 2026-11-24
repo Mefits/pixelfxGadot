@@ -63,7 +63,8 @@ func _ready() -> void:
     left.size=Vector2(172,475)
     add_child(left)
     _label(left,"ПРЕСЕТЫ")
-    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня"],func(i:int):preset=P.demo(i);selected=0;_refresh())
+    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня"],_select_demo)
+    preset.name=UI.label(preset.name)
     name_edit=LineEdit.new()
     name_edit.placeholder_text="Имя эффекта"
     left.add_child(name_edit)
@@ -116,7 +117,8 @@ func _ready() -> void:
     _button(controls,"Цикл",func():loop=not loop;status.text="Цикл: "+str(loop))
     _button(controls,"Движение",func():stage.moving=not stage.moving;dirty=true)
     _button(controls,"Фон",func():stage.bright=not stage.bright;dirty=true)
-    _button(controls,"Seed",func():preset.seed=int(preset.seed)+1;dirty=true)
+    var variant:=_button(controls,"Вариант",func():preset.seed=int(preset.seed)+1;dirty=true)
+    variant.tooltip_text="Новая случайная конфигурация при тех же параметрах"
     _button(controls,"C++",func():renderer.enable_acceleration(not renderer.accelerated);dirty=true)
     perf=Label.new()
     perf.position=Vector2(194,401)
@@ -180,6 +182,12 @@ func _ready() -> void:
     renderer.enable_acceleration()
     _library()
     _refresh()
+func _select_demo(i: int) -> void:
+    preset=P.demo(i)
+    preset.name=UI.label(preset.name)
+    selected=0
+    _refresh()
+
 func _toggle_play() -> void:
     playing=not playing
     if playing and time>=P.duration(preset):time=0
@@ -199,7 +207,7 @@ func _refresh() -> void:
         list.add_item("%d  %s %s"%[i+1,UI.label(l.type),"" if l.enabled else "(выкл.)"])
     selected=clampi(selected,0,preset.layers.size()-1)
     list.select(selected)
-    name_edit.text=UI.label(preset.name)
+    name_edit.text=preset.name
     _sync_fields()
 func _sync_fields() -> void:
     syncing=true

@@ -28,6 +28,7 @@ func _run() -> void:
     check(ed.bank.strike.keys.size()==n+1,"Editor add key")
     ed._add_event()
     check(ed.bank.strike.events.size()==2,"Editor event insert")
+    check(ed.event_kind.get_item_text(0)=="Удар" and ed.bank.strike.events[0].kind=="strike","Localized event retains stable ID")
     ed._seek(.2)
     await process_frame
     check(ed.fighter_select.get_global_rect().end.x<=960,"Fighter chooser inside viewport")
