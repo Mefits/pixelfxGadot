@@ -1,7 +1,8 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.29"
+const VERSION="0.30"
+const EXP=preload("res://addons/creature/kit_export.gd")
 const CAT=preload("res://addons/creature/catalog.gd")
 const PREVIEW=preload("res://lab/catalog_preview.gd")
 const SECTIONS=[
@@ -32,6 +33,9 @@ var viewport:SubViewport
 var picture:TextureRect
 var preview
 var import_dialog:FileDialog
+var export_dialog:FileDialog
+var export_button:Button
+var pending_export:Dictionary={}
 func _ready() -> void:
     var layer:=CanvasLayer.new()
     add_child(layer)
@@ -108,7 +112,7 @@ func _ready() -> void:
     picture.hide()
     root.add_child(picture)
     detail_label=_label(root,"Выбери шаблон из списка.",Vector2(632,330),14,Color("#c4d0db"))
-    detail_label.size=Vector2(300,103)
+    detail_label.size=Vector2(300,76)
     detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     open_button=Button.new()
     open_button.text="Открыть в редакторе"
@@ -124,6 +128,20 @@ func _ready() -> void:
     copy_button.disabled=true
     root.add_child(copy_button)
     copy_button.pressed.connect(_copy_entry)
+    export_button=Button.new()
+    export_button.text="Экспорт в игру (ZIP)"
+    export_button.position=Vector2(632,412)
+    export_button.size=Vector2(300,30)
+    export_button.disabled=true
+    root.add_child(export_button)
+    export_button.pressed.connect(_begin_export)
+    export_dialog=FileDialog.new()
+    export_dialog.file_mode=FileDialog.FILE_MODE_SAVE_FILE
+    export_dialog.access=FileDialog.ACCESS_FILESYSTEM
+    export_dialog.filters=PackedStringArray(["*.zip ; Godot runtime package"])
+    root.add_child(export_dialog)
+    export_dialog.file_selected.connect(_export_entry)
+    export_dialog.canceled.connect(func():pending_export.clear())
     import_dialog=FileDialog.new()
     import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
     import_dialog.access=FileDialog.ACCESS_FILESYSTEM
@@ -159,6 +177,7 @@ func _clear_preview()->void:
     detail_label.text="Выбери шаблон из списка."
     open_button.disabled=true
     copy_button.disabled=true
+    export_button.disabled=true
 
 func _selected_entry()->Dictionary:
     var selected:PackedInt32Array=catalog_list.get_selected_items()
@@ -186,6 +205,8 @@ func _select_entry(i:int)->void:
     detail_label.text=e.name+"\n"+source+"\n"+detail
     open_button.disabled=false
     copy_button.disabled=false
+    export_button.disabled=not EXP.available()
+    if not EXP.available():export_button.tooltip_text="Runtime ZIP не включён. Используй полный проверенный пакет."
 
 func _open_entry()->void:
     var e:Dictionary=_selected_entry()
@@ -206,6 +227,20 @@ func _copy_entry()->void:
     if saved.is_empty():status.text="Не удалось сохранить копию";return
     _reload()
     status.text="Копия сохранена: "+str(saved.name)
+
+func _begin_export()->void:
+    pending_export=_selected_entry().duplicate(true)
+    if pending_export.is_empty():return
+    export_dialog.current_file="creature_template_"+str(int(Time.get_unix_time_from_system()))+".zip"
+    export_dialog.popup_centered_ratio(.75)
+
+func _export_entry(path:String)->void:
+    if pending_export.is_empty():return
+    var err:Error=EXP.export_entry(pending_export,path)
+    pending_export.clear()
+    if err==OK:status.text="ZIP сохранён: "+path.get_file()
+    elif err==ERR_ALREADY_EXISTS:status.text="Файл уже существует. Выбери новое имя."
+    else:status.text="Ошибка экспорта: "+error_string(err)
 
 func _import_entry(path:String)->void:
     var saved:Dictionary=CAT.import_file(path)

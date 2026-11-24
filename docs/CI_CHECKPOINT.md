@@ -12,3 +12,6 @@ Five physical body profiles, bounded branched chains, upright two-leg prototype,
 
 ## v0.29 physical ability checkpoint
 Six portable physical profiles, bounded tip-directed grab, swept projectile and acid ticks, live mutation, catalogue handoff and compatible picker. Full regression suite, no art acceptance claim.
+
+## v0.30 portable checkpoint
+Validate source runtime dependency closure and five independent exported projects. Preserve prior complete regression checks. Export is source-only GDScript; no Windows desktop rebuild yet.

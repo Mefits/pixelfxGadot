@@ -35,6 +35,9 @@ jobs:
           cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md docs/VFX_WORKSHOP.md docs/TOOLKIT_RU.md /tmp/complete/docs/
           cp SKILL.md AGENTS.md PORTABLE.md /tmp/complete/
           printf '%s\n' "$GITHUB_SHA" > /tmp/complete/CREATURE_REVISION.txt
+          python3 tools/build_creature_runtime.py --project /tmp/complete/godot --example portable_example --licenses /tmp/complete
+          cp -a portable_example /tmp/complete/
+          cp tools/build_creature_runtime.py /tmp/complete/tools/
       - name: Install Godot
         run: |
           curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
@@ -66,6 +69,33 @@ jobs:
           if [ "$failed" -ne 0 ]; then exit 1; fi
           rm -rf .godot
           find . -name '*.import' -delete
+      - name: Verify portable ZIPs in independent clean Godot projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CREATURE_EXPORT_TEST_DIR=/tmp/export-tests
+          mkdir -p "$CREATURE_EXPORT_TEST_DIR" /tmp/standalone
+          cd /tmp/complete/godot
+          godot --headless --editor --import 2>&1 | tee /tmp/export-import.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/export-import.log
+          timeout 60s godot --headless --script res://tests/creature_export.gd 2>&1 | tee /tmp/export-test.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/export-test.log
+          test "$(find "$CREATURE_EXPORT_TEST_DIR" -name '*.zip' | wc -l)" -eq 5
+          for zip in "$CREATURE_EXPORT_TEST_DIR"/*.zip; do
+            name="$(basename "$zip" .zip)"
+            dest="/tmp/standalone/$name"
+            mkdir -p "$dest"
+            unzip -q "$zip" -d "$dest"
+            test ! -d "$dest/lab"
+            cd "$dest"
+            timeout 45s godot --headless --editor --import 2>&1 | tee "/tmp/standalone-$name-import.log"
+            ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/standalone-$name-import.log"
+            timeout 45s godot --headless -- --smoke 2>&1 | tee "/tmp/standalone-$name.log"
+            grep DEMO_SMOKE_OK "/tmp/standalone-$name.log"
+            ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/standalone-$name.log"
+          done
+          rm -rf /tmp/complete/godot/.godot
+          find /tmp/complete/godot -name '*.import' -delete
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -75,6 +105,10 @@ jobs:
         with:
           name: Animation-Creature-Previews
           path: /tmp/complete/reports/*.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Creature-Standalone-Examples
+          path: /tmp/export-tests/*.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Animation-Creature-Lab-Complete
