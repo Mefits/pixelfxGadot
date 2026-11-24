@@ -99,7 +99,7 @@ func _ready() -> void:
     scope=OptionButton.new()
     scope.position=Vector2(274,160)
     scope.size=Vector2(339,30)
-    for value in ["Все шаблоны","Мои шаблоны","Избранное","Недавние"]:scope.add_item(value)
+    for value in ["Все шаблоны","Мои шаблоны","Избранное","Недавние","Корзина"]:scope.add_item(value)
     root.add_child(scope)
     scope.item_selected.connect(func(_i:int):_filter())
     catalog_list=ItemList.new()
@@ -185,7 +185,7 @@ func _filter()->void:
     filtered.clear()
     catalog_list.clear()
     var kind:String="" if category.selected<=0 else CAT.KINDS[category.selected-1]
-    var ordered:Array=entries.duplicate()
+    var ordered:Array=CAT.scan_trash() if scope.selected==4 else entries.duplicate()
     if scope.selected==3:
         ordered.sort_custom(func(a:Dictionary,b:Dictionary):return view_state.recent.find(a.id)<view_state.recent.find(b.id))
     for e in ordered:
@@ -195,7 +195,7 @@ func _filter()->void:
         var star:String="☆ " if e.id in view_state.favorites else ""
         catalog_list.add_item(star+prefix+e.name+" · "+CAT.LABELS[e.kind])
     _clear_preview()
-    status.text="Шаблонов: %d / %d · ☆ избранное · ★ копия · ● сохранённый"%[filtered.size(),entries.size()]
+    status.text="В корзине: %d · выбери копию и нажми «Восстановить»"%filtered.size() if scope.selected==4 else "Шаблонов: %d / %d · ☆ избранное · ★ копия · ● сохранённый"%[filtered.size(),entries.size()]
 
 func _clear_preview()->void:
     if is_instance_valid(preview):
@@ -206,6 +206,7 @@ func _clear_preview()->void:
     picture.hide()
     detail_label.text="Выбери шаблон из списка."
     open_button.disabled=true
+    open_button.text="Открыть в редакторе"
     copy_button.disabled=true
     export_button.disabled=true
     favorite_button.disabled=true
@@ -226,7 +227,7 @@ func _select_entry(i:int)->void:
     preview.set_entry(e)
     viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
     picture.show()
-    var source:String={"builtin":"Встроенный шаблон","library":"Копия библиотеки","saved":"Сохранённый файл"}.get(e.source,"")
+    var source:String={"builtin":"Встроенный шаблон","library":"Копия библиотеки","saved":"Сохранённый файл","trash":"В корзине"}.get(e.source,"")
     var detail:String=""
     match e.kind:
         "vfx":detail="%d слоёв"%e.payload.layers.size()
@@ -244,10 +245,21 @@ func _select_entry(i:int)->void:
     trash_button.disabled=e.source!="library"
     export_button.disabled=not EXP.available()
     if not EXP.available():export_button.tooltip_text="Runtime ZIP не включён. Используй полный проверенный пакет."
+    if e.source=="trash":
+        open_button.text="Восстановить"
+        copy_button.disabled=true
+        export_button.disabled=true
+        favorite_button.disabled=true
 
 func _open_entry()->void:
     var e:Dictionary=_selected_entry()
     if e.is_empty():return
+    if e.source=="trash":
+        var restored:Error=CAT.restore_copy(e.id)
+        if restored!=OK:status.text="Ошибка восстановления: "+error_string(restored);return
+        _show_saved(e.id)
+        status.text="Копия восстановлена: "+e.name
+        return
     get_tree().set_meta(CAT.HANDOFF,e.duplicate(true))
     var err:Error=get_tree().change_scene_to_file("res://lab/"+CAT.route(e)+".tscn")
     if err!=OK:
@@ -257,7 +269,7 @@ func _open_entry()->void:
 
 func _copy_entry()->void:
     var e:Dictionary=_selected_entry()
-    if e.is_empty():return
+    if e.is_empty() or e.source=="trash":return
     var value:Dictionary=e.duplicate(true)
     value.name=(str(e.name)+" — копия").left(120)
     if e.kind in ["vfx","ability","creature"]:value.payload.name=value.name
@@ -268,7 +280,7 @@ func _copy_entry()->void:
 
 func _begin_export()->void:
     pending_export=_selected_entry().duplicate(true)
-    if pending_export.is_empty():return
+    if pending_export.is_empty() or pending_export.source=="trash":return
     export_dialog.current_file="creature_template_"+str(int(Time.get_unix_time_from_system()))+".zip"
     export_dialog.popup_centered_ratio(.75)
 
@@ -387,7 +399,7 @@ func _show_saved(id:String)->void:
     _select_id(id)
 func _favorite()->void:
     var e:Dictionary=_selected_entry()
-    if e.is_empty():return
+    if e.is_empty() or e.source=="trash":return
     view_state.toggle(e.id)
     _filter()
     _select_id(e.id)
@@ -418,4 +430,4 @@ func _trash_confirmed()->void:
     if err!=OK:status.text="Не удалось переместить: "+error_string(err);return
     view_state.remove(id)
     _reload()
-    status.text="Копия в корзине. Файл сохранён в user://creature_library_trash."
+    status.text="Копия в корзине. Можно восстановить через фильтр «Корзина»."

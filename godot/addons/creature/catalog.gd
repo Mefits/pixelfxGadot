@@ -172,3 +172,26 @@ static func trash_copy(id:String)->Error:
     var target:String=TRASH.path_join(id+".json")
     if FileAccess.file_exists(target):return ERR_ALREADY_EXISTS
     return DirAccess.rename_absolute(source,target)
+
+static func scan_trash()->Array:
+    var out:Array=[]
+    var dir:=DirAccess.open(TRASH)
+    if dir==null:return out
+    for file in dir.get_files():
+        if not file.ends_with(".json") or not safe_id(file.get_basename()):continue
+        var e:Dictionary=read_entry(TRASH.path_join(file))
+        if e.is_empty():continue
+        e.id=file.get_basename()
+        e.source="trash"
+        out.append(e)
+    return out
+
+static func restore_copy(id:String)->Error:
+    if not safe_id(id):return ERR_INVALID_PARAMETER
+    var source:String=TRASH.path_join(id+".json")
+    if read_entry(source).is_empty():return ERR_FILE_NOT_FOUND
+    var err:Error=DirAccess.make_dir_recursive_absolute(FOLDER)
+    if err!=OK:return err
+    var destination:String=FOLDER.path_join(id+".json")
+    if FileAccess.file_exists(destination):return ERR_ALREADY_EXISTS
+    return DirAccess.rename_absolute(source,destination)

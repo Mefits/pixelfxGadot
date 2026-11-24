@@ -68,6 +68,8 @@ var saved_preset:Dictionary={}
 var unsaved_label:Label
 var leave_dialog:ConfirmationDialog
 var pending_action:Callable
+var demos:OptionButton
+var demo_index:int=0
 var advanced_mode:bool=false
 var mode_button:Button
 var delete_button:Button
@@ -117,7 +119,7 @@ func _ready() -> void:
     left.size=Vector2(172,475)
     add_child(left)
     _label(left,"ПРЕСЕТЫ")
-    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань","Ударная волна","Энергетический луч","Вихрь","Энергетическая сфера","Разлом"],func(i:int):_guard_change(func():_select_demo(i)))
+    demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань","Ударная волна","Энергетический луч","Вихрь","Энергетическая сфера","Разлом"],_request_demo)
     demos.fit_to_longest_item=false
     demos.clip_text=true
     preset.name=UI.label(preset.name)
@@ -131,7 +133,7 @@ func _ready() -> void:
     var io:=HBoxContainer.new()
     left.add_child(io)
     UI.action_button(_button(io,"Сохранить",_save),"Ctrl+S",true)
-    _button(io,"Загрузить",func():_guard_change(_load))
+    _button(io,"Загрузить",_request_load)
     library=OptionButton.new()
     library.fit_to_longest_item=false
     library.clip_text=true
@@ -534,6 +536,8 @@ func _effect_duration() -> float:
 
 func _select_demo(i: int) -> void:
     catalog_entry={}
+    demo_index=i
+    demos.select(i)
     preset=P.demo(i)
     preset.name=UI.label(preset.name)
     selected=0
@@ -884,7 +888,9 @@ func _save_current()->bool:
     return true
 func _load() -> void:
     if library.selected<0:return
-    var value: Dictionary=P.load_preset(P.FOLDER.path_join(library.get_item_text(library.selected)))
+    _load_path(P.FOLDER.path_join(library.get_item_text(library.selected)))
+func _load_path(path:String)->void:
+    var value:Dictionary=P.load_preset(path)
     if value.is_empty():status.text="Неверный файл";return
     catalog_entry={}
     preset=value
@@ -1041,7 +1047,7 @@ func _make_leave_dialog()->void:
         if action==&"discard":
             leave_dialog.hide()
             _run_pending())
-    leave_dialog.canceled.connect(func():pending_action=Callable())
+    leave_dialog.canceled.connect(func():pending_action=Callable();demos.select(demo_index))
 func _guard_change(action:Callable)->void:
     if not _has_changes():action.call();return
     pending_action=action
@@ -1052,3 +1058,11 @@ func _run_pending()->void:
     if action.is_valid():action.call()
 func _leave(path:String)->void:
     _guard_change(func():get_tree().change_scene_to_file(path))
+
+func _request_demo(i:int)->void:
+    demos.select(demo_index)
+    _guard_change(func():_select_demo(i))
+func _request_load()->void:
+    if library.selected<0:return
+    var path:String=P.FOLDER.path_join(library.get_item_text(library.selected))
+    _guard_change(func():_load_path(path))

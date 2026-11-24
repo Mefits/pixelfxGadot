@@ -40,4 +40,5 @@ func includes(e:Dictionary,scope:int)->bool:
         1:return e.source!="builtin"
         2:return e.id in favorites
         3:return e.id in recent
+        4:return e.source=="trash"
     return true
