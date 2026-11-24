@@ -35,7 +35,7 @@ class PixelFXOriginal : public RefCounted {
     void exception(){
         JSValue e=JS_GetException(ctx);
         error=str(e);JSValue stack=JS_GetPropertyStr(ctx,e,"stack");
-        if(!JS_IsException(stack)&&!JS_IsUndefined(stack)){String s=str(stack);if(!s.is_empty())error+="\n"+s;}
+        if(!JS_IsException(stack)&&!JS_IsUndefined(stack)){String s=str(stack);if(!s.is_empty())error+=String("\n")+s;}
         JS_FreeValue(ctx,stack);JS_FreeValue(ctx,e);
     }
     JSValue jsstr(const String &v){CharString s=v.utf8();return JS_NewStringLen(ctx,s.get_data(),s.length());}
@@ -109,6 +109,7 @@ public:
         size_t bytes=size_t(color.size())*4;
         JSValue c=JS_NewArrayBufferCopy(ctx,reinterpret_cast<const uint8_t*>(color.ptr()),bytes);
         JSValue l=JS_NewArrayBufferCopy(ctx,reinterpret_cast<const uint8_t*>(light.ptr()),bytes);
+        if(JS_IsException(c)||JS_IsException(l)){JS_FreeValue(ctx,c);JS_FreeValue(ctx,l);exception();return Array();}
         JSValue out=call("render",{integer(handle),integer(w),integer(h),integer(ox),integer(oy),jsstr(layer),JS_NewBool(ctx,body),JS_NewBool(ctx,target),c,l});
         Array a;
         if(!JS_IsException(out)){

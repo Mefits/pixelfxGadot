@@ -16,3 +16,6 @@ godot/addons/pixelfx/pixelfx.gdextension
 native_cpp/quickjs-ng/
 native_cpp/quickjs-build/
 tools/.original-entry.mjs
+
+godot/generated/original_bundle.txt
+godot/generated/original_catalog.json

@@ -5,7 +5,7 @@ var backend: Object
 var error: String=""
 var entries: Array=[]
 
-func open(path: String="res://generated/original_runtime/bundle.txt") -> bool:
+func open(path: String="res://generated/original_bundle.txt") -> bool:
     if not ClassDB.class_exists("PixelFXOriginal"):
         error="Original runtime extension unavailable"
         return false
