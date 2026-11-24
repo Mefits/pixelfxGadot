@@ -30,10 +30,15 @@ var jump_buffer: float=0
 var jump_held: bool=true
 var jump_cut: bool=false
 var airborne_jump: bool=false
-var turn_progress: float=1
-var turn_from: float=1
+var air_time: float=0
+var landing_time: float=0
+var landing_strength: float=0
+var landing_count: int=0
+var wall_push_time: float=0
+var wall_push_side: float=0
+var motion_state: String="air"
+var contact_polish: bool=true
 var smooth_motion: bool=true
-var previous_direction: float=1
 var tail_count: int=2
 var mass_scale: float=1
 var grounded: bool=false
@@ -42,8 +47,6 @@ var grip_count: int=0
 
 func _init(at: Vector2,boxes: Array[Rect2],tail: int=2,mass: float=1,with_limbs: bool=true,initial_direction: float=1) -> void:
     direction=-1.0 if initial_direction<0 else 1.0
-    previous_direction=direction
-    turn_from=direction
     tail_count=clampi(tail,0,12)
     mass_scale=clampf(mass,.5,3)
     body.obstacles.assign(boxes)
@@ -71,10 +74,15 @@ func advance(dt: float,axis: float,jump: bool,_legacy_grab: bool=false,climb: fl
         jump_buffer=.12
     if strike:attack_requested=true
     body.advance(dt,_control,_after_step)
-    limbs.update_geometry(body,dt,direction)
-
+    
 func _after_step(dt: float) -> void:
     attack.after_step(body,limbs,dt)
+    limbs.update_geometry(body,dt,direction)
+    if surface.active:motion_state="wall"
+    elif grip_index>=0:motion_state="ledge"
+    elif landing_time>0 and grounded:motion_state="landing"
+    elif grounded:motion_state="run" if absf(input_axis)>.05 else "idle"
+    else:motion_state="rise" if float(body.nodes[0].v.y)<-12 else "fall"
 
 func _control(dt: float) -> void:
     if attack.active and (not limbs.enabled or surface.active or grip_index>=0):attack.cancel(limbs)
@@ -86,6 +94,10 @@ func _control(dt: float) -> void:
     if not attack.active and not surface.active and grip_index<0 and absf(input_axis)>.05:
         direction=signf(input_axis)
     var intent: Dictionary=attack.sample(attack.time) if attack.active else {}
+    landing_time=maxf(0,landing_time-dt)
+    wall_push_time=maxf(0,wall_push_time-dt)
+    limbs.contact_polish=contact_polish
+    limbs.landing_offset=-landing_strength*clampf(landing_time/.22,0,1) if contact_polish and not attack.active else 0.0
     limbs.rear_height_offset=float(intent.get("rear",0))
     limbs.front_height_offset=-sin(float(intent.get("tilt",0)))*float(body.links[0].length)*.7 if attack.active else 0.0
     if smooth_motion and not attack.active and not surface.active and grip_index<0:
@@ -107,8 +119,11 @@ func _control(dt: float) -> void:
         if jump_requested:
             for i in range(body.nodes.size()):
                 body.impulse(i,Vector2(surface.normal.x*115,-(jump_speed if smooth_motion else 146.0)*.8)/sqrt(mass_scale))
+            wall_push_side=surface.normal.x
+            wall_push_time=.17 if contact_polish else 0.0
             surface.detach()
             limbs.release_all()
+            grounded=false
             jump_requested=false
             jump_buffer=0
             airborne_jump=true
@@ -129,6 +144,8 @@ func _control(dt: float) -> void:
         elif limbs.support_count>0:
             surface.drive(body,climb_axis,limbs.support_count)
             grounded=false
+            air_time=0
+            landing_time=0
             coyote=0
             wall_ticks+=1
             return
@@ -139,15 +156,19 @@ func _control(dt: float) -> void:
     var allow_feet: bool=jump_cooldown<=0 and grip_index<0 and (not airborne_jump or not rising)
     limbs.step(body,dt,input_axis,direction,allow_feet)
     grounded=body.nodes[0].ground or body.nodes[1].ground or limbs.support_count>0
+    if grounded:
+        var fall_speed: float=(float(body.nodes[0].v.y)+float(body.nodes[1].v.y))*.5
+        if contact_polish and air_time>.10 and fall_speed>45 and grip_index<0:
+            landing_count+=1
+            landing_strength=clampf(fall_speed*.033,2,6)
+            landing_time=.22
+        air_time=0
+    elif grip_index<0:air_time+=dt
+    else:air_time=0
     if grounded and jump_cooldown<=0:airborne_jump=false
     coyote=.12 if grounded else maxf(0,coyote-dt)
     if attack.active:direction=attack.facing
     elif absf(input_axis)>.05:direction=signf(input_axis)
-    if direction!=previous_direction:
-        turn_from=previous_direction
-        turn_progress=0
-        previous_direction=direction
-    turn_progress=minf(1,turn_progress+dt/.19)
     if not attack.active and grip_index<0 and grip_cooldown<=0 and absf(input_axis)>.1 and not jump_requested:
         _find_grip()
     if grip_index>=0:
@@ -173,6 +194,7 @@ func _control(dt: float) -> void:
                 var desired_y: float=-speed*(1.0 if i<2 else .86)
                 body.impulse(i,Vector2(input_axis*18,desired_y-minf(0,float(n.v.y))))
             grip_index=-1
+            landing_time=0
             grip_cooldown=.24
             limbs.release_all()
             coyote=0
@@ -191,6 +213,8 @@ func _control(dt: float) -> void:
     for i in range(2):
         var n: Dictionary=body.nodes[i]
         var target: float=float(intent.get("speed",0))*direction if attack.active else input_axis*(max_speed if smooth_motion else 94.0)
+        if contact_polish and wall_push_time>0 and not attack.active:
+            target=wall_push_side*maxf(85,absf(target))
         var power: float=680*1.6*(1.0 if grounded else .48) if attack.active else (acceleration if smooth_motion else 680.0)*(1.0 if grounded else .65)
         var gain: float=9
         if smooth_motion and not attack.active:
@@ -204,9 +228,6 @@ func _control(dt: float) -> void:
     var front: Vector2=body.nodes[0].p
     var rear: Vector2=body.nodes[1].p
     var goal:=Vector2(direction*16,-2)
-    if smooth_motion and turn_progress<1 and not attack.active and grip_index<0:
-        var theta: float=PI*turn_progress
-        goal=Vector2(turn_from*cos(theta)*16,-2-sin(theta)*14)
     if attack.active:
         var trunk: float=body.links[0].length
         var tilt: float=float(intent.tilt)

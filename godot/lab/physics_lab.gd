@@ -18,6 +18,7 @@ var boxes: Array[Rect2]=[
 var creature
 var debug: bool=false
 var motion_on: bool=true
+var contact_on: bool=true
 var motion_label: Label
 var paused: bool=false
 var slow: bool=false
@@ -75,6 +76,7 @@ func _reset() -> void:
     creature.surface.enabled=walls_on
     creature.smooth_motion=motion_on
     creature.limbs.adaptive_gait=motion_on
+    creature.contact_polish=contact_on
     dummy={"id":"training","p":Vector2(183,446),"r":10.0,"hp":100}
     creature.attack.targets.append(dummy)
     trail.clear()
@@ -117,7 +119,8 @@ func _update_hud() -> void:
         creature.body.nodes.size(),creature.limbs.support_count,creature.limbs.legs.size(),creature.mass_scale,("СТЕНА" if creature.surface.active else ("ЗЕМЛЯ" if creature.grounded else "ВОЗДУХ")),creature.body.max_error,creature.body.penetration(),step_ms,"ПАУЗА" if paused else ("МЕДЛЕННО" if slow else "120 Гц"),"вкл." if walls_on else "выкл."]
     hud.text+=" | атака: %s | цель %d"%[UI.label(creature.attack.phase()),dummy.get("hp",100)]
     var vel: Vector2=(Vector2(creature.body.nodes[0].v)+Vector2(creature.body.nodes[1].v))*.5
-    motion_label.text="Скорость %.0f px/с | прыжки %d | B: %s | короткое / длинное нажатие прыжка"%[vel.x,creature.jump_count,"новое движение" if motion_on else "старые настройки"]
+    var states: Dictionary={"wall":"лазание","ledge":"подтягивание","landing":"приземление","run":"бег","idle":"стойка","rise":"взлёт","fall":"падение","air":"воздух"}
+    motion_label.text="%.0f px/с | %s | B мотор: %s · N контакты: %s | посадок %d"%[vel.x,states.get(creature.motion_state,""),"новый" if motion_on else "старый","новые" if contact_on else "старые",creature.landing_count]
     mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · X медленно"%[creature.tail_count,creature.limb_scale,creature.mutations]
     if Time.get_ticks_msec()<notice_until:mutation_label.text=notice
 
@@ -206,7 +209,7 @@ func _unhandled_input(e: InputEvent) -> void:
                 creature.surface.enabled=walls_on
                 if not walls_on:creature.surface.detach()
             KEY_M:
-                course=(course+1)%3
+                course=(course+1)%4
                 _set_course()
                 _reset()
             KEY_Q:
@@ -217,6 +220,11 @@ func _unhandled_input(e: InputEvent) -> void:
                 motion_on=not motion_on
                 creature.smooth_motion=motion_on
                 creature.limbs.adaptive_gait=motion_on
+            KEY_N:
+                contact_on=not contact_on
+                creature.contact_polish=contact_on
+                creature.limbs.contact_polish=contact_on
+                creature.landing_time=0
             KEY_V:debug=not debug
             KEY_G:
                 dummy.p=get_global_mouse_position()
@@ -245,8 +253,10 @@ func _set_course() -> void:
         boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70),Rect2(230,432,72,38),Rect2(302,390,90,80),Rect2(470,360,120,20),Rect2(660,300,130,20),Rect2(790,300,28,170),Rect2(60,320,145,18),Rect2(250,225,160,18),Rect2(530,180,220,18),Rect2(836,414,124,56)])
     elif course==1:
         boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70),Rect2(280,215,65,255),Rect2(345,215,110,18),Rect2(475,418,140,32),Rect2(650,360,90,110),Rect2(800,200,45,270),Rect2(845,280,115,18)])
-    else:
+    elif course==2:
         boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70)])
+    else:
+        boxes.assign([Rect2(-40,0,40,540),Rect2(960,0,40,540),Rect2(0,-40,960,40),Rect2(0,470,960,70),Rect2(220,448,65,22),Rect2(285,426,65,44),Rect2(350,404,65,66),Rect2(475,390,88,18),Rect2(625,342,85,18),Rect2(760,285,55,185),Rect2(815,285,100,18)])
 
 func _mutation(ok: bool) -> void:
     notice="Мутация применена" if ok else "Недоступно: занят, нет места или достигнут предел"

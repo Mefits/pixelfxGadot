@@ -21,6 +21,10 @@ var rear_height_offset: float=0
 var front_height_offset: float=0
 var adaptive_gait: bool=true
 var foot_lift: float=6
+var contact_polish: bool=true
+var landing_offset: float=0
+var recovery_steps: int=0
+var knee_avoids: int=0
 
 func setup(body) -> void:
     legs.clear()
@@ -91,8 +95,10 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         var lead: float=axis*stride
         if adaptive_gait:lead=clampf(speed*.10,-stride,stride) if absf(axis)>.05 else 0.0
         var desired: float=hip.x+bias+lead
+        var lost: bool=false
         if l.planted and (hip.distance_to(l.foot)>max_reach or _blocked(hip,l.foot,body.obstacles)):
             l.planted=false
+            lost=true
         if l.swing:
             l.age+=dt
             var u: float=clampf(float(l.age)/float(l.get("swing_duration",swing_time)),0,1)
@@ -106,8 +112,21 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         elif not l.planted:
             var candidate: Dictionary=find_support(hip,desired,body.obstacles)
             if not candidate.is_empty():
-                l.foot=candidate.foot
-                l.planted=true
+                # Recover a lost walking contact with a short swing if a sibling
+                # still supports this chunk. Air-to-ground acquisition stays immediate.
+                var supported: bool=false
+                for other in legs:
+                    if other.parent==l.parent and other.planted:supported=true;break
+                if contact_polish and lost and supported:
+                    l.start=l.foot
+                    l.target=candidate.foot
+                    l.age=0.0
+                    l.swing_duration=.07
+                    l.swing=true
+                    recovery_steps+=1
+                else:
+                    l.foot=candidate.foot
+                    l.planted=true
         elif (absf(axis)>.1 or (adaptive_gait and absf(speed)<15)) and l.group==phase and absf(float(l.foot.x)-desired)>(8 if adaptive_gait else 10):
             var candidate: Dictionary=find_support(hip,desired,body.obstacles)
             if not candidate.is_empty() and Vector2(l.foot).distance_to(candidate.foot)>5:
@@ -131,10 +150,11 @@ func step(body,dt: float,axis: float,direction: float,allow_support: bool) -> vo
         y/=active.size()
         var height: float=y-float(n.p.y)
         # Compress support posture below low ceilings, without shrinking collision circles.
-        var desired_height: float=rest_height+(rear_height_offset if parent==1 else front_height_offset)
+        var desired_height: float=rest_height+(rear_height_offset if parent==1 else front_height_offset)+landing_offset
         for box in body.obstacles:
             if float(n.p.x)>=box.position.x-7 and float(n.p.x)<=box.end.x+7 and box.end.y<float(n.p.y) and box.end.y>y-40:
                 desired_height=minf(desired_height,maxf(7.5,y-box.end.y-8))
+        desired_height=maxf(7.5,desired_height)
         current_height=desired_height
         var ay: float=clampf(-body.gravity.y+(height-desired_height)*155-float(n.v.y)*23,-1250,0)
         body.force(parent,Vector2(0,ay/float(n.inv)))
@@ -146,6 +166,13 @@ func update_geometry(body,dt: float,direction: float) -> void:
         var hip: Vector2=body.nodes[l.parent].p
         if not l.planted and not l.swing:
             var tuck:=Vector2(direction*(5 if l.parent==0 else -5)+float(l.side)*2,12)
+            if contact_polish and surface_normal==Vector2.UP:
+                var vy: float=body.nodes[l.parent].v.y
+                if vy>15:
+                    # Extend toward the next contact on descent, tuck during ascent.
+                    tuck.y=lerpf(12,minf(max_reach-2,rest_height+5),clampf(vy/120,0,1))
+                    tuck.x+=clampf(float(body.nodes[l.parent].v.x)*.045,-6,6)
+                elif vy< -15:tuck.y=8
             if surface_normal!=Vector2.UP:tuck=-surface_normal*12+Vector2(0,float(l.side)*5)
             l.foot=Vector2(l.foot).lerp(hip+tuck,clampf(dt*18,0,1))
         # IK only draws a reachable endpoint, never teleports a physical chunk.
@@ -155,8 +182,15 @@ func update_geometry(body,dt: float,direction: float) -> void:
         var along: float=(upper*upper-lower*lower+length*length)/(2*length)
         var bend: float=sqrt(maxf(0,upper*upper-along*along))
         var sign0: float=direction if l.parent==0 else -direction
-        l.knee=hip+axis*along+axis.orthogonal()*bend*sign0
-        l.tip=hip+axis*length
+        var tip: Vector2=hip+axis*length
+        var knee: Vector2=hip+axis*along+axis.orthogonal()*bend*sign0
+        if contact_polish and (_blocked(hip,knee,body.obstacles) or _blocked(knee,tip,body.obstacles)):
+            var alternate: Vector2=hip+axis*along-axis.orthogonal()*bend*sign0
+            if not _blocked(hip,alternate,body.obstacles) and not _blocked(alternate,tip,body.obstacles):
+                knee=alternate
+                knee_avoids+=1
+        l.knee=knee
+        l.tip=tip
 
 func step_wall(body,dt: float,climb: float,normal: Vector2,face: Rect2) -> void:
     if surface_normal!=normal:

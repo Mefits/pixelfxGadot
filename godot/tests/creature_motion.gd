@@ -57,5 +57,35 @@ func _run()->void:
         if request:requested=true
         landing.advance(1.0/60,0,request)
     check(requested and landing.jump_count==1,"Single buffered landing jump")
+    var land=make_body(flat)
+    var lowest: float=INF
+    var compression: float=0
+    var state_seen: bool=false
+    for i in range(120):
+        land.advance(1.0/60,0,i==0)
+        if land.landing_time>0:
+            state_seen=state_seen or land.motion_state=="landing"
+            compression=maxf(compression,-land.limbs.landing_offset)
+            lowest=minf(lowest,200-land.body.point("front").y)
+    print("Landing: count ",land.landing_count," max compression target ",compression," minimum height ",lowest)
+    check(land.landing_count==1 and state_seen and compression>2,"Single landing with physical crouch")
+    check(land.grounded and land.landing_time==0 and absf(200-land.body.point("front").y-18)<3,"Landing recovers")
+    var wall:Array[Rect2]=[flat[0],Rect2(160,20,50,180)]
+    var climber=C.new(Vector2(143,150),wall,2,1,true)
+    for i in range(45):climber.advance(1.0/60,0,false,false,-1)
+    check(climber.surface.active,"Wall before kick")
+    var wx:float=climber.body.center_of_mass().x
+    climber.advance(1.0/60,0,true)
+    for i in range(10):climber.advance(1.0/60,0,false)
+    var distance:float=wx-climber.body.center_of_mass().x
+    print("Wall jump separation in .18s ",distance)
+    check(not climber.surface.active and distance>10 and climber.jump_count==1,"Wall jump carries away")
+    var a=make_body(flat)
+    var b=make_body(flat)
+    for i in range(120):a.advance(1.0/60,1,i==30)
+    for i in range(60):b.advance(1.0/30,1,i==15)
+    check(a.body.point("front").distance_to(b.body.point("front"))<.001,"Body independent of frame grouping")
+    for i in range(a.limbs.legs.size()):
+        check(Vector2(a.limbs.legs[i].tip).distance_to(b.limbs.legs[i].tip)<.001,"Limb geometry independent of frame grouping")
     print("Motion tests failures: ",failures)
     quit(0 if failures==0 else 1)
