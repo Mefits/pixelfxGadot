@@ -31,6 +31,17 @@ jobs:
           node-version: '22'
       - if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+      - run: node tools/make_cpp_fixture.mjs
+      - if: runner.os == 'Linux'
+        run: |
+          g++ -std=c++17 -O3 -ffp-contract=off -fno-fast-math native_cpp/test_kernel.cpp -o /tmp/pixelfx-kernel-test
+          /tmp/pixelfx-kernel-test godot/tests/fixtures/cpp.bin
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cl /nologo /std:c++17 /O2 /fp:strict /EHsc native_cpp/test_kernel.cpp /Fe:pixelfx-kernel-test.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\pixelfx-kernel-test.exe godot/tests/fixtures/cpp.bin
       - run: pip install scons
       - run: python native_cpp/build.py
       - run: node tools/make_native_fixture.mjs
