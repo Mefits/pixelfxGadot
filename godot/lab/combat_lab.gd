@@ -1,4 +1,6 @@
 extends Control
+const CAT=preload("res://addons/creature/catalog.gd")
+var catalog_entry:Dictionary={}
 const UI=preload("res://lab/ui_ru.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const COMBAT=preload("res://addons/creature/combat.gd")
@@ -70,7 +72,8 @@ func _ready() -> void:
     info.text="Игрок 1: A/D ходьба · W прыжок · F удар / в воздухе · H тяжёлый · J ногой · G магия · S блок\nИгрок 2: стрелки · K удар · L магия · O тяжёлый · P ногой | B бот · N динамика · X медл. · C эффекты · M трен. · R сброс · Tab редактор · Esc"
     info.add_theme_font_size_override("font_size",13)
     add_child(info)
-    ability_profile=ABILITY.load_profile()
+    catalog_entry=CAT.consume(get_tree(),"ability")
+    ability_profile=ABILITY.load_profile() if catalog_entry.is_empty() else catalog_entry.payload.duplicate(true)
     phase_label=Label.new()
     phase_label.position=Vector2(24,90)
     phase_label.add_theme_font_size_override("font_size",13)
@@ -81,7 +84,11 @@ func _ready() -> void:
     _reset()
 
 func _apply_ability(profile: Dictionary) -> void:
-    if not ABILITY.save_profile(profile):return
+    if not catalog_entry.is_empty():
+        var saved:Dictionary=CAT.save_draft(catalog_entry,profile,profile.name)
+        if saved.is_empty():return
+        catalog_entry=saved
+    elif not ABILITY.save_profile(profile):return
     ability_profile=profile
     _reset()
 

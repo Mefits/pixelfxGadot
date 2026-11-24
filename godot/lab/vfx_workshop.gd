@@ -1,4 +1,6 @@
 extends Control
+const CAT=preload("res://addons/creature/catalog.gd")
+var catalog_entry:Dictionary={}
 const UI=preload("res://lab/ui_ru.gd")
 const P=preload("res://addons/pixelfx/composer/preset.gd")
 const R=preload("res://addons/pixelfx/composer/renderer.gd")
@@ -380,6 +382,15 @@ func _ready() -> void:
     compare_labels.hide()
     renderer.enable_acceleration()
     _library()
+    catalog_entry=CAT.consume(get_tree(),"vfx")
+    if not catalog_entry.is_empty():
+        preset=catalog_entry.payload.duplicate(true)
+        selected=0
+        time=0
+        stage.sweep=false
+        for l in preset.layers:
+            if l.type=="trail":stage.moving=true;stage.sweep=true;break
+        status.text="Библиотека: сохранение в отдельную копию."
     _refresh()
 func _quick_open() -> void:
     playing=false
@@ -801,6 +812,12 @@ func _library() -> void:
     for f in dir.get_files():
         if f.ends_with(".json"):library.add_item(f)
 func _save() -> void:
+    if not catalog_entry.is_empty():
+        var saved:Dictionary=CAT.save_draft(catalog_entry,preset,preset.name)
+        if saved.is_empty():status.text="Ошибка сохранения";return
+        catalog_entry=saved
+        status.text="Копия сохранена в общей библиотеке"
+        return
     status.text="Сохранено в user://vfx_presets" if P.save_preset(preset) else "Неверный пресет"
     _library()
 func _load() -> void:

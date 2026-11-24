@@ -1,4 +1,6 @@
 extends Node2D
+const CAT=preload("res://addons/creature/catalog.gd")
+var catalog_entry:Dictionary={}
 const UI=preload("res://lab/ui_ru.gd")
 const CREATURE=preload("res://addons/creature/physical_creature.gd")
 const INTENT=preload("res://lab/intent_panel.gd")
@@ -65,12 +67,17 @@ func _ready() -> void:
     motion_label.position=Vector2(18,62)
     motion_label.add_theme_font_size_override("font_size",13)
     layer.add_child(motion_label)
+    catalog_entry=CAT.consume(get_tree(),"creature")
     _reset()
 
 func _reset() -> void:
     if is_instance_valid(panel):panel.queue_free();panel=null
     tail=2
     mass=1
+    if not catalog_entry.is_empty():
+        tail=int(catalog_entry.payload.tail)
+        mass=float(catalog_entry.payload.mass)
+        legs_on=bool(catalog_entry.payload.limbs)
     creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
     creature.attack.set_track(TRACK.load_track())
     creature.surface.enabled=walls_on

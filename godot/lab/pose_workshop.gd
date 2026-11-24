@@ -1,4 +1,6 @@
 extends Control
+const CAT=preload("res://addons/creature/catalog.gd")
+var catalog_entry:Dictionary={}
 const UI=preload("res://lab/ui_ru.gd")
 const RIG=preload("res://addons/creature/rig.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
@@ -299,6 +301,14 @@ func _ready() -> void:
     add_child(confirm)
     confirm.confirmed.connect(func():
         if pending_action.is_valid():pending_action.call())
+    catalog_entry=CAT.consume(get_tree(),"animation")
+    if not catalog_entry.is_empty():
+        name_id=catalog_entry.payload.slot
+        bank[name_id]=catalog_entry.payload.clip.duplicate(true)
+        clip_select.select(CLIPS.NAMES.find(name_id))
+        clip_select.disabled=true
+        fighter_select.disabled=true
+        status.text="Шаблон библиотеки: отдельная копия, не банк бойца."
     _choose(name_id)
 
 func _choose(n: String) -> void:
@@ -572,7 +582,17 @@ func _switch_fighter(i: int) -> void:
     dirty=false
     _choose(name_id)
 
+func _save_draft()->bool:
+    var value:Dictionary=CAT.save_draft(catalog_entry,{"slot":name_id,"clip":bank[name_id]})
+    if value.is_empty():return false
+    catalog_entry=value
+    dirty=false
+    return true
+
 func _save() -> void:
+    if not catalog_entry.is_empty():
+        status.text="Копия сохранена в библиотеке" if _save_draft() else "Ошибка сохранения"
+        return
     if CLIPS.save_bank(bank,_path()):
         dirty=false
         status.text="Сохранено: "+ProjectSettings.globalize_path(_path())
@@ -580,9 +600,11 @@ func _save() -> void:
         status.text="Ошибка: неверные данные анимации."
 
 func _go(path: String) -> void:
-    if dirty and not CLIPS.save_bank(bank,_path()):
-        status.text="Не удалось сохранить. Проверь данные анимации."
-        return
+    if dirty:
+        var ok:bool=_save_draft() if not catalog_entry.is_empty() else CLIPS.save_bank(bank,_path())
+        if not ok:
+            status.text="Не удалось сохранить. Проверь данные анимации."
+            return
     get_tree().change_scene_to_file(path)
 
 func _play() -> void:
@@ -706,6 +728,12 @@ func _ask_default() -> void:
         _refresh_lists())
 
 func _ask_load() -> void:
+    if not catalog_entry.is_empty():
+        _ask("Восстановить последний сохранённый шаблон?",func():
+            bank[name_id]=catalog_entry.payload.clip.duplicate(true)
+            _choose(name_id)
+            dirty=false)
+        return
     _ask("Загрузить сохранённые анимации бойца? Несохранённые правки будут потеряны.",func():
         bank=CLIPS.fighter_bank(fighter_index)
         _choose(name_id)
