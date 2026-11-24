@@ -2,6 +2,7 @@
 // No standard-library modules or filesystem/network bindings are exposed to JS.
 #pragma once
 #include <quickjs.h>
+#include "original_painter.hpp"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
@@ -59,6 +60,7 @@ protected:
     static void _bind_methods(){
         ClassDB::bind_method(D_METHOD("load_bundle","source"),&PixelFXOriginal::load_bundle);
         ClassDB::bind_method(D_METHOD("last_error"),&PixelFXOriginal::last_error);
+        ClassDB::bind_method(D_METHOD("set_acceleration","enabled"),&PixelFXOriginal::set_acceleration);
         ClassDB::bind_method(D_METHOD("catalog_json"),&PixelFXOriginal::catalog_json);
         ClassDB::bind_method(D_METHOD("timing_json","id"),&PixelFXOriginal::timing_json);
         ClassDB::bind_method(D_METHOD("bounds_json","id"),&PixelFXOriginal::bounds_json);
@@ -81,6 +83,9 @@ public:
         JS_SetMemoryLimit(rt,256*1024*1024);JS_SetMaxStackSize(rt,2*1024*1024);
         JS_SetInterruptHandler(rt,interrupted,this);ctx=JS_NewContext(rt);
         if(!ctx){error="Cannot allocate JS context";close();return false;}
+        JSValue g=JS_GetGlobalObject(ctx);
+        JS_SetPropertyStr(ctx,g,"__pfxNativePrimitive",JS_NewCFunction(ctx,pfx_original::primitive,"pfxNativePrimitive",7));
+        JS_FreeValue(ctx,g);
         budget();
         JSValue v=JS_Eval(ctx,utf.get_data(),utf.length(),"pixelfx.bundle",JS_EVAL_TYPE_GLOBAL);
         if(JS_IsException(v)){exception();JS_FreeValue(ctx,v);close();return false;}
@@ -89,6 +94,7 @@ public:
         JSValue f=JS_GetPropertyStr(ctx,api,"catalog");bool ok=JS_IsFunction(ctx,f);JS_FreeValue(ctx,f);
         if(!ok){error="Missing PixelFX API";close();return false;}return true;
     }
+    bool set_acceleration(bool enabled){return ctx&&bool_call("setAcceleration",{JS_NewBool(ctx,enabled)});}
     String catalog_json(){return ctx?string_call("catalog"):String();}
     String timing_json(String id){return ctx?string_call("timing",{jsstr(id)}):String();}
     String bounds_json(String id){return ctx?string_call("bounds",{jsstr(id)}):String();}

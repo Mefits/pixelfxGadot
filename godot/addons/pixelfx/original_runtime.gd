@@ -82,3 +82,7 @@ func draw(h: int,p,layer: String="",body: bool=false,target: bool=true) -> bool:
     p.color=out[0]
     p.light=out[1]
     return true
+
+## Experimental, opt-in. The original JS Painter remains the default.
+func set_acceleration(enabled: bool) -> bool:
+    return backend!=null and backend.set_acceleration(enabled)

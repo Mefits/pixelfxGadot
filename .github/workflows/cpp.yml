@@ -1,7 +1,7 @@
 name: Optional C++ raster
 on:
   push:
-    branches: [main]
+    branches: [main, feature/original-painter-fast]
     paths:
       - 'native_cpp/**'
       - 'godot/addons/pixelfx/**'
@@ -79,6 +79,7 @@ jobs:
       - run: godot --headless --path godot --editor --import
       - run: godot --headless --path godot --script res://tests/native.gd
       - run: godot --headless --path godot --script res://tests/original.gd
+      - run: godot --headless --path godot --script res://tests/original_accel.gd
       - run: godot --headless --path godot res://lab/original_catalog.tscn --quit-after 120
       - run: godot --headless --path godot --script res://tests/painter_full.gd
       - run: godot --headless --path godot --script res://tests/core.gd
