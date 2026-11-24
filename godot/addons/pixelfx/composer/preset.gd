@@ -1,9 +1,32 @@
 extends RefCounted
-const TYPES=["lightning","sparks","glow","ring","slash","droplets","smoke","trail"]
+const TYPES=["lightning","sparks","glow","ring","slash","droplets","smoke","trail","tendril","organic_mass"]
 const ANCHORS=["origin","hand","target"]
 const FOLDER="user://vfx_presets"
 const CURVES=["linear","ease in","ease out","smooth"]
 const MAX_LAYERS=12
+const ORGANIC_TYPES=["tendril","organic_mass"]
+const MAX_ORGANIC_ARMS=8
+const MAX_ORGANIC_SEGMENTS=48
+static func organic_defaults() -> Dictionary:
+    return {"arms":3.0,"length":42.0,"wave":12.0,"frequency":1.5,"taper":.85,"pulse":.18,"stretch":.25,"aim":false}
+static func valid_organic(o: Variant) -> bool:
+    if not o is Dictionary or not o.get("aim") is bool:return false
+    if not num(o.get("arms"),1,MAX_ORGANIC_ARMS) or float(o.arms)!=floorf(float(o.arms)):return false
+    for spec in [["length",4,96],["wave",0,32],["frequency",0,6],["taper",0,1],["pulse",0,.45],["stretch",0,.65]]:
+        if not num(o.get(spec[0]),spec[1],spec[2]):return false
+    return true
+static func organic_demo() -> Dictionary:
+    var a: Dictionary=layer("tendril")
+    a.duration=2.5
+    a.organic.arms=4.0
+    a.organic.length=58.0
+    a.organic.aim=true
+    a.curves={"alpha":[[0.0,0.0],[.12,1.0],[.8,1.0],[1.0,0.0]]}
+    var b: Dictionary=layer("organic_mass")
+    b.duration=2.5
+    b.organic.pulse=.3
+    b.curves=a.curves.duplicate(true)
+    return {"schema":1,"name":"Живая ткань","seed":617,"layers":[a,b]}
 const PARTICLE_TYPES=["sparks","droplets","smoke"]
 const EMITTER_SHAPES=["point","disc","ring","line"]
 const MAX_BIRTHS=320
@@ -97,10 +120,21 @@ static func layer(kind: String="sparks") -> Dictionary:
         "smoke":l.color="#87919d";l.size=3.0;l.end_size=9.0;l.speed=18.0;l.end_speed=12.0;l.gravity=-10.0;l.glow=0.0;l.duration=1.4;l.alpha=.6;l.spread=65.0;l.follow=false
         "sparks":l.size=2.0;l.end_size=.5
         "trail":l.anchor="hand";l.duration=1.2;l.size=7.0;l.end_size=.5;l.follow=false;l.trail=trail_defaults()
+    if kind in ORGANIC_TYPES:
+        l.organic=organic_defaults()
+        l.anchor="hand"
+        l.duration=2.0
+        l.size=8.0 if kind=="tendril" else 15.0
+        l.end_size=4.0 if kind=="tendril" else 8.0
+        l.color="#a84961" if kind=="tendril" else "#83354e"
+        l.glow=0.0
+        l.angle=0.0
+        l.spread=90.0
     return l
 static func demo(which: int=0) -> Dictionary:
     if which==4:return stream_demo()
     if which==5:return trail_demo()
+    if which==6:return organic_demo()
     var layers: Array=[]
     var names=["Electric burst","Acid impact","Claw slash","Fire burst"]
     match which:
@@ -142,6 +176,9 @@ static func valid(p: Variant) -> bool:
         if l.type=="trail":
             if not valid_trail(l.get("trail")):return false
         elif l.has("trail"):return false
+        if l.type in ORGANIC_TYPES:
+            if not valid_organic(l.get("organic")):return false
+        elif l.has("organic"):return false
         if l.has("curves"):
             if not l.curves is Dictionary:return false
             for channel in l.curves:

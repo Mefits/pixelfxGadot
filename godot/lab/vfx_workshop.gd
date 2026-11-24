@@ -31,6 +31,9 @@ var emitter_fields: Dictionary={}
 var emitter_info: Label
 var trail_panel: VBoxContainer
 var trail_fields: Dictionary={}
+var organic_panel: VBoxContainer
+var organic_fields: Dictionary={}
+var organic_hint: Label
 var selected: int=0
 var time: float=.3
 var playing: bool=true
@@ -75,7 +78,7 @@ func _ready() -> void:
     left.size=Vector2(172,475)
     add_child(left)
     _label(left,"ПРЕСЕТЫ")
-    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф"],_select_demo)
+    var demos=_option(left,["Электроразряд","Кислота","Удар когтем","Вспышка огня","Поток энергии","Электрический шлейф","Живая ткань"],_select_demo)
     preset.name=UI.label(preset.name)
     name_edit=LineEdit.new()
     name_edit.placeholder_text="Имя эффекта"
@@ -218,6 +221,30 @@ func _ready() -> void:
     trail_fields.style=_option(trail_style_row,["Лента","Электрический","Точки"],func(i:int):_trail_change("style",P.TRAIL_STYLES[i]))
     var trail_hint: Label=_label(trail_panel,"Включи «Движение»: след строится по истории точки. Размер = ширина.")
     trail_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    organic_panel=VBoxContainer.new()
+    right.add_child(organic_panel)
+    _label(organic_panel,"ОРГАНИЧЕСКАЯ ДЕФОРМАЦИЯ")
+    for spec in [["arms","Отростков",1,8,1],["length","Длина, px",4,96,1],["wave","Амплитуда, px",0,32,.5],["frequency","Частота, Гц",0,6,.1],["taper","Сужение",0,1,.05],["pulse","Пульсация",0,.45,.05],["stretch","Растяжение",0,.65,.05]]:
+        var row:=HBoxContainer.new()
+        organic_panel.add_child(row)
+        var label: Label=_label(row,spec[1])
+        label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+        var spin:=SpinBox.new()
+        spin.min_value=spec[2]
+        spin.max_value=spec[3]
+        spin.step=spec[4]
+        spin.custom_minimum_size.x=88
+        row.add_child(spin)
+        var key: String=spec[0]
+        organic_fields[key]=spin
+        spin.value_changed.connect(func(v:float):_organic_change(key,v))
+    var aim:=CheckButton.new()
+    aim.text="Направить к цели"
+    organic_panel.add_child(aim)
+    organic_fields.aim=aim
+    aim.toggled.connect(func(v:bool):_organic_change("aim",v))
+    organic_hint=_label(organic_panel,"")
+    organic_hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     _label(right,"КРИВЫЕ ПАРАМЕТРОВ")
     _option(right,["Размер","Прозрачность","Скорость","Свечение"],func(i:int):curve_channel=i;_sync_curve())
     curve_toggle=_button(right,"Своя кривая",_toggle_curve)
@@ -266,7 +293,9 @@ func _select_demo(i: int) -> void:
         stage.moving=true
         stage.sweep=true
         time=.5
-    else:stage.sweep=false
+    else:
+        stage.sweep=false
+        if i==6:time=.7
     _refresh()
 
 func _toggle_play() -> void:
@@ -286,10 +315,14 @@ func _change(key: String,v: Variant) -> void:
             l.trail=P.trail_defaults()
             l.follow=false
         else:l.erase("trail")
+        if v in P.ORGANIC_TYPES:
+            if not l.has("organic"):l.organic=P.organic_defaults()
+        else:l.erase("organic")
     if key in ["type","enabled"]:_refresh()
     else:
         _sync_emitter()
         _sync_trail()
+        _sync_organic()
         _sync_curve()
         dirty=true
 func _refresh() -> void:
@@ -315,6 +348,7 @@ func _sync_fields() -> void:
     syncing=false
     _sync_emitter()
     _sync_trail()
+    _sync_organic()
     _sync_curve()
     dirty=true
 
@@ -345,6 +379,34 @@ func _trail_change(key: String,value: Variant) -> void:
     if l.type!="trail":return
     l.trail[key]=value
     _sync_trail()
+    dirty=true
+
+func _sync_organic() -> void:
+    if organic_panel==null:return
+    var l: Dictionary=preset.layers[selected]
+    var active: bool=l.type in P.ORGANIC_TYPES
+    organic_panel.visible=active
+    if not active:return
+    var previous: bool=syncing
+    syncing=true
+    for key in organic_fields:
+        if key=="aim":organic_fields[key].set_pressed_no_signal(l.organic.aim)
+        else:organic_fields[key].set_value_no_signal(float(l.organic[key]))
+    for key in ["arms","length","taper"]:
+        organic_fields[key].editable=l.type=="tendril"
+    for key in ["count","gravity"]:
+        fields[key].editable=false
+    fields.spread.editable=l.type=="tendril"
+    fields.collision.disabled=true
+    fields.collision.tooltip_text="Визуальная деформация без столкновений"
+    organic_hint.text="Размер = ширина. Длина и направление независимы." if l.type=="tendril" else "Размер = радиус массы. Волна меняет её контур."
+    syncing=previous
+
+func _organic_change(key: String,value: Variant) -> void:
+    if syncing:return
+    var l: Dictionary=preset.layers[selected]
+    if not l.type in P.ORGANIC_TYPES:return
+    l.organic[key]=value
     dirty=true
 
 func _sync_emitter() -> void:
@@ -410,13 +472,14 @@ func _update_curve_controls() -> void:
     for k in ["size","end_size","alpha","end_alpha","speed","end_speed","glow"]:
         if fields.has(k):
             var base: String=k.trim_prefix("end_")
-            fields[k].editable=not P.has_curve(l,base) and not (l.type=="trail" and base=="speed")
+            fields[k].editable=not P.has_curve(l,base) and not ((l.type=="trail" or l.type in P.ORGANIC_TYPES) and base=="speed")
             fields[k].tooltip_text="Управляется своей кривой" if not fields[k].editable else ""
     var message: String="%d/%d точек. Своя кривая."%[graph.points.size(),P.MAX_POINTS] if custom else "Базовые значения. Включи свою кривую для редактирования."
     if channel=="speed" and l.type not in ["sparks","droplets","smoke"]:
         message+=" Скорость действует только на частицы."
     if P.is_stream(l):message+=" Время жизни одной частицы."
     if l.type=="trail":message+=" Возраст участка следа. Размер = ширина."
+    if l.type in P.ORGANIC_TYPES:message+=" Возраст органического эффекта."
     if channel=="alpha":message+=" 1 = непрозрачно."
     curve_status.text=message
 

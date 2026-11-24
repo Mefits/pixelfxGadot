@@ -2,6 +2,7 @@ extends SceneTree
 const P=preload("res://addons/pixelfx/composer/preset.gd")
 const R=preload("res://addons/pixelfx/composer/renderer.gd")
 const PAINT=preload("res://addons/pixelfx/native/painter.gd")
+const O=preload("res://addons/pixelfx/composer/organic.gd")
 var failures: int=0
 func _initialize() -> void:call_deferred("_run")
 func check(ok: bool,msg: String) -> void:
@@ -146,7 +147,52 @@ func _trails() -> void:
     check(not P.valid(invalid),"Reject trail sample rate")
     check(P.valid(P.demo(5)),"Trail demo valid")
 
+func _organics() -> void:
+    var p: Dictionary=P.demo(6)
+    check(P.valid(p),"Organic demo valid")
+    var l: Dictionary=p.layers[0]
+    var base:=Vector2(80,80)
+    var target:=Vector2(160,80)
+    var a: PackedVector2Array=O.centerline(l,base,target,.2,0,17)
+    var b: PackedVector2Array=O.centerline(l,base,target,.7,0,17)
+    check(a[0]==base and b[0]==base and a!=b,"Root fixed, wave changes")
+    check(a.size()<=P.MAX_ORGANIC_SEGMENTS+1,"Bounded centerline")
+    check(a==O.centerline(l,base,target,.2,0,17),"Deterministic geometry")
+    var mass: Dictionary=p.layers[1]
+    var axes_a: Vector2=O.mass_axes(mass,15.0,0.0)
+    var axes_b: Vector2=O.mass_axes(mass,15.0,.2)
+    check(axes_a!=axes_b and axes_b.x>0 and axes_b.y>0,"Pulsating mass")
+    var renderer=R.new()
+    var paint=PAINT.new(240,160)
+    var anchors: Dictionary={"hand":base,"target":target}
+    for kind in P.ORGANIC_TYPES:
+        var q: Dictionary={"schema":1,"name":kind,"seed":31,"layers":[P.layer(kind)]}
+        renderer.render(paint,q,.5,anchors)
+        check(renderer.organic_segments>0 and paint.color.count(0)<paint.color.size(),"Visible "+kind)
+        var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,q,1.1,anchors)
+        check(pixels!=paint.rgba_bytes()+paint.rgba_bytes(true),"Organic changes over time")
+        renderer.render(paint,q,.5,anchors)
+        check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Organic reverse seek")
+        renderer.render(paint,q,2.1,anchors)
+        check(renderer.organic_segments==0 and paint.color.count(0)==paint.color.size(),"Organic expires")
+    check(P.save_preset(p,"user://test_organic_fx.json"),"Save organics")
+    var loaded: Dictionary=P.load_preset("user://test_organic_fx.json")
+    check(P.valid(loaded),"Load organics")
+    if not loaded.is_empty():
+        renderer.render(paint,p,.8,anchors)
+        var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,loaded,.8,anchors)
+        check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Organic roundtrip pixels")
+    var invalid: Dictionary=p.duplicate(true)
+    invalid.layers[0].organic.arms=9
+    check(not P.valid(invalid),"Reject excess arms")
+    invalid.layers[0].organic.arms=3
+    invalid.layers[0].organic.stretch=1.0
+    check(not P.valid(invalid),"Reject singular stretch")
+
 func _run() -> void:
+    _organics()
     _trails()
     _curves()
     _streams()

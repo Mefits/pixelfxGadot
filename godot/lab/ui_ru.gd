@@ -37,6 +37,8 @@ const LABELS={
     "droplets": "Капли",
     "smoke": "Дым",
     "trail": "Шлейф",
+    "tendril": "Щупальца",
+    "organic_mass": "Живая масса",
     "origin": "Центр",
     "hand": "Рука",
     "target": "Цель",

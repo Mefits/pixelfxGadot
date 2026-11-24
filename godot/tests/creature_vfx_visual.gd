@@ -57,5 +57,14 @@ func _run() -> void:
     check(is_equal_approx(float(scene.preset.layers[0].trail.life),.9),"Trail inspector")
     await RenderingServer.frame_post_draw
     check(root.get_texture().get_image().save_png(dir.path_join("vfx-trail.png"))==OK,"Capture trail")
+    scene._select_demo(6)
+    scene._seek(.8)
+    await process_frame
+    await process_frame
+    check(scene.renderer.organic_segments>0,"Organic demo visible")
+    scene.organic_fields.length.value=65
+    check(is_equal_approx(float(scene.preset.layers[0].organic.length),65.0),"Organic inspector")
+    await RenderingServer.frame_post_draw
+    check(root.get_texture().get_image().save_png(dir.path_join("vfx-organic.png"))==OK,"Capture organic")
     print("VFX workshop GL failures: ",failures)
     quit(0 if failures==0 else 1)
