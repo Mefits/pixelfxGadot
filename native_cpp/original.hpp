@@ -20,7 +20,7 @@ class PixelFXOriginal : public RefCounted {
     String error;
     using Clock=std::chrono::steady_clock;
     Clock::time_point deadline;
-    static int interrupted(JSRuntime*,void* p){return Clock::now()>static_cast<PixelFXOriginal*>(p)->deadline;}
+    static int interrupted(JSContext*,void* p){return Clock::now()>static_cast<PixelFXOriginal*>(p)->deadline;}
     void budget(){deadline=Clock::now()+std::chrono::seconds(2);}
     void close(){
         if(ctx){JS_FreeValue(ctx,api);JS_FreeContext(ctx);}
