@@ -76,6 +76,10 @@ func _run() -> void:
         lightning.crackle(f,LIGHTNING.bowed(r,3,3,58,10,-9,.22,.4),.9,c,.35,.8)
         _compare(f.color,item["color"],"Bolt color seed "+str(item["seed"]))
         _compare(f.light,item["light"],"Bolt light seed "+str(item["seed"]))
+    if OS.get_cmdline_user_args().has("--cpp"):
+        _check(lightning.accelerated_calls==data["bolts"].size()*2,"All fixture strokes used C++")
+        _check(lightning.rejected_calls==0,"No rejected C++ calls")
+        print("C++ calls: ",lightning.accelerated_calls," rejected: ",lightning.rejected_calls)
     var bytes=PAINTER.new(1,1)
     bytes.put(0,0,0xff643214)
     bytes.add(0,0,0xff030201,1.0)

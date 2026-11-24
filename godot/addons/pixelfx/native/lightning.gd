@@ -9,6 +9,8 @@ const CROSS = [[1,0],[-1,0],[0,1],[0,-1]]
 var grid := PackedByteArray()
 var hits := PackedInt32Array()
 var accelerator: Object
+var accelerated_calls: int=0
+var rejected_calls: int=0
 
 func enable_acceleration(enabled: bool=true) -> bool:
     accelerator=null
@@ -22,7 +24,9 @@ func _fast(p,paths: Array,k: float,c: Array,s: float,o: Dictionary,thin: bool) -
     var cfg:=PackedFloat64Array([p.width,p.height,p.ox,p.oy,p.tx,p.ty,p.mirror,p.cs,p.sn,p.fade,p.light_k])
     var buffers: Array=accelerator.render_bolt(p.color,p.light,cfg,paths,c,k,s,o,thin)
     if buffers.size()!=2:
+        rejected_calls+=1
         return false
+    accelerated_calls+=1
     p.color=buffers[0]
     p.light=buffers[1]
     return true

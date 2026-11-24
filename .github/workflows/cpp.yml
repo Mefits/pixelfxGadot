@@ -46,13 +46,15 @@ jobs:
           Invoke-WebRequest https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip -OutFile "$env:RUNNER_TEMP/godot.zip"
           Expand-Archive "$env:RUNNER_TEMP/godot.zip" "$env:RUNNER_TEMP/godot"
           $exe = Get-ChildItem "$env:RUNNER_TEMP/godot" -Recurse -Filter "*console.exe" | Select-Object -First 1
-          Copy-Item $exe.FullName (Join-Path $exe.DirectoryName "godot.exe")
+          if (-not $exe) { throw "Godot console executable missing" }
+          Set-Content -Path (Join-Path $exe.DirectoryName "godot.cmd") -Value ('@"' + $exe.FullName + '" %*')
           $exe.DirectoryName >> $env:GITHUB_PATH
       - run: godot --headless --path godot --editor --import
       - run: godot --headless --path godot --script res://tests/native.gd
       - run: godot --headless --path godot --script res://tests/native.gd -- --cpp
       - run: godot --headless --path godot --script res://tests/native_benchmark.gd
       - run: godot --headless --path godot --script res://tests/native_benchmark.gd -- --cpp
+      - run: godot --headless --path godot --script res://tests/cpp_stress.gd -- --cpp
       - uses: actions/upload-artifact@v4
         with:
           name: pixelfx-cpp-${{ runner.os }}

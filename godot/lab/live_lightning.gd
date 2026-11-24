@@ -43,6 +43,7 @@ func _ready() -> void:
     surface.scale=Vector2.ONE*PIXEL_SCALE
     surface.configure(SIZE.x,SIZE.y)
     lightning=LIGHTNING.new()
+    lightning.enable_acceleration()
     particles=PS.new(712,_ground,["#ffffff","#c8f8ff","#7ff3ff","#1ab8e6"])
     particles.capacity=96
     lights=LIGHTS.new()
@@ -58,7 +59,7 @@ func _ready() -> void:
     layer.add_child(hud)
     var help:=Label.new()
     help.position=Vector2(24,56)
-    help.text="Hold LMB and move | 1: stroke | 2: crackle | B: background | Esc: export lab"
+    help.text="Hold LMB | 1: stroke | 2: crackle | A: backend | B: background | Esc: export lab"
     layer.add_child(help)
     stats=Label.new()
     stats.position=Vector2(24,82)
@@ -81,6 +82,7 @@ func _unhandled_input(event: InputEvent) -> void:
         match event.keycode:
             KEY_1: crackle=false
             KEY_2: crackle=true
+            KEY_A: lightning.enable_acceleration(lightning.accelerator==null)
             KEY_B: bright=not bright
             KEY_ESCAPE: get_tree().change_scene_to_file("res://lab/main.tscn")
         queue_redraw()
@@ -142,6 +144,6 @@ func _process(delta: float) -> void:
         sample_times.sort()
         var n: int=sample_times.size()
         var p95: float=sample_times[clampi(int(ceil(n*0.95))-1,0,n-1)] if n>0 else 0.0
-        stats.text="FPS %d | native update p95 %.2f ms | %d sparks | %s | experimental CPU" % [Engine.get_frames_per_second(),p95,particles.list.size(),"crackle" if crackle else "stroke"]
+        stats.text="FPS %d | native update p95 %.2f ms | %d sparks | %s | %s" % [Engine.get_frames_per_second(),p95,particles.list.size(),"crackle" if crackle else "stroke","C++" if lightning.accelerator!=null else "GDScript"]
         sample_times.clear()
         stat_clock=0.0

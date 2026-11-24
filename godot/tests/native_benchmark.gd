@@ -54,4 +54,5 @@ func _run() -> void:
         var times: Array=row[1]
         times.sort()
         print("Native stage ",row[0]," p95=",times[113]," ms")
-    quit(0)
+    print("C++ calls: ",l.accelerated_calls," rejected: ",l.rejected_calls)
+    quit(1 if cpp and (l.accelerated_calls!=140 or l.rejected_calls!=0) else 0)
