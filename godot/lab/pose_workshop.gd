@@ -235,8 +235,8 @@ func _ready() -> void:
     UI.action_button(_button(actions,"Сначала",func():_seek(0)),"В начало (Home)")
     var nav:=HBoxContainer.new()
     actions.add_child(nav)
-    _button(nav,"◀ Ключ",func():_adjacent(-1))
-    _button(nav,"Ключ ▶",func():_adjacent(1))
+    _button(nav,"◀",func():_adjacent(-1)).tooltip_text="Предыдущий ключ"
+    _button(nav,"▶",func():_adjacent(1)).tooltip_text="Следующий ключ"
     history_button=_button(nav,"↶",_undo)
     redo_button=_button(nav,"↷",_redo)
     history_button.tooltip_text="Отменить изменение клипа"
@@ -309,6 +309,8 @@ func _ready() -> void:
     timeline.marker_moved.connect(_move_marker)
     timeline.marker_selected.connect(func(lane:int,i:int):
         delete_lane=lane
+        timeline.selected_lane=lane
+        timeline.selected_index=i
         if lane==0:
             keys.select(i)
             event_list.deselect_all()
@@ -357,6 +359,15 @@ func _seek(v: float) -> void:
     playing=false
     edited_pose=false
     time=clampf(v,0,float(bank[name_id].duration))
+    delete_lane=0
+    if keys!=null:
+        keys.deselect_all()
+        event_list.deselect_all()
+        for i in range(bank[name_id].keys.size()):
+            if absf(float(bank[name_id].keys[i].t)-time)<.0001:keys.select(i);break
+    if timeline!=null:
+        timeline.selected_lane=-1
+        timeline.selected_index=-1
     pose=CLIPS.sample(bank[name_id],time,false)
     _sync()
 
@@ -528,14 +539,19 @@ func _refresh_vfx_library() -> void:
     if not vfx_choices.is_empty():vfx_select.select(0)
 
 func _event_selected(index: int) -> void:
-    delete_lane=1
-    keys.deselect_all()
     var events: Array=bank[name_id].events
     if index<0 or index>=events.size():return
     var e: Dictionary=events[index]
     selected=e.anchor if rig.ids.has(e.anchor) else selected
     event_kind.select(EVENT_TYPES.find(e.kind))
     _seek(float(e.t))
+    delete_lane=1
+    keys.deselect_all()
+    event_list.select(index)
+    timeline.selected_lane=1
+    timeline.selected_index=index
+    timeline.queue_redraw()
+    _update_transport()
     if e.kind=="vfx":status.text="VFX: "+str(e.preset.name)+" · "+UI.label(e.anchor)
 
 func _add_vfx_event() -> void:
@@ -591,6 +607,9 @@ func _delete_event() -> void:
         _refresh_lists()
 
 func _refresh_lists() -> void:
+    delete_lane=0
+    timeline.selected_lane=-1
+    timeline.selected_index=-1
     keys.clear()
     event_list.clear()
     for k in bank[name_id].keys:
@@ -743,6 +762,9 @@ func _move_marker(lane: int,index: int,t: float) -> void:
     if lane==1:
         keys.deselect_all()
         event_list.select(arr.find(item))
+        timeline.selected_lane=1
+        timeline.selected_index=arr.find(item)
+        timeline.queue_redraw()
     _update_transport()
     status.text="Маркер перемещён: %.3f с"%t
 

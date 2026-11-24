@@ -144,8 +144,9 @@ func _ready() -> void:
     left.add_child(addrow)
     _button(addrow,"+ Слой",_add_layer)
     _button(addrow,"Копия",_copy_layer)
-    delete_button=_button(addrow,"Del",_delete_selected)
+    delete_button=_button(addrow,"Del",_delete_layer_action)
     UI.action_button(delete_button,"Удалить выбранный слой (Delete). Последний слой защищён.")
+    delete_button.text="Del"
     var order:=HBoxContainer.new()
     left.add_child(order)
     _button(order,"↑",func():_move_layer(-1))
@@ -967,9 +968,11 @@ func _redo()->void:
     _restore_snapshot(redo_history.pop_back())
     status.text="Изменение повторено"
 func _delete_selected()->void:
-    if inspector.current_tab==2 and graph.has_focus():
+    if inspector.current_tab==2 and not list.has_focus():
         if not graph.delete_chosen():status.text="Выбери внутреннюю точку кривой."
         return
+    _delete_layer_action()
+func _delete_layer_action()->void:
     if preset.layers.size()<=1:
         status.text="Последний слой удалить нельзя."
         return
