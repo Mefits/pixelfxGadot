@@ -65,7 +65,7 @@ func _bar(at: Vector2) -> ProgressBar:
     return b
 
 func _reset() -> void:
-    world=COMBAT.new(CLIPS.load_bank())
+    world=COMBAT.new(CLIPS.fighter_bank(0),CLIPS.fighter_bank(1))
     canvas.world=world
     ai_clock=0
 

@@ -59,11 +59,17 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
         pos.y=FLOOR
         velocity.y=0
     pos.x=clampf(pos.x,16,304)
-    var old: float=t
+    var old: float=t if t>0.0 else -0.000001
     t+=dt
     var clip: Dictionary=bank[state]
     if state in ["strike","cast"]:
-        events=CLIPS.events_between(clip,old,t)
+        for marker in CLIPS.events_between(clip,old,t):
+            if not rig.ids.has(marker.anchor):continue
+            var e: Dictionary=marker.duplicate(true)
+            rig.evaluate(CLIPS.sample(clip,float(marker.t),false))
+            e["world_anchor"]=point(marker.anchor)
+            e["direction"]=facing
+            events.append(e)
     rig.evaluate(CLIPS.sample(clip,t))
 
 func damage(amount: int,direction: int) -> void:

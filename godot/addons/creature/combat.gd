@@ -6,9 +6,9 @@ var flashes: Array=[]
 var hits: int=0
 var elapsed: float=0
 
-func _init(bank: Dictionary) -> void:
+func _init(bank: Dictionary,second: Dictionary={}) -> void:
     a=F.new(93,1,Color("#5aafdc"),bank)
-    b=F.new(227,-1,Color("#ce775f"),bank)
+    b=F.new(227,-1,Color("#ce775f"),bank if second.is_empty() else second)
 
 func step(dt: float,left: Dictionary,right: Dictionary) -> void:
     elapsed+=dt
@@ -29,9 +29,9 @@ func step(dt: float,left: Dictionary,right: Dictionary) -> void:
         if flashes[i].age>=flashes[i].life: flashes.remove_at(i)
 
 func _event(src,dst,e: Dictionary) -> void:
-    var hand: Vector2=src.point(e.anchor)
+    var hand: Vector2=e.world_anchor
     var chest: Vector2=dst.point("chest")
-    var direction: int=src.facing
+    var direction: int=e.direction
     var forward: bool=(chest.x-hand.x)*direction>=-5
     match e.kind:
         "charge":

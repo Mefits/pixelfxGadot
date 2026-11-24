@@ -3,7 +3,10 @@ const RIG=preload("res://addons/creature/rig.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const PREVIEW=preload("res://lab/creature_preview.gd")
 var rig=RIG.humanoid()
-var bank: Dictionary=CLIPS.load_bank()
+var bank: Dictionary=CLIPS.fighter_bank(0)
+var fighter_index: int=0
+var copied_pose: Dictionary={}
+var fighter_select: OptionButton
 var name_id: String="strike"
 var pose: Dictionary={}
 var time: float=0
@@ -92,6 +95,17 @@ func _ready() -> void:
     clip_select.select(CLIPS.NAMES.find(name_id))
     clip_select.item_selected.connect(func(i:int): _choose(CLIPS.NAMES[i]))
     _button(top,"Arena",func(): _go("res://lab/combat_lab.tscn"))
+    var choose_fighter:=HBoxContainer.new()
+    side.add_child(choose_fighter)
+    fighter_select=OptionButton.new()
+    fighter_select.add_item("Fighter 1 / Azure")
+    fighter_select.add_item("Fighter 2 / Ember")
+    fighter_select.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    choose_fighter.add_child(fighter_select)
+    fighter_select.item_selected.connect(_switch_fighter)
+    _button(choose_fighter,"Copy pose",func():copied_pose=pose.duplicate(true))
+    _button(choose_fighter,"Paste",func():
+        if not copied_pose.is_empty():pose=copied_pose.duplicate(true);_edit())
     var timings:=HBoxContainer.new()
     side.add_child(timings)
     _label(timings,"Seconds")
@@ -132,7 +146,7 @@ func _ready() -> void:
     _button(actions,"Delete key",_delete_key)
     _button(actions,"Play / pause",_play)
     keys=ItemList.new()
-    keys.custom_minimum_size.y=92
+    keys.custom_minimum_size.y=64
     side.add_child(keys)
     keys.item_selected.connect(func(i:int): _seek(float(bank[name_id].keys[i].t)))
     var erow:=HBoxContainer.new()
@@ -143,12 +157,12 @@ func _ready() -> void:
     _button(erow,"Add event",_add_event)
     _button(erow,"Delete",_delete_event)
     event_list=ItemList.new()
-    event_list.custom_minimum_size.y=60
+    event_list.custom_minimum_size.y=48
     side.add_child(event_list)
     var save:=HBoxContainer.new()
     side.add_child(save)
     _button(save,"Save",_save)
-    _button(save,"Load",func():bank=CLIPS.load_bank();_choose(name_id))
+    _button(save,"Load",func():bank=CLIPS.fighter_bank(fighter_index);_choose(name_id);dirty=false)
     _button(save,"Defaults",func():bank=CLIPS.defaults();_choose(name_id);dirty=true)
     _button(save,"Exit",func():_go("res://lab/main.tscn"))
     timeline=HSlider.new()
@@ -176,7 +190,7 @@ func _choose(n: String) -> void:
 func _seek(v: float) -> void:
     playing=false
     time=clampf(v,0,float(bank[name_id].duration))
-    pose=CLIPS.sample(bank[name_id],time)
+    pose=CLIPS.sample(bank[name_id],time,false)
     _sync()
 
 func _sync() -> void:
@@ -263,15 +277,29 @@ func _refresh_lists() -> void:
     for k in bank[name_id].keys:keys.add_item("Key  %.3f s"%k.t)
     for e in bank[name_id].events:event_list.add_item("%.3f  %s @ %s"%[e.t,e.kind,e.anchor])
 
+func _path() -> String:
+    return CLIPS.SAVE_PATH if fighter_index==0 else CLIPS.SECOND_PATH
+
+func _switch_fighter(i: int) -> void:
+    if dirty and not CLIPS.save_bank(bank,_path()):
+        fighter_select.select(fighter_index)
+        status.text="Save failed; cannot switch fighters."
+        return
+    fighter_index=i
+    bank=CLIPS.fighter_bank(i)
+    preview.tint=Color("#5aafdc") if i==0 else Color("#ce775f")
+    dirty=false
+    _choose(name_id)
+
 func _save() -> void:
-    if CLIPS.save_bank(bank):
+    if CLIPS.save_bank(bank,_path()):
         dirty=false
-        status.text="Saved to "+ProjectSettings.globalize_path(CLIPS.SAVE_PATH)
+        status.text="Saved to "+ProjectSettings.globalize_path(_path())
     else:
         status.text="Save failed: invalid clip data."
 
 func _go(path: String) -> void:
-    if dirty and not CLIPS.save_bank(bank):
+    if dirty and not CLIPS.save_bank(bank,_path()):
         status.text="Could not save. Fix clip data before leaving."
         return
     get_tree().change_scene_to_file(path)
@@ -287,5 +315,5 @@ func _process(dt: float) -> void:
     if time>=d:
         if bank[name_id].loop:time=fposmod(time,d)
         else:time=d;playing=false
-    pose=CLIPS.sample(bank[name_id],floor(time*rate.value)/rate.value)
+    pose=CLIPS.sample(bank[name_id],minf(d,floor(time*rate.value+.00001)/rate.value),false)
     _sync()

@@ -24,6 +24,7 @@ func _run() -> void:
     check(not rig.add_joint("bad","missing",Vector2.ONE),"Invalid parent")
     rig.evaluate(C.pose({"tail0":30}))
     check(rig.point("tail1").distance_to(rig.point("tail0"))>7.99,"Extra limb FK")
+    check(C.sample(bank.idle,1.2,false)==bank.idle.keys[-1].pose,"Editor endpoint")
     var clip: Dictionary=bank.strike
     C.put_key(clip,.1,C.pose({"chest":10}))
     check(clip.keys.size()==5,"Insert key")

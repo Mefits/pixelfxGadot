@@ -1,6 +1,7 @@
 extends RefCounted
 ## JSON-safe keyed poses and event markers. No dependency on humanoid joint names in sampling.
 const SAVE_PATH="user://creature_clips.json"
+const SECOND_PATH="user://creature_clips_fighter2.json"
 const NAMES=["idle","walk","jump","strike","cast","guard","hurt"]
 
 static func pose(a: Dictionary={},x: float=0,y: float=0) -> Dictionary:
@@ -21,9 +22,9 @@ static func defaults() -> Dictionary:
         "hurt":{"duration":.26,"loop":false,"keys":[key(0,{"chest":30,"shoulder_near":25,"shoulder_far":50},-3,0),key(.26,idle)],"events":[]}
     }
 
-static func sample(clip: Dictionary,time: float) -> Dictionary:
+static func sample(clip: Dictionary,time: float,wrap_loop: bool=true) -> Dictionary:
     var duration: float=float(clip.duration)
-    var t: float=fposmod(time,duration) if clip.loop else clampf(time,0,duration)
+    var t: float=fposmod(time,duration) if clip.loop and wrap_loop else clampf(time,0,duration)
     var keys: Array=clip.keys
     if keys.size()==1 or t<=float(keys[0].t):
         return keys[0].pose.duplicate(true)
@@ -90,3 +91,21 @@ static func load_bank(path: String=SAVE_PATH) -> Dictionary:
         var data: Variant=JSON.parse_string(FileAccess.get_file_as_string(path))
         if valid(data): return data
     return defaults()
+
+static func fighter_bank(index: int) -> Dictionary:
+    if index==0:
+        return load_bank()
+    if FileAccess.file_exists(SECOND_PATH):
+        return load_bank(SECOND_PATH)
+    # Distinct heavy fighter timing; same editable joint graph.
+    var bank: Dictionary=defaults()
+    for name in ["strike","cast"]:
+        var factor: float=1.3 if name=="strike" else 1.15
+        bank[name].duration*=factor
+        for k in bank[name].keys:k.t*=factor
+        for e in bank[name].events:e.t*=factor
+    for k in bank.idle.keys:
+        k.pose.angles["chest"]=-8
+        k.pose.angles["shoulder_far"]=20
+        k.pose.angles["elbow_far"]=-95
+    return bank
