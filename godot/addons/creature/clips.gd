@@ -150,6 +150,11 @@ static func followup(original: Dictionary) -> Dictionary:
 
 static func complete(bank: Dictionary) -> Dictionary:
     var result: Dictionary=bank.duplicate(true)
+    if result.size()>=NAMES.size():
+        var all_present: bool=true
+        for name in NAMES:
+            if not result.has(name):all_present=false;break
+        if all_present:return result
     var extra: Dictionary=extra_clips(result)
     for name in extra:
         if not result.has(name):result[name]=extra[name]

@@ -85,7 +85,8 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
             flashes.append({"kind":"charge","a":hand,"b":hand,"age":0.0,"life":.3,"owner":src,"anchor":e.anchor})
         "strike":
             flashes.append({"kind":"strike","a":hand,"b":hand+Vector2(direction*9,-3),"age":0.0,"life":.15})
-            if forward and hand.distance_to(chest)<=19 and dst.hp>0:
+            var melee_forward: bool=(chest.x-float(e.world_chest.x))*direction>=0 if e.attack_kind=="heavy" else forward
+            if melee_forward and hand.distance_to(chest)<=19 and dst.hp>0:
                 amount=25 if e.attack_kind=="heavy" else (17 if e.attack_kind=="kick" else (15 if e.attack_kind=="air_strike" else 13))
         "cast":
             var target: Vector2=hand+Vector2(direction*104,0)

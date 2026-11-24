@@ -20,10 +20,13 @@ func _run()->void:
         w.b.pos.x=125
         var reaction:bool=false
         var anchor:String=""
-        for i in range(90):
-            w.step(1.0/60,{spec[0]:i==0},{})
+        for i in range(180):
+            w.step(W.DT,{spec[0]:i==0},{})
             if w.b.state=="hurt_heavy":reaction=true
-            for e in w.a.events:anchor=e.anchor
+            for e in w.a.events:
+                anchor=e.anchor
+                if e.kind=="strike" and w.hitstop<=0:
+                    print("Marker ",spec[0]," hand ",e.world_anchor," target ",w.b.point("chest")," src chest ",e.world_chest)
         print(spec[0]," damage ",100-w.b.hp," freeze ",w.freeze_total," reaction ",reaction," anchor ",anchor)
         check(w.a.attacks_started==1 and w.hits==1 and w.b.hp==100-int(spec[1]),"Attack "+spec[0])
         if spec[0]=="heavy":check(reaction and w.freeze_total>.10,"Heavy reaction and stop")
