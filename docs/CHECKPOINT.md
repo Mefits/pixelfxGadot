@@ -25,3 +25,6 @@ Freeze hybrid implementation, authored reaction default, draw-only original prov
 Correct tapered limb contour winding after visual log exposed self-intersection. Treat all Godot ERROR lines in graphical capture as failures.
 
 Graphical CI uses Godot Dummy audio driver because the runner has no sound device; polygon errors remain fatal. Previous run confirms all gameplay tests passed and no triangulation errors after the contour fix.
+
+## 0.06.2
+Accepted hybrid default restored, smooth continuous limb skin and bent cloth contours; F6 A/B. Verify actual contours over extreme bends and sampled gameplay poses, old regression and real captures. No new combat actions.

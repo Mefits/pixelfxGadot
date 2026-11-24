@@ -2,6 +2,8 @@ extends Node2D
 const WORLD=preload("res://game/world.gd")
 const M=preload("res://game/motor.gd")
 const SKIN=preload("res://game/fighter_skin.gd")
+const SOFT=preload("res://game/smooth_skin.gd")
+var smooth_skin:bool=true
 var artistic:bool=true
 var world=WORLD.new()
 var paused:bool=false
@@ -16,8 +18,8 @@ func _ready()->void:
     toolbar=HBoxContainer.new()
     toolbar.position=Vector2(24,16)
     toolbar.theme=theme0
-    theme0.default_font_size=13
-    toolbar.add_theme_constant_override("separation",8)
+    theme0.default_font_size=12
+    toolbar.add_theme_constant_override("separation",5)
     add_child(toolbar)
     pause_button=_button("Пауза [Space]",_pause)
     _button("Сброс [R]",_reset)
@@ -26,6 +28,7 @@ func _ready()->void:
     _button("Hitstop [F3]",_toggle_hitstop)
     _button("Гибрид [F4]",_toggle_hybrid)
     _button("Облик [F5]",_toggle_skin)
+    _button("Стыки [F6]",_toggle_smooth)
     _button("Дистанция [T]",_close_reset)
     hud=Label.new()
     hud.position=Vector2(24,490)
@@ -59,6 +62,10 @@ func _close_reset()->void:
     world.rig_a.sample(world.a)
     world.rig_b.sample(world.b)
     queue_redraw()
+func _toggle_smooth()->void:
+    smooth_skin=not smooth_skin
+    queue_redraw()
+    _hud()
 func _toggle_skin()->void:
     artistic=not artistic
     queue_redraw()
@@ -82,6 +89,7 @@ func _unhandled_key_input(e:InputEvent)->void:
         KEY_F3:_toggle_hitstop()
         KEY_F4:_toggle_hybrid()
         KEY_F5:_toggle_skin()
+        KEY_F6:_toggle_smooth()
         KEY_T:_close_reset()
 func _held(key:Key)->bool:return Input.is_physical_key_pressed(key)
 func _physics_process(dt:float)->void:
@@ -92,7 +100,7 @@ func _physics_process(dt:float)->void:
     _hud()
     queue_redraw()
 func _hud()->void:
-    hud.text="A/D — движение · W — прыжок · Shift — бег · F — быстрый · H — тяжёлый   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl · K/L")+"\nN  /  0.06  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · попаданий "+str(world.hits)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
+    hud.text="A/D — движение · W — прыжок · Shift — бег · F — быстрый · H — тяжёлый   |   "+("P2: неподвижен (F2)" if single_player else "P2: ←/→ · ↑ · Ctrl · K/L")+"\nN  /  0.06.2  /  "+("ГИБРИД" if world.hybrid_enabled else "АНИМАЦИЯ")+" · "+("ПЛАВНЫЙ" if smooth_skin else "СТАРЫЙ")+" · попаданий "+str(world.hits)+" · hitstop "+("ON" if world.hitstop_enabled else "OFF")+"   |   "+("ПАУЗА" if paused else ("120 Гц · кадр "+str(world.ticks)))
 func _segment(a:Vector2,b:Vector2,width:float,c:Color)->void:
     draw_line(a,b,Color("#17202b"),width+3,true)
     draw_line(a,b,c,width,true)
@@ -114,7 +122,8 @@ func _fighter(m,r,c:Color)->void:
     draw_circle(Vector2.ZERO,25,Color(0,0,0,.24))
     draw_set_transform(Vector2.ZERO)
     if artistic:
-        SKIN.draw(self,p,m.facing,c)
+        if smooth_skin:SOFT.draw(self,p,m.facing,c)
+        else:SKIN.draw(self,p,m.facing,c)
     else:
         _limbs(p,"far",c.darkened(.38),m.facing)
         var hips:Vector2=p.hips

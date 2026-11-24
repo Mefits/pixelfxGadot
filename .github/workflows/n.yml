@@ -35,6 +35,8 @@ jobs:
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-jab.log; then exit 1; fi
           timeout 30s godot --headless --script res://tests/hybrid.gd 2>&1 | tee /tmp/n-hybrid.log
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/n-hybrid.log; then exit 1; fi
+          timeout 60s godot --headless --script res://tests/skin.gd 2>&1 | tee /tmp/n-skin.log
+          if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-skin.log; then exit 1; fi
           timeout 180s xvfb-run -a godot --audio-driver Dummy --resolution 960x540 --script res://tests/visual.gd 2>&1 | tee /tmp/n-visual.log
           if grep -E 'ERROR:|Parse Error|Failed to load script' /tmp/n-visual.log; then exit 1; fi
           test -f reports/stance.png
@@ -46,7 +48,8 @@ jobs:
           test "$(find reports/back -name '*.png' | wc -l)" -eq 32
           test "$(find reports/leap -name '*.png' | wc -l)" -eq 30
           test "$(find reports/jab -name '*.png' | wc -l)" -eq 34
-          for kind in heavy_hybrid heavy_authored jab_hybrid jab_authored heavy_mannequin; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 44; done
+          for kind in heavy_hybrid heavy_authored jab_hybrid jab_authored heavy_mannequin heavy_old_skin; do test "$(find reports/$kind -name '*.png' | wc -l)" -eq 44; done
+          test "$(find reports/run_old_skin -name '*.png' | wc -l)" -eq 36
           rm -rf .godot
           find . -name '*.import' -delete
           printf '%s\n' "$GITHUB_SHA" > REVISION.txt
@@ -57,7 +60,7 @@ jobs:
           path: /tmp/n-*.log
       - uses: actions/upload-artifact@v4
         with:
-          name: N-0.06-Godot
+          name: N-0.06.2-Godot
           path: |
             project.godot
             game/

@@ -83,6 +83,10 @@ func _run()->void:
         await capture("jab/frame_%03d"%frame)
     if scene.world.hits!=1:push_error("Jab capture missed");quit(1);return
     await impact_sequence(scene,"heavy_hybrid",true,true)
+    scene.smooth_skin=false
+    await impact_sequence(scene,"heavy_old_skin",true,true)
+    await sequence(scene,"run_old_skin",36,"run")
+    scene.smooth_skin=true
     await impact_sequence(scene,"heavy_authored",false,true)
     await impact_sequence(scene,"jab_hybrid",true,false)
     await impact_sequence(scene,"jab_authored",false,false)
@@ -94,6 +98,10 @@ func _run()->void:
     scene._toggle_skin()
     check_skin(scene,state,tick0)
     scene._toggle_skin()
+    check_skin(scene,state,tick0)
+    scene._toggle_smooth()
+    check_skin(scene,state,tick0)
+    scene._toggle_smooth()
     check_skin(scene,state,tick0)
     scene._pause()
     if not scene.paused:quit(1);return
