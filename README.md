@@ -51,3 +51,6 @@ K in the main lab opens Rift Collapse, a new composition using the toolkit (not 
 - Встроенный оригинальный JS — полный каталог и оригинальная хореография без Node.js в игре. Новый режим J; H — Chain Lightning, E — Electrified, O — Ball Lightning. Сборка оригинального режима проверяется отдельно.
 
 [Описание и API оригинального рантайма](docs/ORIGINAL_RUNTIME.md) · [Последняя проверенная сборка с полным Painter](https://github.com/Mefits/pixelfxGadot/actions/runs/45393190916/artifacts/14919084321) · [CI оригинального рантайма](https://github.com/Mefits/pixelfxGadot/actions/runs/45394956913).
+
+## Complete verified toolkit
+[Windows/Linux complete archive](https://github.com/Mefits/pixelfxGadot/actions/runs/45397546384/artifacts/14921842877) · [passing build and package test](https://github.com/Mefits/pixelfxGadot/actions/runs/45397546384). All 244 effect modules and 73 choreography entries pass smoke tests on both platforms. Includes native C++ libraries and original JS bundle. J opens original catalog; A toggles acceleration. Read PORTABLE.md and the latest docs/STATUS.md for actual acceptance criteria and performance limits. For use by another AI, provide the whole archive and SKILL.md.
