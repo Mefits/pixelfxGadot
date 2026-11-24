@@ -18,3 +18,6 @@ Validate source runtime dependency closure and five independent exported project
 
 ## v0.31 SDK checkpoint
 Canonical JSON Schema 2020-12; engine-aware diagnostic validator, compatibility checks, API reference and all built-in fixtures checked by both Godot and independent standard validator. No change to permissive existing editor loading. Full prior regression and isolated exports.
+
+## v0.35 — single consolidated SDK checkpoint
+v0.31 numeric enum mismatch fixed without separate CI. Validate all 37 templates with both validators; test CLI creation, patch, diagnostics, deterministic physical simulation and contact, real Godot frame capture, GIF/contact sheets, and standalone export with paired anatomy. Run complete existing suite and five isolated examples. Independent agent and visual acceptance remain manual; automated black-box reference records explicit status. Do not trigger extra runs on routine commits.

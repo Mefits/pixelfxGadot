@@ -15,7 +15,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -37,7 +37,11 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > /tmp/complete/CREATURE_REVISION.txt
           python3 tools/build_creature_runtime.py --project /tmp/complete/godot --example portable_example --licenses /tmp/complete
           cp -a portable_example /tmp/complete/
-          cp tools/build_creature_runtime.py tools/check_creature_schema.py /tmp/complete/tools/
+          cp tools/build_creature_runtime.py tools/check_creature_schema.py tools/creature_sdk.py tools/test_creature_sdk.py /tmp/complete/tools/
+          cp -a godot/sdk /tmp/complete/godot/
+          mkdir -p /tmp/complete/skills
+          cp -a skills/creature-sdk /tmp/complete/skills/
+          cp -a sdk_acceptance /tmp/complete/
       - name: Install Godot
         run: |
           curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
@@ -72,7 +76,7 @@ jobs:
       - name: Cross-check canonical fixtures with standard JSON Schema
         run: |
           python3 -m venv /tmp/schema-venv
-          /tmp/schema-venv/bin/pip install --quiet jsonschema==4.23.0
+          /tmp/schema-venv/bin/pip install --quiet jsonschema==4.23.0 Pillow==11.3.0
           /tmp/schema-venv/bin/python tools/check_creature_schema.py /tmp/complete/godot/addons/creature/template.schema.json /tmp/sdk-fixtures
       - name: Verify portable ZIPs in independent clean Godot projects
         shell: bash
@@ -101,6 +105,24 @@ jobs:
           done
           rm -rf /tmp/complete/godot/.godot
           find /tmp/complete/godot -name '*.import' -delete
+      - name: Full SDK black-box acceptance via public commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/complete/godot
+          godot --headless --editor --import 2>&1 | tee /tmp/sdk-final-import.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/sdk-final-import.log
+          /tmp/schema-venv/bin/python /tmp/complete/tools/test_creature_sdk.py --project /tmp/complete/godot --out /tmp/sdk-acceptance 2>&1 | tee /tmp/sdk-acceptance.log
+          grep SDK_BLACK_BOX_OK /tmp/sdk-acceptance.log
+          test -f /tmp/sdk-acceptance/acceptance.json
+          rm -rf /tmp/complete/godot/.godot /tmp/sdk-acceptance/clean_project/.godot
+          find /tmp/complete/godot -name '*.import' -delete
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Creature-SDK-Acceptance-Evidence
+          path: /tmp/sdk-acceptance/
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:
