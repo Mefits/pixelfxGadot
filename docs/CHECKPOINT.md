@@ -23,3 +23,5 @@ Correct float32 clamp comparison: reset angular velocity only when a hard angula
 Freeze hybrid implementation, authored reaction default, draw-only original provisional skin. Retain all tests; explicitly enable hybrid in regression; verify toggling art preserves world state. Capture authored jab, authored heavy and same heavy with mannequin for comparison.
 
 Correct tapered limb contour winding after visual log exposed self-intersection. Treat all Godot ERROR lines in graphical capture as failures.
+
+Graphical CI uses Godot Dummy audio driver because the runner has no sound device; polygon errors remain fatal. Previous run confirms all gameplay tests passed and no triangulation errors after the contour fix.
