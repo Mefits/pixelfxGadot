@@ -2,6 +2,12 @@ extends Control
 ## Two lanes: exact pose keys and event markers. Click a marker to seek exactly.
 signal value_changed(value: float)
 signal marker_selected(lane: int,index: int)
+signal marker_moved(lane: int,index: int,time: float)
+var drag_lane: int=-1
+var drag_index: int=-1
+var press_x: float=0
+var drag_time: float=0
+var moving_marker: bool=false
 var value: float=0:
     set(v):
         value=clampf(v,0,max_value)
@@ -30,23 +36,58 @@ func _draw() -> void:
         var x: float=at(event.t)
         draw_colored_polygon(PackedVector2Array([Vector2(x,28),Vector2(x+5,37),Vector2(x-5,37)]),Color("#e9ad62"))
     draw_line(Vector2(at(value),0),Vector2(at(value),size.y),Color.WHITE,1)
+    if moving_marker:
+        var x: float=at(drag_time)
+        draw_line(Vector2(x,12),Vector2(x,size.y),Color("#e6b670"),2)
+        draw_string(font,Vector2(clampf(x+5,LEFT,size.x-48),12),"%.3f"%drag_time,HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("#f5cc90"))
 func _gui_input(e: InputEvent) -> void:
     if e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT:
-        dragging=e.pressed
-        if e.pressed:
-            var lane: int=0 if e.position.y>=13 and e.position.y<27 else (1 if e.position.y>=27 else -1)
-            if lane>=0:
-                var arr: Array=clip.get("keys" if lane==0 else "events",[])
-                for i in range(arr.size()):
-                    if absf(at(arr[i].t)-e.position.x)<=7:
-                        value_changed.emit(float(arr[i].t))
-                        marker_selected.emit(lane,i)
-                        accept_event()
-                        return
-            _seek(e.position.x)
-        accept_event()
-    elif e is InputEventMouseMotion and dragging:
+        if not e.pressed:
+            if moving_marker:
+                marker_moved.emit(drag_lane,drag_index,drag_time)
+            dragging=false
+            moving_marker=false
+            drag_lane=-1
+            drag_index=-1
+            queue_redraw()
+            accept_event()
+            return
+        dragging=true
+        press_x=e.position.x
+        drag_lane=-1
+        drag_index=-1
+        moving_marker=false
+        var lane: int=0 if e.position.y>=13 and e.position.y<27 else (1 if e.position.y>=27 else -1)
+        if lane>=0:
+            var arr: Array=clip.get("keys" if lane==0 else "events",[])
+            var best: float=8
+            for i in range(arr.size()):
+                var dist: float=absf(at(arr[i].t)-e.position.x)
+                if dist<best:
+                    best=dist
+                    drag_lane=lane
+                    drag_index=i
+            if drag_index>=0:
+                drag_time=float(arr[drag_index].t)
+                value_changed.emit(drag_time)
+                marker_selected.emit(lane,drag_index)
+                accept_event()
+                return
         _seek(e.position.x)
         accept_event()
+    elif e is InputEventMouseMotion and dragging:
+        if drag_index>=0:
+            if absf(e.position.x-press_x)>4:moving_marker=true
+            if moving_marker:
+                var t: float=_time_at(e.position.x)
+                drag_time=clampf(snappedf(t,.01),0,max_value)
+                if e.shift_pressed:drag_time=t
+                queue_redraw()
+        else:_seek(e.position.x)
+        accept_event()
+
+func _time_at(x: float) -> float:
+    return clampf((x-LEFT)/maxf(1,size.x-LEFT-10),0,1)*max_value
+
 func _seek(x: float) -> void:
-    value_changed.emit(clampf((x-LEFT)/maxf(1,size.x-LEFT-10),0,1)*max_value)
+    value_changed.emit(_time_at(x))

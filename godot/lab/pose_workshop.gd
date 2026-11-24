@@ -41,6 +41,13 @@ var event_kind: OptionButton
 var status: Label
 var clock_label: Label
 var dragging: bool=false
+var rotating: bool=false
+var rotation_start: float=0
+var rotation_mouse: float=0
+var rotation_pivot:=Vector2.ZERO
+var confirm: ConfirmationDialog
+var pending_action: Callable
+var mode_label: Label
 
 func _button(parent: Control,label: String,fn: Callable) -> Button:
     var b:=Button.new()
@@ -74,7 +81,7 @@ func _ready() -> void:
     add_child(bg)
     var title:=Label.new()
     title.position=Vector2(16,9)
-    title.text="РЕДАКТОР АНИМАЦИЙ / позы и ключевые кадры"
+    title.text="РЕДАКТОР АНИМАЦИЙ / позы и ключи"
     title.add_theme_font_size_override("font_size",21)
     add_child(title)
     var view:=SubViewport.new()
@@ -138,12 +145,18 @@ func _ready() -> void:
     ease.text="Плавно"
     toggles.add_child(ease)
     ease.toggled.connect(func(v:bool):
-        if not syncing: bank[name_id]["easing"]="smooth" if v else "linear"; dirty=true)
+        if not syncing:
+            _remember()
+            bank[name_id]["easing"]="smooth" if v else "linear"
+            dirty=true)
     loop=CheckButton.new()
     loop.text="Цикл"
     toggles.add_child(loop)
     loop.toggled.connect(func(v:bool):
-        if not syncing: bank[name_id]["loop"]=v; dirty=true)
+        if not syncing:
+            _remember()
+            bank[name_id]["loop"]=v
+            dirty=true)
     _label(side,"2. Выбери сустав и измени позу")
     joint_select=OptionButton.new()
     side.add_child(joint_select)
@@ -160,6 +173,14 @@ func _ready() -> void:
         if not syncing: pose.root[0]=v; _edit())
     root_y=_spin(controls,-40,40,.5,func(v:float):
         if not syncing: pose.root[1]=v; _edit())
+    var pose_actions:=HBoxContainer.new()
+    side.add_child(pose_actions)
+    var mirror:=_button(pose_actions,"Зеркало",_mirror_pose)
+    mirror.tooltip_text="Поменять ближние и дальние конечности и отразить углы"
+    _button(pose_actions,"Угол 0",_zero_joint)
+    _button(pose_actions,"Чистый клип",_ask_blank)
+    mode_label=_label(side,"ЛКМ: перемещение · ПКМ: вращение выбранного сустава")
+    mode_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     var aids:=HBoxContainer.new()
     side.add_child(aids)
     auto_key=CheckButton.new()
@@ -202,10 +223,12 @@ func _ready() -> void:
     event_list.custom_minimum_size.y=48
     side.add_child(event_list)
     var save:=HBoxContainer.new()
-    side.add_child(save)
+    save.position=Vector2(604,9)
+    save.theme=compact
+    add_child(save)
     _button(save,"Сохранить",_save)
-    _button(save,"Загрузить",func():bank=CLIPS.fighter_bank(fighter_index);_choose(name_id);dirty=false)
-    _button(save,"Сброс",func():bank=CLIPS.defaults();_choose(name_id);dirty=true)
+    _button(save,"Загрузить",_ask_load)
+    _button(save,"Сброс клипа",_ask_default)
     _button(save,"Выход",func():_go("res://lab/main.tscn"))
     timeline=preload("res://lab/pose_timeline.gd").new()
     timeline.position=Vector2(18,478)
@@ -214,6 +237,7 @@ func _ready() -> void:
     add_child(timeline)
     timeline.value_changed.connect(func(v:float):
         if not syncing: _seek(v))
+    timeline.marker_moved.connect(_move_marker)
     timeline.marker_selected.connect(func(lane:int,i:int):
         if lane==0:keys.select(i)
         else:event_list.select(i))
@@ -227,6 +251,13 @@ func _ready() -> void:
     status.add_theme_font_size_override("font_size",13)
     status.text="Перетащи кисть, стопу или таз. Автоключ запишет позу."
     add_child(status)
+    confirm=ConfirmationDialog.new()
+    confirm.title="Подтверждение"
+    confirm.ok_button_text="Продолжить"
+    confirm.cancel_button_text="Отмена"
+    add_child(confirm)
+    confirm.confirmed.connect(func():
+        if pending_action.is_valid():pending_action.call())
     _choose(name_id)
 
 func _choose(n: String) -> void:
@@ -279,9 +310,27 @@ func _edit() -> void:
     edited_pose=true
     status.text="Поза изменена. Запиши ключ, чтобы сохранить её."
     _sync()
-    if auto_key.button_pressed and not dragging:_key()
+    if auto_key.button_pressed and not dragging and not rotating:_key()
 
 func _drag(e: InputEvent) -> void:
+    if e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_RIGHT:
+        if not e.pressed:
+            if rotating and edited_pose and auto_key.button_pressed:_key()
+            rotating=false
+            return
+        playing=false
+        rotation_pivot=rig.point(selected)
+        var mouse: Vector2=e.position/4-preview.origin-rotation_pivot
+        rotating=mouse.length()>1
+        rotation_mouse=mouse.angle()
+        rotation_start=float(pose.angles.get(selected,0))
+        return
+    if e is InputEventMouseMotion and rotating:
+        var mouse: Vector2=e.position/4-preview.origin-rotation_pivot
+        if mouse.length()>1:
+            pose.angles[selected]=wrapf(rotation_start+rad_to_deg(wrapf(mouse.angle()-rotation_mouse,-PI,PI)),-180,180)
+            _edit()
+        return
     if e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT:
         if not e.pressed:
             if dragging and edited_pose and auto_key.button_pressed:_key()
@@ -316,6 +365,7 @@ func _key() -> void:
     edited_pose=false
     dirty=true
     _refresh_lists()
+    _sync()
     status.text="Ключ записан: %.3f с"%time
 
 func _delete_key() -> void:
@@ -412,7 +462,7 @@ func _process(dt: float) -> void:
     if time>=d:
         if bank[name_id].loop:time=fposmod(time,d)
         else:time=d;playing=false
-    pose=CLIPS.sample(bank[name_id],minf(d,floor(time*rate.value+.00001)/rate.value),false)
+    pose=CLIPS.sample(bank[name_id],d if not playing and time>=d else minf(d,floor(time*rate.value+.00001)/rate.value),false)
     _sync()
 
 func _adjacent(direction: int) -> void:
@@ -449,3 +499,72 @@ func _redo() -> void:
     dirty=true
     _seek(time)
     _refresh_lists()
+
+func _move_marker(lane: int,index: int,t: float) -> void:
+    var c: Dictionary=bank[name_id]
+    var arr: Array=c.keys if lane==0 else c.events
+    if index<0 or index>=arr.size():return
+    t=clampf(t,0,float(c.duration))
+    if absf(float(arr[index].t)-t)<.0001:return
+    if lane==0:
+        for i in range(arr.size()):
+            if i!=index and absf(float(arr[i].t)-t)<.0001:
+                status.text="На этом времени уже есть ключ. Перемещение отменено."
+                return
+    _remember()
+    var item: Dictionary=arr[index]
+    item.t=t
+    arr.sort_custom(func(a,b):return float(a.t)<float(b.t))
+    dirty=true
+    _seek(t)
+    _refresh_lists()
+    if lane==1:event_list.select(arr.find(item))
+    status.text="Маркер перемещён: %.3f с"%t
+
+func _mirror_pose() -> void:
+    var a: Dictionary={}
+    for id in pose.angles:
+        var dest: String=str(id)
+        if dest.ends_with("_near"):dest=dest.trim_suffix("_near")+"_far"
+        elif dest.ends_with("_far"):dest=dest.trim_suffix("_far")+"_near"
+        a[dest]=-float(pose.angles[id])
+    pose={"angles":a,"root":[-float(pose.root[0]),pose.root[1]]}
+    _edit()
+
+func _zero_joint() -> void:
+    pose.angles[selected]=0.0
+    _edit()
+
+func _ask(message: String,action: Callable) -> void:
+    pending_action=action
+    confirm.dialog_text=message
+    confirm.popup_centered(Vector2i(400,140))
+
+func _ask_blank() -> void:
+    _ask("Очистить только текущую анимацию? Можно отменить через Ctrl+Z.",_blank_clip)
+
+func _blank_clip() -> void:
+    _remember()
+    var c: Dictionary=bank[name_id]
+    var d: float=c.duration
+    var neutral: Dictionary=CLIPS.sample(bank.idle,0,false)
+    c.keys=[{"t":0.0,"pose":neutral.duplicate(true)},{"t":d,"pose":neutral.duplicate(true)}]
+    c.events=[]
+    dirty=true
+    _seek(0)
+    _refresh_lists()
+    status.text="Чистый клип. Выбери время и измени позу."
+
+func _ask_default() -> void:
+    _ask("Восстановить исходную версию только текущего клипа?",func():
+        _remember()
+        bank[name_id]=CLIPS.defaults()[name_id].duplicate(true)
+        dirty=true
+        _seek(0)
+        _refresh_lists())
+
+func _ask_load() -> void:
+    _ask("Загрузить сохранённые анимации бойца? Несохранённые правки будут потеряны.",func():
+        bank=CLIPS.fighter_bank(fighter_index)
+        _choose(name_id)
+        dirty=false)
