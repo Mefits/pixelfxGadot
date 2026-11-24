@@ -49,8 +49,61 @@ func _curves() -> void:
         renderer.render(paint,equivalent,t,anchors)
         check(baseline==paint.rgba_bytes()+paint.rgba_bytes(true),"Legacy linear equivalent pixels")
 
+func _streams() -> void:
+    var l: Dictionary=P.layer("sparks")
+    l.duration=1.0
+    l.follow=false
+    l.gravity=0.0
+    l.emitter={"rate":4.0,"life":.6,"life_jitter":0.0,"shape":"point","radius":0.0}
+    var p: Dictionary={"schema":1,"name":"Stream","seed":9,"layers":[l]}
+    check(P.valid(p) and P.birth_count(l)==4,"Stream valid and bounded")
+    check(is_equal_approx(P.duration(p),1.6),"Tail extends preset")
+    var renderer=R.new()
+    var paint=PAINT.new(240,160)
+    var anchors: Dictionary={"origin":Vector2(100,80)}
+    for spec in [[0.0,1],[.24,1],[.26,2],[.51,3],[.76,3],[1.1,2],[1.26,1],[1.36,0],[1.6,0]]:
+        renderer.render(paint,p,float(spec[0]),anchors)
+        check(renderer.particles==int(spec[1]),"Stream alive at "+str(spec[0]))
+    check(paint.color.count(0)==paint.color.size() and paint.light.count(0)==paint.light.size(),"Stream expires")
+    var visits: Array=[]
+    var provider: Callable=func(_name:String,t:float)->Vector2:
+        visits.append(t)
+        return Vector2(80+t*20,80)
+    renderer.render(paint,p,.76,{},128,provider)
+    check(visits.has(.25) and visits.has(.5) and visits.has(.75),"World particles use birth anchors")
+    visits.clear()
+    l.follow=true
+    renderer.render(paint,p,.76,{},128,provider)
+    check(visits.size()==1 and is_equal_approx(float(visits[0]),.76),"Attached particles use current anchor")
+    l.follow=false
+    for shape in P.EMITTER_SHAPES:
+        l.emitter.shape=shape
+        l.emitter.radius=8.0
+        l.emitter.life_jitter=.4
+        renderer.render(paint,p,.81,anchors)
+        var first: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,p,.2,anchors)
+        renderer.render(paint,p,.81,anchors)
+        check(first==paint.rgba_bytes()+paint.rgba_bytes(true),"Stream seek "+shape)
+    check(P.save_preset(p,"user://test_stream_fx.json"),"Save stream")
+    var loaded: Dictionary=P.load_preset("user://test_stream_fx.json")
+    check(P.valid(loaded),"Load stream")
+    if not loaded.is_empty():
+        renderer.render(paint,p,.81,anchors)
+        var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+        renderer.render(paint,loaded,.81,anchors)
+        check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Stream roundtrip pixels")
+    var invalid: Dictionary=p.duplicate(true)
+    invalid.layers[0].emitter.rate=65
+    check(not P.valid(invalid),"Reject over-budget rate")
+    invalid.layers[0].emitter.rate=32
+    invalid.layers[0].type="ring"
+    check(not P.valid(invalid),"Reject emitter on non-particle primitive")
+    check(P.valid(P.demo(4)),"Stream demo valid")
+
 func _run() -> void:
     _curves()
+    _streams()
     var renderer=R.new()
     var paint=PAINT.new(240,160)
     var anchors={"origin":Vector2(120,80),"hand":Vector2(83,76),"target":Vector2(166,76)}

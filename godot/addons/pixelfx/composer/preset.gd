@@ -4,6 +4,49 @@ const ANCHORS=["origin","hand","target"]
 const FOLDER="user://vfx_presets"
 const CURVES=["linear","ease in","ease out","smooth"]
 const MAX_LAYERS=12
+const PARTICLE_TYPES=["sparks","droplets","smoke"]
+const EMITTER_SHAPES=["point","disc","ring","line"]
+const MAX_BIRTHS=320
+static func emitter_defaults() -> Dictionary:
+    return {"rate":32.0,"life":.65,"life_jitter":.2,"shape":"point","radius":8.0}
+static func is_stream(l: Dictionary) -> bool:
+    return l.type in PARTICLE_TYPES and l.has("emitter")
+static func max_particle_life(l: Dictionary) -> float:
+    return float(l.emitter.life)*(1.0+float(l.emitter.life_jitter))
+static func layer_duration(l: Dictionary) -> float:
+    return float(l.duration)+max_particle_life(l) if is_stream(l) else float(l.duration)
+static func valid_emitter(e: Variant) -> bool:
+    if not e is Dictionary or not e.get("shape") in EMITTER_SHAPES:return false
+    if not num(e.get("rate"),1,64) or float(e.rate)!=floorf(float(e.rate)):return false
+    return num(e.get("life"),.05,3) and num(e.get("life_jitter"),0,.8) and num(e.get("radius"),0,40)
+static func birth_count(l: Dictionary) -> int:
+    return mini(MAX_BIRTHS,int(ceil(float(l.duration)*float(l.emitter.rate))))
+static func stream_demo() -> Dictionary:
+    var a: Dictionary=layer("sparks")
+    a.anchor="hand"
+    a.follow=false
+    a.duration=1.6
+    a.angle=0.0
+    a.spread=24.0
+    a.gravity=0.0
+    a.color="#65dfff"
+    a.size=3.0
+    a.end_size=.5
+    a.speed=85.0
+    a.end_speed=18.0
+    a.emitter={"rate":48.0,"life":.72,"life_jitter":.3,"shape":"disc","radius":4.0}
+    a.curves={"alpha":[[0.0,.8],[.15,1.0],[1.0,0.0]],"glow":[[0.0,.8],[.5,.5],[1.0,0.0]]}
+    var b: Dictionary=layer("smoke")
+    b.anchor="hand"
+    b.follow=false
+    b.duration=1.6
+    b.angle=0.0
+    b.spread=25.0
+    b.color="#526d8f"
+    b.speed=38.0
+    b.end_speed=12.0
+    b.emitter={"rate":15.0,"life":1.1,"life_jitter":.25,"shape":"disc","radius":4.0}
+    return {"schema":1,"name":"Поток энергии","seed":127,"layers":[b,a]}
 const CHANNELS=["size","alpha","speed","glow"]
 const RANGES={"size":[.5,80.0],"alpha":[0.0,1.0],"speed":[0.0,200.0],"glow":[0.0,1.0]}
 const MAX_POINTS=16
@@ -20,6 +63,7 @@ static func layer(kind: String="sparks") -> Dictionary:
         "sparks":l.size=2.0;l.end_size=.5
     return l
 static func demo(which: int=0) -> Dictionary:
+    if which==4:return stream_demo()
     var layers: Array=[]
     var names=["Electric burst","Acid impact","Claw slash","Fire burst"]
     match which:
@@ -57,6 +101,7 @@ static func valid(p: Variant) -> bool:
         for spec in [["start",0,5],["duration",.05,5],["size",.5,80],["end_size",.5,80],["alpha",0,1],["end_alpha",0,1],["speed",0,200],["end_speed",0,200],["count",1,64],["spread",0,360],["angle",-180,180],["gravity",-200,300],["glow",0,1],["x",-100,100],["y",-100,100]]:
             if not num(l.get(spec[0]),spec[1],spec[2]):return false
         if float(l.start)+float(l.duration)>10:return false
+        if l.has("emitter") and (not l.type in PARTICLE_TYPES or not valid_emitter(l.emitter)):return false
         if l.has("curves"):
             if not l.curves is Dictionary:return false
             for channel in l.curves:
@@ -65,7 +110,7 @@ static func valid(p: Variant) -> bool:
 static func duration(p: Dictionary) -> float:
     var d: float=.05
     for l in p.layers:
-        d=maxf(d,float(l.start)+float(l.duration))
+        d=maxf(d,float(l.start)+layer_duration(l))
     return d
 static func curve(u: float,kind: String) -> float:
     u=clampf(u,0,1)

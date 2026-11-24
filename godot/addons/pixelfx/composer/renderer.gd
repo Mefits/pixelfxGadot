@@ -31,8 +31,11 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
     for i in range(preset.layers.size()):
         var l: Dictionary=preset.layers[i]
         var age: float=time-float(l.start)
-        if not l.enabled or age<0 or age>=float(l.duration):continue
+        if not l.enabled or age<0 or age>=P.layer_duration(l):continue
         active_layers+=1
+        if P.is_stream(l):
+            _stream(painter,l,age,time,R.hash32([int(preset.seed),i]),anchors,floor_y,provider)
+            continue
         var u: float=age/float(l.duration)
         var size: float=P.value(l,"size",u)
         var alpha: float=P.value(l,"alpha",u)
@@ -88,6 +91,55 @@ func render(painter,preset: Dictionary,time: float,anchors: Dictionary={},floor_
                     if glow>.01:d.glow(q.x,q.y,maxf(2,rad*2),color,glow*alpha)
         batch.finish()
     render_ms=(Time.get_ticks_usec()-stamp)/1000.0
+# Stream particles are evaluated directly from their birth index and current time.
+# No mutable particle pool, no replay from frame zero, and bounded work per layer.
+func _stream(painter,l: Dictionary,age: float,time: float,seed0: int,anchors: Dictionary,floor_y: float,provider: Callable) -> void:
+    var e: Dictionary=l.emitter
+    var rate: float=float(e.rate)
+    var total: int=P.birth_count(l)
+    var first: int=maxi(0,int(floor((age-P.max_particle_life(l))*rate)))
+    var last: int=mini(total-1,int(floor(age*rate)))
+    if first>last:return
+    var d=batch.begin(painter)
+    var color: int=PAL.from_hex(l.color)
+    var current_origin: Vector2=origin(l.anchor,time,anchors,provider)+Vector2(l.x,l.y)
+    for j in range(first,last+1):
+        var birth: float=float(j)/rate
+        var particle_age: float=age-birth
+        var rng=R.new(R.hash32([seed0,j]))
+        var life: float=float(e.life)*(1.0+rng.between(-float(e.life_jitter),float(e.life_jitter)))
+        if particle_age<0 or particle_age>=life:continue
+        var u: float=particle_age/life
+        var angle: float=deg_to_rad(float(l.angle)+rng.between(-float(l.spread)*.5,float(l.spread)*.5))
+        var factor: float=rng.between(.45,1.0)
+        var rad: float=maxf(.5,P.value(l,"size",u)*rng.between(.55,1.0))
+        var alpha: float=P.value(l,"alpha",u)
+        var glow: float=P.value(l,"glow",u)
+        var offset: Vector2=_spawn_offset(e,rng)
+        var pos: Vector2=current_origin if l.follow else origin(l.anchor,float(l.start)+birth,anchors,provider)+Vector2(l.x,l.y)
+        var travel: float=P.speed_distance(l,u)*life/float(l.duration)*factor
+        var v: Vector2=Vector2.from_angle(angle)
+        var q: Vector2=pos+offset+v*travel+Vector2(0,float(l.gravity)*particle_age*particle_age*.5)
+        if l.collision and q.y>floor_y:q.y=floor_y-minf(8.0,(q.y-floor_y)*.3)
+        particles+=1
+        if l.type=="smoke":
+            d.disc(q.x,q.y,rad,color,alpha*.6)
+        elif l.type=="droplets":
+            d.circle(q.x,q.y,rad,color,alpha)
+        else:
+            var end: Vector2=q-v*rad*2
+            d.line(q.x,q.y,end.x,end.y,color,alpha)
+        if glow>.01:d.glow(q.x,q.y,maxf(2,rad*2),color,glow*alpha)
+    batch.finish()
+
+static func _spawn_offset(e: Dictionary,rng) -> Vector2:
+    var radius: float=float(e.radius)
+    match e.shape:
+        "disc":return Vector2.from_angle(rng.between(0,TAU))*sqrt(rng.next())*radius
+        "ring":return Vector2.from_angle(rng.between(0,TAU))*radius
+        "line":return Vector2(rng.between(-radius,radius),0)
+    return Vector2.ZERO
+
 static func _arc(d,pos: Vector2,radius: float,start: float,sweep: float,c: int,a: float) -> void:
     var n: int=clampi(int(absf(sweep)*radius*.6),8,160)
     var old: Vector2=pos+Vector2.from_angle(start)*radius

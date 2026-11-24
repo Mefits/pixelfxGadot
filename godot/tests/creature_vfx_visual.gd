@@ -19,6 +19,11 @@ func _run() -> void:
     scene.fields.color.color=Color("#daaa76")
     scene.fields.color.color_changed.emit(Color("#daaa76"))
     check(is_equal_approx(float(scene.preset.layers[4].start),.3) and scene.preset.layers[4].color=="#daaa76","Inspector changes")
+    scene._toggle_emitter(true)
+    scene.emitter_fields.rate.value=20
+    scene.emitter_fields.shape.select(1)
+    scene.emitter_fields.shape.item_selected.emit(1)
+    check(P.is_stream(scene.preset.layers[4]) and scene.preset.layers[4].emitter.rate==20 and scene.preset.layers[4].emitter.shape=="disc","Stream inspector")
     scene._copy_layer()
     check(scene.preset.layers.size()==6,"Duplicate")
     scene._move_layer(-1)
@@ -32,6 +37,7 @@ func _run() -> void:
         if scene.library.get_item_text(i)=="UI_test_preset.json":scene.library.select(i)
     scene._load()
     check(scene.preset.layers.size()==5,"Workshop reload")
+    check(P.is_stream(scene.preset.layers[4]),"Stream settings persisted")
     scene.stage.moving=true
     scene._seek(.32)
     await process_frame
