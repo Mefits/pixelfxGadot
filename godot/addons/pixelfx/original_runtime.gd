@@ -86,3 +86,9 @@ func draw(h: int,p,layer: String="",body: bool=false,target: bool=true) -> bool:
 ## Experimental, opt-in. The original JS Painter remains the default.
 func set_acceleration(enabled: bool) -> bool:
     return backend!=null and backend.set_acceleration(enabled)
+
+func acceleration_stats() -> Dictionary:
+    if backend==null:
+        return {}
+    var d:Variant=JSON.parse_string(backend.acceleration_stats())
+    return d if d is Dictionary else {}

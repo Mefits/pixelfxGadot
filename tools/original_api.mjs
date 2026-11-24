@@ -30,6 +30,7 @@ export function installOriginalAPI(core, modules){
  }return o;}
  return {
   setAcceleration,
+  accelerationStats(){return JSON.stringify(stats);},
   catalog(){return JSON.stringify(Object.entries(modules).map(([id,m])=>({id,meta:m.meta,act:!!m.act})));},
   timing(id){const m=modules[id];if(!m)throw Error('Unknown effect '+id);return JSON.stringify(core.actTiming(m));},
   bounds(id){const m=modules[id];if(!m)throw Error('Unknown effect '+id);return JSON.stringify(core.actBounds(m));},

@@ -54,5 +54,9 @@ func _run() -> void:
         print("Original Painter host ",c.id," ",c.mode," p95 ms: ",ta[mini(ta.size()-1,int(ta.size()*.95))]," -> ",tb[mini(tb.size()-1,int(tb.size()*.95))])
         a.destroy(ha)
         b.destroy(hb)
+    var stats:Dictionary=b.acceleration_stats()
+    print("Original Painter native calls: ",stats)
+    if int(stats.get("calls",0))<100:
+        bad+=1
     print("Original Painter host exact comparison: ",frames," frames; ",bad," failures")
     quit(0 if bad==0 else 1)

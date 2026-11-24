@@ -22,7 +22,7 @@ class PixelFXOriginal : public RefCounted {
     using Clock=std::chrono::steady_clock;
     Clock::time_point deadline;
     static int interrupted(JSContext*,void* p){return Clock::now()>static_cast<PixelFXOriginal*>(p)->deadline;}
-    void budget(){deadline=Clock::now()+std::chrono::seconds(2);}
+    void budget(int seconds=2){deadline=Clock::now()+std::chrono::seconds(seconds);}
     void close(){
         if(ctx){JS_FreeValue(ctx,api);JS_FreeContext(ctx);}
         if(rt)JS_FreeRuntime(rt);
@@ -42,7 +42,7 @@ class PixelFXOriginal : public RefCounted {
     JSValue jsstr(const String &v){CharString s=v.utf8();return JS_NewStringLen(ctx,s.get_data(),s.length());}
     JSValue integer(int v){return JS_NewInt32(ctx,v);}
     JSValue call(const char* name,std::vector<JSValue> args={}){
-        budget();error=String();
+        budget(std::strcmp(name,"create")==0?20:2);error=String();
         JSValue fn=JS_GetPropertyStr(ctx,api,name);
         JSValue result=JS_Call(ctx,fn,api,int(args.size()),args.data());
         JS_FreeValue(ctx,fn);for(auto a:args)JS_FreeValue(ctx,a);
@@ -60,6 +60,7 @@ protected:
     static void _bind_methods(){
         ClassDB::bind_method(D_METHOD("load_bundle","source"),&PixelFXOriginal::load_bundle);
         ClassDB::bind_method(D_METHOD("last_error"),&PixelFXOriginal::last_error);
+        ClassDB::bind_method(D_METHOD("acceleration_stats"),&PixelFXOriginal::acceleration_stats);
         ClassDB::bind_method(D_METHOD("set_acceleration","enabled"),&PixelFXOriginal::set_acceleration);
         ClassDB::bind_method(D_METHOD("catalog_json"),&PixelFXOriginal::catalog_json);
         ClassDB::bind_method(D_METHOD("timing_json","id"),&PixelFXOriginal::timing_json);
@@ -94,6 +95,7 @@ public:
         JSValue f=JS_GetPropertyStr(ctx,api,"catalog");bool ok=JS_IsFunction(ctx,f);JS_FreeValue(ctx,f);
         if(!ok){error="Missing PixelFX API";close();return false;}return true;
     }
+    String acceleration_stats(){return ctx?string_call("accelerationStats"):String();}
     bool set_acceleration(bool enabled){return ctx&&bool_call("setAcceleration",{JS_NewBool(ctx,enabled)});}
     String catalog_json(){return ctx?string_call("catalog"):String();}
     String timing_json(String id){return ctx?string_call("timing",{jsstr(id)}):String();}
