@@ -25,7 +25,7 @@ func step()->void:
         speeds[i]+=(stiffness[i]*(target[i]-angles[i])-damping[i]*speeds[i])*DT
         var raw:float=angles[i]+speeds[i]*DT
         angles[i]=clampf(raw,-LIMITS[i],LIMITS[i])
-        if angles[i]!=raw:speeds[i]=0
+        if raw < -LIMITS[i] or raw > LIMITS[i]:speeds[i]=0
     if angles.length()<.03 and speeds.length()<.2:clear()
 func finite()->bool:
     return angles.is_finite() and speeds.is_finite()
