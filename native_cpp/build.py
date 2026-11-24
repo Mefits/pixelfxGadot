@@ -19,7 +19,7 @@ if "--original" in sys.argv:
         run("git","clone","--no-checkout","https://github.com/quickjs-ng/quickjs.git",str(qjs))
     run("git","checkout","--detach",qrev,cwd=qjs)
     out=root/"quickjs-build"
-    run("cmake","-S",str(qjs),"-B",str(out),"-DBUILD_SHARED_LIBS=OFF","-DQJS_ENABLE_INSTALL=OFF","-DQJS_BUILD_LIBC=OFF","-DCMAKE_BUILD_TYPE=Release","-DCMAKE_POSITION_INDEPENDENT_CODE=ON","-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
+    run("cmake","-S",str(qjs),"-B",str(out),"-DBUILD_SHARED_LIBS=OFF","-DQJS_ENABLE_INSTALL=OFF","-DQJS_BUILD_LIBC=OFF","-DCMAKE_BUILD_TYPE=Release","-DCMAKE_POSITION_INDEPENDENT_CODE=ON","-DCMAKE_POLICY_DEFAULT_CMP0091=NEW","-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded")
     run("cmake","--build",str(out),"--config","Release","--target","qjs","--parallel","4")
     candidates=list(out.rglob("qjs.lib" if platform=="windows" else "libqjs.a"))
     if len(candidates)!=1: raise RuntimeError(f"Expected one static QuickJS lib, got {candidates}")
