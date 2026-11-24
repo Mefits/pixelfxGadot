@@ -14,3 +14,6 @@ Color and additive light are stored separately in paged atlases. The exported cl
 Use AGENTS.md and SKILL.md when passing the toolkit to AI. Read CATALOG.md and docs/ROADMAP.md. Code implementation is not proof of visual or performance parity; see docs/STATUS.md.
 
 Original PixelFX: MIT, Patch and Hugo Duprez. See LICENSE-PixelFX.txt.
+
+## Переносимый архив
+На странице Actions открой успешный запуск и скачай артефакт **PixelFX-Godot-Toolkit**. В отличие от обычного GitHub ZIP, он содержит все оригинальные исходники эффектов, инструменты, семь подготовленных клипов и Godot-проект. Для готовых клипов достаточно Godot; для экспорта новых — Node.js 18+, без интернета. Контрольные суммы исходников проверяются перед экспортом. Галерейные медиа и история Git не входят в архив. 

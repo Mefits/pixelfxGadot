@@ -2,7 +2,7 @@
 import {readFileSync,writeFileSync,mkdirSync,existsSync,renameSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {spawnSync} from 'node:child_process';
+import {verifyOriginal} from './verify_original.mjs';
 import {createHash} from 'node:crypto';
 import {splitFrame,reconstruct,packPages} from './buffers.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -12,9 +12,7 @@ if(!id||!/^[a-z0-9-]+\/[a-z0-9-]+$/.test(id))throw Error('Usage: node tools/expo
 const flags={};for(let i=0;i<args.length;i+=2){if(!['--seed','--fps','--opts','--name','--max'].includes(args[i])||args[i+1]===undefined)throw Error('Invalid flag '+args[i]);flags[args[i]]=args[i+1];}
 const original=join(root,'original','pixelfx');
 if(!existsSync(join(original,'tools/lib/fxlib.mjs')))throw Error('Run npm run setup first.');
-const rev=spawnSync('git',['rev-parse','HEAD'],{cwd:original,encoding:'utf8'});
-const status=spawnSync('git',['status','--porcelain','--untracked-files=no'],{cwd:original,encoding:'utf8'});
-if(rev.status!==0||rev.stdout.trim()!==lock.commit||status.status!==0||status.stdout.trim())throw Error('Original checkout must match lock and be unmodified.');
+verifyOriginal();
 const imp=p=>import(pathToFileURL(join(original,p)).href);
 const {loadEffect,renderFrames,contactSheet}=await imp('tools/lib/fxlib.mjs');
 const {encodePNG}=await imp('tools/lib/png.mjs');

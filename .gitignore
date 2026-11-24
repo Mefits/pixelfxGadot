@@ -2,3 +2,6 @@ godot/.godot/
 godot/generated/*/
 node_modules/
 reports/
+
+dist/
+godot/tests/fixtures/

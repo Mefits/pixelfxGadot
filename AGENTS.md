@@ -1,5 +1,5 @@
 # PixelFX Godot Toolkit — agent contract
-Read README.md, docs/ROADMAP.md and original/pixelfx/skills/pixelfx/SKILL.md first. Run git submodule update --init --recursive if needed. The locked upstream is the reference; do not edit it.
+Read README.md, docs/ROADMAP.md and original/pixelfx/skills/pixelfx/SKILL.md first. Run npm run setup if needed. A portable archive carries the original source snapshot, verified by tools/verify_original.mjs; it does not require Git or internet. The locked upstream is the reference; do not edit it.
 - Locate actual effects in upstream docs/CATALOG.md; inspect source, metadata, palette, and timing. Render reference before designing.
 - Use the existing two-buffer export/player first. Native simulation is a separate milestone. Do not describe cached frames as live particles or approximations as faithful ports.
 - Preserve original color and additive light independently, seeded randomness, 1px scale, pivot and timings. Actor-dependent effects may contain pixels of the stock actor, not the game's sprite.
