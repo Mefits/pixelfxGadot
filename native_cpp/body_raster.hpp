@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <unordered_map>
 
 namespace body {
 using Vec = std::array<double, 3>;
@@ -32,6 +33,8 @@ struct Config {
     bool organic = false;
     double smooth = 0;
     std::vector<std::array<int, 2>> joins;
+    double normal_blend = 0; // depth band in rig units; zero retains exact legacy lighting
+    std::vector<std::array<int, 2>> normal_links; // explicit primitive-index pairs
 };
 struct Pixel {
     float depth = 0, light = 0;
@@ -50,6 +53,8 @@ inline int steps(const Primitive &p) {
 }
 class Raster {
     std::vector<int> touched;
+    std::vector<std::array<float,3>> normals;
+    bool normal_active = false;
     struct Ball {
         double x, y, r;
     };
@@ -155,6 +160,30 @@ class Raster {
             if (cost > 16000000)
                 return "joint work budget exceeded";
         }
+        if (!(c.normal_blend>=0 && c.normal_blend<=3) || c.normal_links.size()>64 ||
+            (c.normal_blend==0 && !c.normal_links.empty()))
+            return "invalid normal blend";
+        if (c.normal_blend>0) {
+            for (auto pair:c.normal_links) {
+                if(pair[0]<0 || pair[1]<0 || pair[0]==pair[1] ||
+                   size_t(pair[0])>=ps.size() || size_t(pair[1])>=ps.size())
+                    return "invalid normal link indices";
+                const auto &a=ps[pair[0]], &b=ps[pair[1]];
+                if(a.shape!=Shape::Loft || b.shape!=Shape::Loft || a.material!=b.material)
+                    return "normal links require same-material lofts";
+                for(size_t j=0;j<ps.size();++j)
+                    if((j!=size_t(pair[0]) && ps[j].part==a.part) ||
+                       (j!=size_t(pair[1]) && ps[j].part==b.part))
+                        return "normal link owners must be unique";
+            }
+            for(size_t i=0;i<c.normal_links.size();++i)
+                for(size_t j=0;j<i;++j)
+                    if(c.normal_links[i]==c.normal_links[j] ||
+                       (c.normal_links[i][0]==c.normal_links[j][1] && c.normal_links[i][1]==c.normal_links[j][0]))
+                        return "duplicate normal link";
+            cost += double(c.width)*c.height*c.normal_links.size()*2;
+            if(cost>16000000)return "normal blend work budget exceeded";
+        }
         return nullptr;
     }
     template <class F> void stamp(const Config &c, const Vec &a, double r, F sample) {
@@ -169,12 +198,13 @@ class Raster {
                 sample(y * c.width + x, (x - c.ox) / c.density - a[0], (y - c.oy) / c.density - a[1]);
             }
     }
-    void plot(int i, double z, double light, const Primitive &p) {
+    void plot(int i, double z, double light, const Primitive &p, const Vec *normal=nullptr) {
         Pixel &v = pixels[i];
         if (v.part && z <= v.depth)
             return;
         if (!v.part)
             touched.push_back(i);
+        if(normal_active) normals[i]=normal?std::array<float,3>{float((*normal)[0]),float((*normal)[1]),float((*normal)[2])}:std::array<float,3>{0,0,0};
         v.depth = float(z);
         v.light = float(light);
         v.part = p.part;
@@ -240,7 +270,7 @@ class Raster {
             stamp(c,center,radius,[&](int i,double x,double y){
                 LoftHit h;
                 if(span.sample(mid*len+x*ux+y*uy,-x*uy+y*ux,h))
-                    plot(i,h.front,dot(h.normal,c.light),p);
+                    plot(i,h.front,dot(h.normal,c.light),p,&h.normal);
             });
         }
     }
@@ -325,6 +355,55 @@ class Raster {
             pixels[i].join = join;
         });
     }
+    // Sample the adjacent loft at the SAME camera ray. Only its normal is
+    // mixed; the visible front depth/ownership and silhouette never change.
+    static bool sample_loft(const Primitive &p,double x,double y,LoftHit &h) {
+        const double dx=p.b[0]-p.a[0],dy=p.b[1]-p.a[1],len=std::hypot(dx,dy);
+        const double ux=dx/len,uy=dy/len;
+        x-=p.a[0];y-=p.a[1];
+        const double s=x*ux+y*uy,v=-x*uy+y*ux,t=s/len;
+        if(t<p.sections.front().t || t>p.sections.back().t)return false;
+        auto it=std::lower_bound(p.sections.begin()+1,p.sections.end(),t,
+            [](const Section &a,double x){return a.t<x;});
+        if(it==p.sections.end())return false;
+        const LoftSpan span{len,ux,uy,p.a[2],p.b[2],p.profile,*(it-1),*it};
+        return span.sample(s,v,h);
+    }
+    void blend_normals(const Config &c,const std::vector<Primitive> &ps) {
+        std::unordered_map<int,std::vector<const Primitive*>> links;
+        for(auto pair:c.normal_links){
+            const auto &a=ps[pair[0]],&b=ps[pair[1]];
+            links[a.part].push_back(&b); links[b.part].push_back(&a);
+        }
+        for(int i:touched){
+            auto &p=pixels[i];
+            auto it=links.find(p.part);
+            if(it==links.end())continue;
+            const auto &src=normals[i];
+            Vec n{src[0],src[1],src[2]};
+            if(dot(n,n)<.5)continue;
+            const double x=(i%c.width-c.ox)/c.density,y=(i/c.width-c.oy)/c.density;
+            bool mixed=false;
+            for(const Primitive *other:it->second){
+                LoftHit h;
+                ++normal_tests;
+                if(!sample_loft(*other,x,y,h))continue;
+                const double delta=std::abs(double(p.depth)-h.front);
+                if(delta>=c.normal_blend)continue;
+                double w=1-delta/c.normal_blend;
+                w=w*w*(3-2*w);
+                // Prevent near-opposing normals from cancelling. This is a
+                // lighting correction, not a smooth geometric union.
+                if(dot(Vec{src[0],src[1],src[2]},h.normal)<-.25)continue;
+                for(int k=0;k<3;++k)n[k]+=w*h.normal[k];
+                mixed=true;
+            }
+            if(mixed){
+                const double len=std::sqrt(dot(n,n));
+                if(len>1e-8){p.light=float(dot(n,c.light)/len);++normal_pixels;}
+            }
+        }
+    }
     void finish(const Config &c) {
         for (int i : touched) {
             auto &p = pixels[i];
@@ -382,7 +461,7 @@ class Raster {
   public:
     std::vector<Pixel> pixels;
     std::vector<uint32_t> color; // 0xAABBGGRR
-    uint64_t samples = 0, field_tests = 0;
+    uint64_t samples = 0, field_tests = 0, normal_tests=0, normal_pixels=0;
     int buffer_growths = 0;
     size_t body_pixels() const { return touched.size(); }
     const char *render(const Config &c, const std::vector<Primitive> &ps) {
@@ -391,7 +470,9 @@ class Raster {
         size_t area = size_t(c.width) * c.height;
         buffer_growths =
             int(pixels.capacity() < area) + int(color.capacity() < area) + int(touched.capacity() < area);
-        field_tests = 0;
+        field_tests = normal_tests = normal_pixels = 0;
+        normal_active=c.normal_blend>0 && !c.normal_links.empty();
+        if(normal_active){buffer_growths+=normals.capacity()<area;normals.assign(area,{0,0,0});}
         pixels.assign(area, Pixel{});
         color.assign(area, 0);
         touched.clear();
@@ -417,6 +498,7 @@ class Raster {
                 smooth_joint(c, ps[pair[0]], ps[pair[1]], int(i));
             }
         }
+        if(normal_active)blend_normals(c,ps);
         finish(c);
         return nullptr;
     }

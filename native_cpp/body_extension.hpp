@@ -117,6 +117,27 @@ class PixelFXBodyRaster : public godot::RefCounted {
                 c.joins.push_back(indices);
             }
         }
+        c.normal_blend=r.number(cfg.get("normal_blend",0),"normal_blend");
+        c.normal_links.clear();
+        if(cfg.has("normal_links")){
+            Variant value=r.get(cfg,"normal_links",Variant::ARRAY);
+            if(!r.error.is_empty())return failure(r.error);
+            Array links=value;
+            if(links.size()>64)return failure("too many normal links");
+            for(int i=0;i<links.size();++i){
+                if(links[i].get_type()!=Variant::ARRAY)return failure("expected normal link pair");
+                Array pair=links[i];
+                if(pair.size()!=2)return failure("expected two normal link indices");
+                std::array<int,2> idx{};
+                for(int k=0;k<2;++k){
+                    if(pair[k].get_type()!=Variant::INT)return failure("expected normal link index");
+                    int64_t n=pair[k];
+                    if(n<0 || n>=primitives.size())return failure("invalid normal link index");
+                    idx[k]=int(n);
+                }
+                c.normal_links.push_back(idx);
+            }
+        }
         c.width = r.integer(cfg, "width", 1, 1024);
         c.height = r.integer(cfg, "height", 1, 1024);
         std::array<double, 2> origin{};
@@ -224,6 +245,8 @@ class PixelFXBodyRaster : public godot::RefCounted {
         out["cpu_us"] = std::chrono::duration<double, std::micro>(elapsed).count();
         out["buffer_growths"] = raster.buffer_growths;
         out["field_tests"] = int64_t(raster.field_tests);
+        out["normal_tests"] = int64_t(raster.normal_tests);
+        out["normal_pixels"] = int64_t(raster.normal_pixels);
         out["sample_tests"] = int64_t(raster.samples);
         out["body_pixels"] = int64_t(raster.body_pixels());
         int n = c.width * c.height;

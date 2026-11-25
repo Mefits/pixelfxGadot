@@ -19,3 +19,6 @@ Performance: separate CPU raster, bridge, texture upload submission; warmed p50/
 
 ## 0.56 experimental triangle input
 `triangle` takes a,b,c XYZ and na,nb,nc unit XYZ normals. Orthographic integer sample centers, barycentric interpolated z and normalized normal, inclusive shared edges, existing plot tie rule. Degenerate XY projection emits nothing. Validation bounds position and normals and conservative work budget. Same material and part IDs across adjacent triangles. Existing shapes and reference oracle remain unchanged. Caller supplies deformed vertices; no skinning inside kernel, no full mesh or backface/collision guarantees.
+
+## 0.61 optional Loft normal blending
+`normal_blend` (0..3 rig depth units, default 0) and `normal_links` (explicit zero-based pairs of same-material Loft primitives with unique part IDs). For visible linked surface, sample neighbor at same XY, use smoothstep weight by absolute front depth difference, reject near-opposite normals, renormalize sum before quantization. Geometry, depth, ownership, alpha/outline unchanged. No geometric union or cross-material blending. `normal_tests`/`normal_pixels` counters report work and eligible blended pixels, not number of changed colors. Default off. Bounded work and invalid link validation.

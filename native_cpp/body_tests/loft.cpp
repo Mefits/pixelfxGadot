@@ -44,5 +44,30 @@ int main(){
     invalid=p;invalid.b=invalid.a;assert(r.render(c,{invalid}));
     invalid=p;invalid.sections[2].offset_z=std::numeric_limits<double>::infinity();
     assert(r.render(c,{invalid}));
+    // Same-ray normal blend must never change geometric buffers or unlinked pixels.
+    q=p;q.part=2;q.a={0,-6,.2};q.b={0,6,.2};
+    c.light={.6,0,.8};
+    assert(!r.render(c,{p,q}));
+    auto orig=r.pixels;auto colors=r.color;
+    c.normal_blend=1.4;c.normal_links={{0,1}};
+    assert(!r.render(c,{p,q}) && r.normal_pixels>0);
+    bool changed=false;
+    for(size_t i=0;i<orig.size();++i){
+        assert(orig[i].depth==r.pixels[i].depth && orig[i].part==r.pixels[i].part &&
+               orig[i].material==r.pixels[i].material);
+        if(orig[i].light!=r.pixels[i].light)changed=true;
+    }
+    assert(changed);
+    auto blended=r.color;
+    assert(!r.render(c,{p,q}) && blended==r.color);
+    c.normal_links.clear();c.normal_blend=0;
+    assert(!r.render(c,{p,q}) && colors==r.color);
+    q.a[2]=q.b[2]=10;
+    assert(!r.render(c,{p,q}));colors=r.color;
+    c.normal_links={{0,1}};c.normal_blend=1.4;
+    assert(!r.render(c,{p,q}) && r.normal_pixels==0 && colors==r.color);
+    c.normal_links={{0,1},{1,0}};assert(r.render(c,{p,q}));
+    c.normal_links={{0,1}};q.material=1;c.materials.push_back(c.materials[0]);assert(r.render(c,{p,q}));
+    std::cout<<"NORMAL_BLEND_OK immutable geometry, determinism, depth gate, material and link validation\n";
     std::cout<<"LOFT_OK gradients, axial width, rotation, depth swap, full fold, invalid profiles\n";
 }
