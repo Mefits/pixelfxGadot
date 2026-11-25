@@ -83,3 +83,6 @@ Owner authorized three anatomy variants on Astra 0.58. OLD exact 0.58; A lean, B
 
 ## 0.60 — reference-guided pelvis
 Owner identified narrow waist and laterally attached thighs. Manual front silhouette measurements documented in docs/body-pelvis-060-reference.json; 3/4 qualitative only. OLD 059 C, A broadened trunk and hip, B additionally inserts proximal thigh with inward width offset and reduced local depth bias. 192 native poses verified; B min pelvic overlap 26.807 vs 18.652 baseline (19-pose sample), zero disconnected masks, but central lower torso protrudes in extreme kick and shading seams remain. Do not equate overlap with smooth shading. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45707647719). Owner review pending.
+
+## 0.61 — isolate joint shading
+On 0.60 B, same-ray normal mixing only between explicit linked same-material lofts with near front depths. Opt-in depth band .65/1.4 rig units. Verified exact depth/ownership/material/frame/alpha invariance across 192 native poses. Median RGB changes only 22/54.5 pixels; visual improvement subtle, central hip still segmented. Native raster p95 1.679/1.904/1.909ms. Do not mistake blending normals for geometry union. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45709346263). Owner review pending.
