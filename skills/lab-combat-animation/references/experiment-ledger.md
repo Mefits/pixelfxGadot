@@ -47,3 +47,6 @@
 ## Открытые вопросы
 
 Динамическая опора и COM, анатомические joint limits, depth/occlusion, лопатки, передача импульса между поясами, целостность переходов, каденция и художественные деформации. Не считать их реализованными. Не обобщать метрики одного удара на универсальные ограничения.
+
+## 0.52a2 — support-release discontinuity (technical evidence, not artistic acceptance)
+When switching a planted foot to swing, authored ray may differ drastically from the last actual world-space ankle. In 0.52a B the release jumped 24.73 rig px in one sample. 0.52a2 B blends from the previous actual planted ankle to the free solution over six ticks while ramping support-root adjustment; bounds swing ray norm (not just its x component) and corrects pelvic lead. Max adjacent joint step falls to 11.74px, static bag overlap 8.00→.65px; contact knee flexion .34→19.87deg. These simultaneous changes are diagnostic, not proof of individual causal effects. Check release/landing continuity explicitly before applying artistic holds; C holds raise max step to 21.04px. A smooth endpoint transition can still generate a poor intermediate silhouette; inspect both. [Native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45678557967), implementation 215615abcc73739071945e5e1bb0e5926ca68ea8. Await owner assessment.
