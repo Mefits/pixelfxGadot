@@ -267,14 +267,79 @@ def shoulder049(frames,meta):
         out.append(v)
     return out
 
+def pelvis050(frames,meta):
+    # Owner accepted C. Keep its first jab through tick 22 exactly.
+    base=shoulder049(frames,meta)[2]
+    seq=copy.deepcopy(base["frames"][:23])
+    start=seq[-1]
+    def pose(x,y,tilt,hip,shoulder,near,far,leg,support):
+        p=copy.deepcopy(start)
+        for k in ("aim_tip","aim_point","aim_weight"):p.pop(k,None)
+        p.update(root=[x,y],tilt=tilt,hip_extra=hip,shoulder_turn=shoulder)
+        p["targets"]["hand_near"]=[*near,1]
+        p["targets"]["hand_far"]=[*far,1]
+        p["targets"]["foot_far"]=[*leg,-1]
+        p["feet"]=[[start["feet"][0][0],0],[start["feet"][1][0],0 if support else -10]]
+        return p
+    # Authored kick, not mocap: retract jab, chamber far knee, extend,
+    # re-chamber, plant, finish with rising near punch. Shared path/clocks.
+    knots=[
+        (22,start),
+        (26,pose(2.5,-1.5,-8,-4,20,(.35,.05),(.45,-.08),(.12,.96),False)),
+        (32,pose(3.5,-2.0,-19,-5,12,(.25,.12),(.54,-.15),(.42,.30),False)),
+        (38,pose(7.0,-2.5,-18,3,8,(.35,.18),(.35,-.13),(.98,-.12),False)),
+        (40,pose(7.0,-2.5,-18,3,8,(.35,.18),(.35,-.13),(.98,-.12),False)),
+        (46,pose(4.0,-2.0,-12,-3,32,(.22,.40),(.48,-.08),(.42,.30),False)),
+        (52,pose(4.0,-1.0,-10,-3,25,(.10,.60),(.47,-.09),(.05,.98),True)),
+        (56,pose(4.0,-.3,-10,-4,12,(.22,.55),(.42,-.12),(.05,.98),True)),
+        (60,pose(7.5,-4.5,12,5,0,(.66,-.73),(.34,.12),(.05,.98),True)),
+        (62,pose(7.2,-4.3,10,4,0,(.64,-.72),(.34,.12),(.05,.98),True)),
+        (68,pose(5.5,-2.8,2,0,0,(.36,-.12),(.48,.05),(.05,.98),True)),
+        (76,pose(5.0,-3.0,-3,0,0,(.50,.02),(.55,.03),(.05,.98),True)),
+    ]
+    for (a,lo),(b,hi) in zip(knots,knots[1:]):
+        for k in range(a+1,b+1):
+            u=(k-a)/(b-a)
+            if b not in (38,60):u=u*u*(3-2*u)
+            blend=lambda x,y:(np.array(x)*(1-u)+np.array(y)*u).tolist()
+            p=copy.deepcopy(lo)
+            for key in ("aim_tip","aim_point","aim_weight"):p.pop(key,None)
+            p.update(root=blend(lo["root"],hi["root"]),tilt=lo["tilt"]*(1-u)+hi["tilt"]*u,
+                hip_extra=lo.get("hip_extra",0)*(1-u)+hi.get("hip_extra",0)*u,
+                shoulder_turn=lo.get("shoulder_turn",0)*(1-u)+hi.get("shoulder_turn",0)*u,
+                feet=blend(lo["feet"],hi["feet"]))
+            p["feet"][0][1]=0
+            p["feet"][1][1]=-10 if 25<=k<52 else 0
+            for tip in p["targets"]:
+                p["targets"][tip]=blend(lo["targets"][tip][:2],hi["targets"][tip][:2])+[hi["targets"][tip][2] if tip=="foot_far" else lo["targets"][tip][2]]
+            if 32<k<44:
+                w=(k-32)/6 if k<=38 else (44-k)/6
+                p.update(aim_tip="foot_far",aim_point=[32.0,-23.0],aim_weight=w*w*(3-2*w))
+            if 56<k<64:
+                w=(k-56)/4 if k<=60 else (64-k)/4
+                p.update(aim_tip="hand_near",aim_point=[32.0,-47.0],aim_weight=.4*w*w*(3-2*w))
+            seq.append(p)
+    assert len(seq)==77 and seq[:23]==base["frames"][:23]
+    events=[{"tick":20,"anchor":"hand_near"},{"tick":38,"anchor":"foot_far"},{"tick":60,"anchor":"hand_near"}]
+    out=[]
+    for label,mode in [("A / fixed pelvis","fixed"),("B / coupled","coupled"),("C / independent","independent")]:
+        v=copy.deepcopy(base)
+        v.update(label=label,frames=copy.deepcopy(seq),events=events,cadence=0,pelvis_mode=mode)
+        for i,f in enumerate(v["frames"]):
+            if mode=="coupled":f["pelvis_turn"]=f.get("shoulder_turn",0)
+            elif mode=="independent":
+                f["pelvis_turn"]=float(np.interp(i,[0,22,26,32,38,40,46,52,56,76],[0,0,12,40,90,90,45,0,0,0]))
+        out.append(v)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49"],default="49");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50"],default="50");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -292,7 +357,7 @@ def main():
         select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
         fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    if a.stage in ("48","49"):
+    if a.stage in ("48","49","50"):
         # Keep all strike frames, 20+ ms delays, exact rounded 1.1x cycle.
         select=sorted(set(range(0,len(imgs),2))|{len(imgs)-1}|{e["tick"] for e in config[0]["events"]})
         spans=[(imgs[0],12)]+[(imgs[k],(select[j+1]-k if j+1<len(select) else 1)) for j,k in enumerate(select)]+[(imgs[-1],12)]
@@ -305,16 +370,16 @@ def main():
             delays.append(10*(round((elapsed+n)*100/66)-round(elapsed*100/66)));elapsed+=n
         assert min(delays)>=20
         merged[0][0].save(out/"comparison-1p1.gif",save_all=True,append_images=[im for im,_ in merged[1:]],duration=delays,loop=0,disposal=2)
-    review_ticks=[0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
+    review_ticks=[0,20,32,38,46,52,60,76] if a.stage=="50" else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
     for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
-    if a.stage=="49":
+    if a.stage in ("49","50"):
         entry=json.loads((out/"clip_2.json").read_text())
         full=entry["payload"]["clip"]["keys"]
         # Editable artistic knots, NOT error-bounded compression. Includes every strike.
-        ticks=[0,9,14,17,20,22,26,28,32,34,40,42,46,48,54,64]
+        ticks=[0,9,14,20,22,26,32,38,40,46,52,56,60,62,68,76] if a.stage=="50" else [0,9,14,17,20,22,26,28,32,34,40,42,46,48,54,64]
         entry["payload"]["clip"]["keys"]=[full[k] for k in ticks]
-        entry.update(id="lab049_combo_min",name="Lab 0.49 C - minimal")
-        (out/"Lab049_Combo_Minimal.json").write_text(json.dumps(entry,indent=2))
+        entry.update(id="lab0"+a.stage+"_combo_min",name="Lab 0."+a.stage+" C - minimal")
+        (out/("Lab0"+a.stage+"_Combo_Minimal.json")).write_text(json.dumps(entry,indent=2))
 if __name__=="__main__":main()

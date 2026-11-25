@@ -14,9 +14,11 @@ func run()->void:
     await process_frame
     if not scene.preview.bag_visible or scene.bank.strike.keys.size()!=16 or scene.bank.strike.events.size()!=3:
         push_error("Imported editor state invalid");quit(1);return
-    scene._seek(32.0/60.0)
+    scene._seek(38.0/60.0)
     if not scene.pose.angles.has("shoulder_turn"):push_error("Shoulder channel missing");quit(1);return
-    scene.pose.angles["shoulder_turn"]=70.0
+    if not scene.pose.angles.has("pelvis_turn"):push_error("Pelvis channel missing");quit(1);return
+    scene.pose.angles["pelvis_turn"]=70.0
+    scene.pose.angles["shoulder_turn"]=25.0
     scene.pose.angles["elbow_far"]+=5.0
     scene._key()
     if not scene._export_json(args[1]):push_error("Export failed");quit(1);return

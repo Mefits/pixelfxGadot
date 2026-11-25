@@ -5,6 +5,7 @@ const UI=preload("res://lab/ui_ru.gd")
 const RIG=preload("res://addons/creature/rig.gd")
 const RIG49=preload("res://lab/anatomy_rd/rig_049.gd")
 var shoulder_turn_control:SpinBox
+var pelvis_turn_control:SpinBox
 const CLIPS=preload("res://addons/creature/clips.gd")
 const VFX=preload("res://addons/pixelfx/composer/preset.gd")
 const FX_PREVIEW=preload("res://addons/creature/vfx_preview.gd")
@@ -248,6 +249,12 @@ func _ready() -> void:
     shoulder_turn_control=_spin(turn_row,0,90,1,func(v:float):
         if not syncing:pose.angles["shoulder_turn"]=v;_edit())
     turn_row.hide()
+    var pelvis_row:=HBoxContainer.new()
+    side.add_child(pelvis_row)
+    _label(pelvis_row,"Разворот таза")
+    pelvis_turn_control=_spin(pelvis_row,0,90,1,func(v:float):
+        if not syncing:pose.angles["pelvis_turn"]=v;_edit())
+    pelvis_row.hide()
     _button(side,"Экспорт правок JSON",_begin_json_export)
     export_json_dialog=FileDialog.new()
     export_json_dialog.access=FileDialog.ACCESS_FILESYSTEM
@@ -377,12 +384,13 @@ func _ready() -> void:
         clip_select.disabled=true
         fighter_select.disabled=true
         status.text="Шаблон библиотеки: отдельная копия, не банк бойца."
-        if str(catalog_entry.name).begins_with("Lab 0.49"):
+        if str(catalog_entry.name).begins_with("Lab 0.49") or str(catalog_entry.name).begins_with("Lab 0.50"):
             rig=RIG49.make()
             preview.rig=rig
             preview.ghost_rig=RIG49.make()
             turn_row.show()
-        if str(catalog_entry.name).begins_with("Lab 0.48") or str(catalog_entry.name).begins_with("Lab 0.49"):
+            if str(catalog_entry.name).begins_with("Lab 0.50"):pelvis_row.show()
+        if str(catalog_entry.name).begins_with("Lab 0.48") or str(catalog_entry.name).begins_with("Lab 0.49") or str(catalog_entry.name).begins_with("Lab 0.50"):
             rate.value=60
             ghost.set_pressed_no_signal(false)
             fx_visible.set_pressed_no_signal(false)
@@ -446,6 +454,7 @@ func _sync() -> void:
     root_x.value=float(pose.root[0])
     root_y.value=float(pose.root[1])
     shoulder_turn_control.set_value_no_signal(float(pose.angles.get("shoulder_turn",0)))
+    pelvis_turn_control.set_value_no_signal(float(pose.angles.get("pelvis_turn",0)))
     joint_select.select(rig.ids[selected])
     clock_label.text="%.3f / %.2f с"%[time,bank[name_id].duration]
     syncing=false

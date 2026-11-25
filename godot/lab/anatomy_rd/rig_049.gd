@@ -13,4 +13,8 @@ func evaluate(pose:Dictionary)->void:
     var x:=sqrt(50.0)*sin(deg_to_rad(45.0-turn))
     joints[ids["shoulder_near"]].offset=Vector2(x,1)
     joints[ids["shoulder_far"]].offset=Vector2(-x,1)
+    var pelvis:=clampf(float(pose.get("angles",{}).get("pelvis_turn",0.0)),0.0,90.0)
+    var hip_x:=sqrt(32.0)*sin(deg_to_rad(45.0-pelvis))
+    joints[ids["thigh_near"]].offset=Vector2(hip_x,0)
+    joints[ids["thigh_far"]].offset=Vector2(-hip_x,0)
     super.evaluate(pose)

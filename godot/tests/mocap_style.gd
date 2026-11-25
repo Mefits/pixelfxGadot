@@ -173,6 +173,7 @@ func run()->void:
             var hip_extra:float=f.get("hip_extra",0.0)
             var p:=CLIPS.pose({"hips":tilt*.25+hip_extra,"chest":tilt*.75-hip_extra,"head":-tilt*.45},f.root[0],f.root[1])
             if f.has("shoulder_turn"):p.angles["shoulder_turn"]=f.shoulder_turn
+            if f.has("pelvis_turn"):p.angles["pelvis_turn"]=f.pelvis_turn
             p=solve(rig,p,f.targets)
             # Foot correction uses actual source ankle height and a fixed planted point.
             var goals:Dictionary={}
@@ -280,12 +281,16 @@ func run()->void:
                 var chain:Array=CHAINS[e.anchor]
                 var shoulder:Vector2=sampled[tick][chain[0]]
                 var elbow:Vector2=sampled[tick][chain[1]]
-                var fist:Vector2=wrist+(wrist-elbow).normalized()*2.3
+                var fist:Vector2=wrist+Vector2(4,-.9) if str(e.anchor).begins_with("foot") else wrist+(wrist-elbow).normalized()*2.3
                 check["shoulder"]=[shoulder.x,shoulder.y]
                 check["chest"]=[sampled[tick]["chest"].x,sampled[tick]["chest"].y]
                 check["fist_tip"]=[fist.x,fist.y]
                 check["bag_front_gap_px"]=36.0-fist.x
-                check["arm_extension_px"]=shoulder.distance_to(wrist)
+                check["limb_extension_px"]=shoulder.distance_to(wrist)
+                if str(e.anchor).begins_with("hand"):check["arm_extension_px"]=shoulder.distance_to(wrist)
+                else:check["hip"]=[shoulder.x,shoulder.y]
+                check["pelvis_turn_deg"]=float(keys[tick].pose.angles.get("pelvis_turn",0))
+                check["shoulder_turn_deg"]=float(keys[tick].pose.angles.get("shoulder_turn",0))
             event_checks.append(check)
         report.append({"event_checks":event_checks,"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"sdk_keys":clip.keys.size(),"exposure_indices":exposure_indices,"exposure_count":exposure_indices.size(),"cadence_error_px":max_cadence_error,"cadence_support_error_px":max_cadence_support,"cadence_floor_px":max_cadence_floor,"cadence_max_step_px":max_cadence_step,"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
     for t in count:

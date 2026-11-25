@@ -39,14 +39,14 @@ jobs:
         run: |
           mkdir -p editor-package
           cp -r godot editor-package/
-          cp mocap-style-results/Lab049_Combo_Minimal.json editor-package/
-          xvfb-run -a -s "-screen 0 1280x768x24" godot --path godot --audio-driver Dummy --script res://tests/lab_combo_editor.gd -- "$PWD/editor-package/Lab049_Combo_Minimal.json" "$PWD/mocap-style-results/edited-smoke.json" 2>&1 | tee mocap-style-results/editor.log
+          cp mocap-style-results/Lab050_Combo_Minimal.json editor-package/
+          xvfb-run -a -s "-screen 0 1280x768x24" godot --path godot --audio-driver Dummy --script res://tests/lab_combo_editor.gd -- "$PWD/editor-package/Lab050_Combo_Minimal.json" "$PWD/mocap-style-results/edited-smoke.json" 2>&1 | tee mocap-style-results/editor.log
           grep LAB_EDITOR_ROUNDTRIP_OK mocap-style-results/editor.log
           if grep -E 'SCRIPT ERROR|Parse Error|^ERROR:' mocap-style-results/editor.log; then exit 1; fi
-          printf '%s\n' 'Godot 4.4.1: import godot/project.godot, F6 main.tscn or F5. In launcher Import JSON: Lab049_Combo_Minimal.json. Open in editor; Export JSON to share edits.' > editor-package/README.txt
+          printf '%s\n' 'Godot 4.4.1: import godot/project.godot, F6 main.tscn or F5. In launcher Import JSON: Lab050_Combo_Minimal.json. Open in editor; Export JSON to share edits.' > editor-package/README.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Lab-049-Editable-Godot
+          name: Lab-050-Editable-Godot
           path: editor-package/
       - uses: actions/upload-artifact@v4
         if: always()
