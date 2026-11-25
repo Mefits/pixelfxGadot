@@ -74,3 +74,6 @@ Owner pointed out curved neutral legs and balloon-like clothing. Corrected only 
 
 ## 0.56 — connected surface prototype
 Owner rejected 0.55c and emphasized that rounded anatomy attachments also need work. Native triangle input works with common Z-buffer and outline; old oracle passed. Pose-space strips remove shoulder/hip bulges and are faster to rasterize, but still show thin neck/torso and angular pelvis transitions. This is proof of raster architecture, not artistic acceptance or full skinning. Next investigate indexed bind-pose mesh, explicit weights and joint correctives rather than more separate primitives. See docs/BODY_SURFACE_RD.md and [native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45699553309).
+
+## 0.57 — weighted skin test
+Generic indexed mesh with 2-bone weights, bounded correction on elbow/knee rows; native capture passed. Art not accepted. Bind identity exact; 17.54 mean projected orientation reversals and max edge ratio 56.09 (diagnostic, short rest edges amplify). C lowers mean collapsed faces 1.97→1.59 but does not fix shoulder/hip/neck distortion. Do not equate zero bind error with good deformation. Recommend architecture work on anatomical joint frames, depth and corrective constraints before clothing. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45700158471).
