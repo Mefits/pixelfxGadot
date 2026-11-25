@@ -32,12 +32,20 @@ static func solve(rig,pose:Dictionary,targets:Dictionary)->Dictionary:
 class Board extends Node2D:
     var pts:Array=[]
     var skins:Array=[]
+    var bags:Array=[]
     func _draw()->void:
         for i in pts.size():
             var x:=float(i*240)
             draw_rect(Rect2(x,0,240,230),Color("#273b4b"))
             draw_line(Vector2(x+4,210),Vector2(x+236,210),Color("#738a8f"))
-            draw_set_transform(Vector2(x+103,210),0,Vector2.ONE*3.4)
+            draw_set_transform(Vector2(x+(70 if bags[i] else 103),210),0,Vector2.ONE*3.4)
+            if bags[i]:
+                draw_line(Vector2(41,-60),Vector2(41,-53),Color("#9c9a8a"),.65)
+                draw_rect(Rect2(36,-53,10,47),Color("#75634f"))
+                draw_circle(Vector2(41,-53),5,Color("#75634f"))
+                draw_circle(Vector2(41,-6),5,Color("#75634f"))
+                draw_line(Vector2(36,-48),Vector2(36,-10),Color("#c0aa87"),.65)
+                for y in [-47,-33,-19]:draw_line(Vector2(36,y),Vector2(46,y),Color("#a58b67"),.45)
             if skins[i]:INK46.actor(self,pts[i],0,"hand_near")
             else:INK.actor(self,pts[i],0,"hand_near")
             draw_set_transform(Vector2.ZERO)
@@ -139,7 +147,9 @@ func run()->void:
     var capture_size:=Vector2i(cfg.size()*240,230)
     root.content_scale_size=capture_size
     root.size=capture_size
-    for v in cfg:board.skins.append(v.get("skin46",false))
+    for v in cfg:
+        board.skins.append(v.get("skin46",false))
+        board.bags.append(v.get("bag",false))
     var all_points:Array=[]
     var report:Array=[]
     var count:=0
@@ -196,6 +206,16 @@ func run()->void:
             max_pen=maxf(max_pen,penetration)
             p.root[1]-=penetration
             rig.evaluate(p)
+            if f.has("aim_tip"):
+                var tip:String=f.aim_tip
+                var chain:Array=CHAINS[tip]
+                var shoulder:Vector2=rig.point(chain[0])
+                var span:float=rig.joints[rig.ids[chain[1]]].offset.length()+rig.joints[rig.ids[tip]].offset.length()
+                var goal:=Vector2(f.aim_point[0],f.aim_point[1])
+                var ray:Vector2=(rig.point(tip).lerp(goal,float(f.aim_weight))-shoulder)/span
+                # Avoid locked-out elbow, preserve current bend pole, no scaling.
+                ray=ray.limit_length(.985)
+                p=solve(rig,p,{tip:[ray.x,ray.y,f.targets[tip][2]]})
             for tip in locks:max_support_error=maxf(max_support_error,rig.point(tip).distance_to(locks[tip]))
             for joint in rig.joints:
                 if not joint.parent.is_empty():
@@ -252,7 +272,17 @@ func run()->void:
         for e in events:
             var tick:=roundi(float(e.t)*60)
             var wrist:Vector2=sampled[tick][e.anchor]
-            event_checks.append({"tick":tick,"anchor":e.anchor,"point":[wrist.x,wrist.y],"error_px":wrist.distance_to(poses[tick][e.anchor])})
+            var check:Dictionary={"tick":tick,"anchor":e.anchor,"point":[wrist.x,wrist.y],"error_px":wrist.distance_to(poses[tick][e.anchor])}
+            if v.get("bag",false):
+                var chain:Array=CHAINS[e.anchor]
+                var shoulder:Vector2=sampled[tick][chain[0]]
+                var elbow:Vector2=sampled[tick][chain[1]]
+                var fist:Vector2=wrist+(wrist-elbow).normalized()*2.3
+                check["shoulder"]=[shoulder.x,shoulder.y]
+                check["fist_tip"]=[fist.x,fist.y]
+                check["bag_front_gap_px"]=36.0-fist.x
+                check["arm_extension_px"]=shoulder.distance_to(wrist)
+            event_checks.append(check)
         report.append({"event_checks":event_checks,"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"sdk_keys":clip.keys.size(),"exposure_indices":exposure_indices,"exposure_count":exposure_indices.size(),"cadence_error_px":max_cadence_error,"cadence_support_error_px":max_cadence_support,"cadence_floor_px":max_cadence_floor,"cadence_max_step_px":max_cadence_step,"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
     for t in count:
         board.pts=[]

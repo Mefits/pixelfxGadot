@@ -217,14 +217,45 @@ def combo047(frames,meta):
         out.append(v)
     return out
 
+def bag048(frames,meta):
+    base=combo047(frames,meta)[0]
+    out=[]
+    for label,body,cadence in [("A / original",False,0),("B / aim only",False,0),("C / aim + shoulder",True,0)]:
+        v=copy.deepcopy(base)
+        v.update(label=label,bag=True,cadence=cadence,aim=(label[0]!="A"))
+        # Fixed bag front at x=36 rig px; target wrist slightly in front.
+        # Aim envelopes are sampled after support IK. No motion of bag.
+        for i,f in enumerate(v["frames"]):
+            if not v["aim"]:continue
+            if body:
+                w=float(np.interp(i,[0,22,26,28,32,34,38,42,64],[0,0,0,0,1,0.9,0.3,0,0]))
+                # Shoulder travel primarily from pelvis rotation: hip angle
+                # moves chest base, not just the angle of the arm.
+                f["hip_extra"]=f.get("hip_extra",0)+18*w
+                f["tilt"]+=12*w
+                f["root"][0]+=3.5*w
+                f["root"][1]+=1.0*w
+            # Do not aim the wrist during windup or the recovery into the next blow.
+            windows=[(20,17,22,"hand_near",[33.5,-32.5],.35),
+                     (32,28,35,"hand_far",[33.5,-33.0],1.0),
+                     (46,42,49,"hand_near",[32.0,-47.0],.40)]
+            for hit,lo,hi,tip,target,weight in windows:
+                if lo<i<hi:
+                    u=(i-lo)/(hit-lo) if i<=hit else (hi-i)/(hi-hit)
+                    f["aim_tip"]=tip
+                    f["aim_point"]=target
+                    f["aim_weight"]=weight*u*u*(3-2*u)
+        out.append(v)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47"],default="47");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48"],default="48");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -242,7 +273,20 @@ def main():
         select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
         fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    review_ticks=[0,20,28,32,40,46,64] if a.stage=="47" else [0,config[0]["contact"],len(imgs)-1]
+    if a.stage=="48":
+        # Keep all strike frames, 20+ ms delays, exact rounded 1.1x cycle.
+        select=sorted(set(range(0,len(imgs),2))|{len(imgs)-1}|{e["tick"] for e in config[0]["events"]})
+        spans=[(imgs[0],12)]+[(imgs[k],(select[j+1]-k if j+1<len(select) else 1)) for j,k in enumerate(select)]+[(imgs[-1],12)]
+        merged=[]
+        for im,n in spans:
+            if merged and merged[-1][0].tobytes()==im.tobytes():merged[-1]=(im,merged[-1][1]+n)
+            else:merged.append((im,n))
+        elapsed=0;delays=[]
+        for _,n in merged:
+            delays.append(10*(round((elapsed+n)*100/66)-round(elapsed*100/66)));elapsed+=n
+        assert min(delays)>=20
+        merged[0][0].save(out/"comparison-1p1.gif",save_all=True,append_images=[im for im,_ in merged[1:]],duration=delays,loop=0,disposal=2)
+    review_ticks=[0,20,28,32,40,46,64] if a.stage in ("47","48") else [0,config[0]["contact"],len(imgs)-1]
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
     for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
