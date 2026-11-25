@@ -178,6 +178,7 @@ func run()->void:
         var max_sole_pen:=0.0
         var max_toe_error:=0.0
         var max_heel_lift:=0.0
+        var release_origin:=Vector2.ZERO
         for t in v.frames.size():
             var f:Dictionary=v.frames[t]
             var tilt:float=clampf(f.tilt,-65,65)
@@ -241,6 +242,15 @@ func run()->void:
                 var ray:Vector2=(goals[tip]-rig.point(chain[0]))/span
                 targets[tip]=[ray.x,ray.y,f.targets[tip][2]]
             p=solve(rig,p,targets)
+            if f.has("release_blend") and not locks.has("foot_far"):
+                var release:float=float(f.release_blend)
+                if release<=.00001 and previous.has("foot_far"):
+                    release_origin=previous["foot_far"]
+                var hip:Vector2=rig.point("thigh_far")
+                var span:float=rig.joints[rig.ids["knee_far"]].offset.length()+rig.joints[rig.ids["foot_far"]].offset.length()
+                var desired:Vector2=release_origin.lerp(rig.point("foot_far"),release)
+                var ray:Vector2=(desired-hip)/span
+                p=solve(rig,p,{"foot_far":[ray.x,ray.y,f.targets["foot_far"][2]]})
             var penetration:=maxf(0,maxf(rig.point("foot_near").y,rig.point("foot_far").y))
             if int(v.get("foot51",0))>0:
                 for tip in feet:

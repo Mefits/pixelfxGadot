@@ -512,14 +512,34 @@ def push052a(frames,meta):
     out.append(c)
     return out
 
+def push052a2(frames,meta):
+    old=push052a(frames,meta)
+    a=copy.deepcopy(old[1]);a["label"]="A / first attempt"
+    b=copy.deepcopy(old[1]);b["label"]="B / release + reach"
+    for i,f in enumerate(b["frames"]):
+        if 40<=i<=46:
+            u=(i-40)/6
+            f["release_blend"]=u*u*(3-2*u)
+            f["reference_support_weight"]*=f["release_blend"]
+        w=float(np.interp(i,[0,44,50,52,58,76],[0,0,1,1,0,0]))
+        if w>0:
+            f["pelvis_turn"]-=25*w
+            f["reference_support_dx"]-=3*w
+            ray=f["targets"]["foot_far"]
+            length=float(np.hypot(ray[0],ray[1]))
+            if length>.985:
+                ray[0]*=.985/length;ray[1]*=.985/length
+    c=copy.deepcopy(b);c.update(label="C / release + holds",cadence=-1,holds=old[2]["holds"])
+    return [a,b,c]
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b","51c","51c2","52a"],default="52a");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b","51c","51c2","52a","52a2"],default="52a2");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=push052a(frames,meta) if a.stage=="52a" else refine051c(frames,meta) if a.stage=="51c2" else reference051c(frames,meta) if a.stage=="51c" else foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=push052a2(frames,meta) if a.stage=="52a2" else push052a(frames,meta) if a.stage=="52a" else refine051c(frames,meta) if a.stage=="51c2" else reference051c(frames,meta) if a.stage=="51c" else foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -537,7 +557,7 @@ def main():
         select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
         fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    if a.stage in ("48","49","50","51a","51b","51c","51c2","52a"):
+    if a.stage in ("48","49","50","51a","51b","51c","51c2","52a","52a2"):
         # Keep all strike frames, 20+ ms delays, exact rounded 1.1x cycle.
         select=sorted(set(range(0,len(imgs),2))|{len(imgs)-1}|{e["tick"] for e in config[0]["events"]})
         spans=[(imgs[0],12)]+[(imgs[k],(select[j+1]-k if j+1<len(select) else 1)) for j,k in enumerate(select)]+[(imgs[-1],12)]
@@ -550,12 +570,12 @@ def main():
             delays.append(10*(round((elapsed+n)*100/66)-round(elapsed*100/66)));elapsed+=n
         assert min(delays)>=20
         merged[0][0].save(out/"comparison-1p1.gif",save_all=True,append_images=[im for im,_ in merged[1:]],duration=delays,loop=0,disposal=2)
-    review_ticks=[0,20,32,42,46,50,58,76] if a.stage=="52a" else [0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b","51c","51c2") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
+    review_ticks=[0,20,32,42,46,50,58,76] if a.stage in ("52a","52a2") else [0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b","51c","51c2") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
     for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
-    if a.stage in ("51c","51c2","52a"):
-        imgs[50 if a.stage=="52a" else 38].save(out/"contact-review.png")
+    if a.stage in ("51c","51c2","52a","52a2"):
+        imgs[50 if a.stage in ("52a","52a2") else 38].save(out/"contact-review.png")
     if a.stage=="51a":
         clips=[json.loads((out/f"clip_{i}.json").read_text())["payload"] for i in range(3)]
         assert clips[0]==clips[1]==clips[2], "Skin variants must not alter animation data"
