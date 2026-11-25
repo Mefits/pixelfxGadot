@@ -33,6 +33,8 @@ struct Config {
     bool organic = false;
     double smooth = 0;
     std::vector<std::array<int, 2>> joins;
+    double union_band = 0; // opt-in front-surface geometric smooth max, rig units
+    std::vector<std::array<int, 2>> union_links;
     double normal_blend = 0; // depth band in rig units; zero retains exact legacy lighting
     std::vector<std::array<int, 2>> normal_links; // explicit primitive-index pairs
 };
@@ -183,6 +185,31 @@ class Raster {
                         return "duplicate normal link";
             cost += double(c.width)*c.height*c.normal_links.size()*2;
             if(cost>16000000)return "normal blend work budget exceeded";
+        }
+        if (c.union_band>0 && c.normal_blend>0) return "front union and normal blend are mutually exclusive";
+        if (!(c.union_band>=0 && c.union_band<=3) || c.union_links.size()>64 ||
+            (c.union_band==0 && !c.union_links.empty()))
+            return "invalid front union";
+        if (c.union_band>0) {
+            for (auto pair:c.union_links) {
+                if(pair[0]<0 || pair[1]<0 || pair[0]==pair[1] ||
+                   size_t(pair[0])>=ps.size() || size_t(pair[1])>=ps.size())
+                    return "invalid union link indices";
+                const auto &a=ps[pair[0]], &b=ps[pair[1]];
+                if(a.shape!=Shape::Loft || b.shape!=Shape::Loft || a.material!=b.material)
+                    return "union links require same-material lofts";
+                for(size_t j=0;j<ps.size();++j)
+                    if((j!=size_t(pair[0]) && ps[j].part==a.part) ||
+                       (j!=size_t(pair[1]) && ps[j].part==b.part))
+                        return "union link owners must be unique";
+            }
+            for(size_t i=0;i<c.union_links.size();++i)
+                for(size_t j=0;j<i;++j)
+                    if(c.union_links[i]==c.union_links[j] ||
+                       (c.union_links[i][0]==c.union_links[j][1] && c.union_links[i][1]==c.union_links[j][0]))
+                        return "duplicate union link";
+            cost += double(c.width)*c.height*c.union_links.size()*10;
+            if(cost>16000000)return "front union work budget exceeded";
         }
         return nullptr;
     }
@@ -367,7 +394,66 @@ class Raster {
             [](const Section &a,double x){return a.t<x;});
         if(it==p.sections.end())return false;
         const LoftSpan span{len,ux,uy,p.a[2],p.b[2],p.profile,*(it-1),*it};
-        return span.sample(s,v,h);
+        if(!span.sample(s,v,h))return false;
+        h.clearance=std::min({(t-p.sections.front().t)*len,(p.sections.back().t-t)*len,(h.front-h.back)*.5});
+        return true;
+    }
+    // Same-ray bounded geometric correction, NOT a full 3D SDF union.
+    // Fade at axial/lateral boundaries and at vanishing interval overlap.
+    static double ease(double x) {
+        x=std::clamp(x,0.,1.); return x*x*(3-2*x);
+    }
+    static bool union_front(const Primitive &a,const Primitive &b,double x,double y,double band,double &front,double &gain) {
+        LoftHit u{},v{};
+        if(!sample_loft(a,x,y,u)||!sample_loft(b,x,y,v))return false;
+        front=std::max(u.front,v.front);
+        const double overlap=std::min(u.front,v.front)-std::max(u.back,v.back);
+        const double k=band*ease(overlap/.65)*ease(std::min(u.clearance,v.clearance)/.55);
+        const double d=std::abs(u.front-v.front);
+        gain=0;
+        if(k>1e-9 && d<k) {
+            const double h=k-d;
+            gain=h*h/(4*k);
+            front+=gain;
+        }
+        return true;
+    }
+    void unite_fronts(const Config &c,const std::vector<Primitive> &ps) {
+        std::unordered_map<int,std::vector<std::array<int,2>>> links;
+        for(auto pair:c.union_links){
+            links[ps[pair[0]].part].push_back(pair);
+            links[ps[pair[1]].part].push_back(pair);
+        }
+        for(int i:touched){
+            auto &p=pixels[i];
+            auto it=links.find(p.part);
+            if(it==links.end())continue;
+            const double x=(i%c.width-c.ox)/c.density,y=(i/c.width-c.oy)/c.density;
+            double best=0,best_light=p.light;
+            const double original=p.depth;
+            for(auto pair:it->second){
+                const auto &a=ps[pair[0]],&b=ps[pair[1]];
+                double z,g;
+                ++union_tests;
+                if(!union_front(a,b,x,y,c.union_band,z,g)||g<=1e-6)continue;
+                // Only the original visible pair may be corrected; do not
+                // promote a buried link through an unrelated occluding part.
+                if(std::abs((z-g)-original)>2e-4 || g<=best)continue;
+                constexpr double e=.005;
+                double xp,xm,yp,ym,unused;
+                union_tests+=4;
+                if(!union_front(a,b,x+e,y,c.union_band,xp,unused)||
+                   !union_front(a,b,x-e,y,c.union_band,xm,unused)||
+                   !union_front(a,b,x,y+e,c.union_band,yp,unused)||
+                   !union_front(a,b,x,y-e,c.union_band,ym,unused))continue;
+                const Vec n{-(xp-xm)/(2*e),-(yp-ym)/(2*e),1};
+                best=g;best_light=dot(n,c.light)/std::sqrt(dot(n,n));
+            }
+            if(best>0){
+                p.depth=float(original+best);p.light=float(best_light);
+                ++union_pixels;
+            }
+        }
     }
     void blend_normals(const Config &c,const std::vector<Primitive> &ps) {
         std::unordered_map<int,std::vector<const Primitive*>> links;
@@ -461,7 +547,7 @@ class Raster {
   public:
     std::vector<Pixel> pixels;
     std::vector<uint32_t> color; // 0xAABBGGRR
-    uint64_t samples = 0, field_tests = 0, normal_tests=0, normal_pixels=0;
+    uint64_t samples = 0, field_tests = 0, normal_tests=0, normal_pixels=0, union_tests=0, union_pixels=0;
     int buffer_growths = 0;
     size_t body_pixels() const { return touched.size(); }
     const char *render(const Config &c, const std::vector<Primitive> &ps) {
@@ -470,7 +556,7 @@ class Raster {
         size_t area = size_t(c.width) * c.height;
         buffer_growths =
             int(pixels.capacity() < area) + int(color.capacity() < area) + int(touched.capacity() < area);
-        field_tests = normal_tests = normal_pixels = 0;
+        field_tests = normal_tests = normal_pixels = union_tests = union_pixels = 0;
         normal_active=c.normal_blend>0 && !c.normal_links.empty();
         if(normal_active){buffer_growths+=normals.capacity()<area;normals.assign(area,{0,0,0});}
         pixels.assign(area, Pixel{});
@@ -498,6 +584,7 @@ class Raster {
                 smooth_joint(c, ps[pair[0]], ps[pair[1]], int(i));
             }
         }
+        if(c.union_band>0)unite_fronts(c,ps);
         if(normal_active)blend_normals(c,ps);
         finish(c);
         return nullptr;

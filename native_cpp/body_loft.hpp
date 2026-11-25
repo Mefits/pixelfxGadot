@@ -11,6 +11,7 @@ struct Section {
 };
 struct LoftHit {
     double back, front;
+    double clearance = 0; // set by whole-Loft sampling, not individual section
     std::array<double,3> normal;
 };
 struct LoftSpan {

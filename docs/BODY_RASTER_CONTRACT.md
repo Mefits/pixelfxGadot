@@ -22,3 +22,7 @@ Performance: separate CPU raster, bridge, texture upload submission; warmed p50/
 
 ## 0.61 optional Loft normal blending
 `normal_blend` (0..3 rig depth units, default 0) and `normal_links` (explicit zero-based pairs of same-material Loft primitives with unique part IDs). For visible linked surface, sample neighbor at same XY, use smoothstep weight by absolute front depth difference, reject near-opposite normals, renormalize sum before quantization. Geometry, depth, ownership, alpha/outline unchanged. No geometric union or cross-material blending. `normal_tests`/`normal_pixels` counters report work and eligible blended pixels, not number of changed colors. Default off. Bounded work and invalid link validation.
+
+
+## 0.62 experimental front-surface geometric union
+Opt-in `union_band` (0..3 rig units) and `union_links` (explicit zero-based unique same-material Loft pairs; default off). For the original visible linked pair, sample both front/back intervals, require positive actual overlap, fade the polynomial smooth maximum near interval and whole-Loft boundaries. Maximum depth gain band/4, no ownership or XY mask change. Recompute surface gradient numerically, then use existing light and tones. No normal blending simultaneously, no unlinked occlusion promotion, no chaining; maximum single pair correction. This is a camera-ray front surface prototype, not full 3D smooth union or silhouette expansion. No change to hidden back geometry. Counters union_tests/union_pixels. 

@@ -138,6 +138,27 @@ class PixelFXBodyRaster : public godot::RefCounted {
                 c.normal_links.push_back(idx);
             }
         }
+        c.union_band=r.number(cfg.get("union_band",0),"union_band");
+        c.union_links.clear();
+        if(cfg.has("union_links")){
+            Variant value=r.get(cfg,"union_links",Variant::ARRAY);
+            if(!r.error.is_empty())return failure(r.error);
+            Array links=value;
+            if(links.size()>64)return failure("too many union links");
+            for(int i=0;i<links.size();++i){
+                if(links[i].get_type()!=Variant::ARRAY)return failure("expected union link pair");
+                Array pair=links[i];
+                if(pair.size()!=2)return failure("expected two union link indices");
+                std::array<int,2> idx{};
+                for(int k=0;k<2;++k){
+                    if(pair[k].get_type()!=Variant::INT)return failure("expected union link index");
+                    int64_t n=pair[k];
+                    if(n<0 || n>=primitives.size())return failure("invalid union link index");
+                    idx[k]=int(n);
+                }
+                c.union_links.push_back(idx);
+            }
+        }
         c.width = r.integer(cfg, "width", 1, 1024);
         c.height = r.integer(cfg, "height", 1, 1024);
         std::array<double, 2> origin{};
@@ -247,6 +268,8 @@ class PixelFXBodyRaster : public godot::RefCounted {
         out["field_tests"] = int64_t(raster.field_tests);
         out["normal_tests"] = int64_t(raster.normal_tests);
         out["normal_pixels"] = int64_t(raster.normal_pixels);
+        out["union_tests"] = int64_t(raster.union_tests);
+        out["union_pixels"] = int64_t(raster.union_pixels);
         out["sample_tests"] = int64_t(raster.samples);
         out["body_pixels"] = int64_t(raster.body_pixels());
         int n = c.width * c.height;

@@ -5,6 +5,9 @@ on:
     paths:
       - 'native_cpp/body_raster.hpp'
       - 'native_cpp/body_extension.hpp'
+      - 'native_cpp/body_loft.hpp'
+      - 'godot/tests/body_union_062.gd'
+      - 'tools/body_union_062.py'
       - 'native_cpp/body_tests/loft.cpp'
       - 'godot/tests/body_normals_061.gd'
       - 'tools/body_normals_061.py'
@@ -51,6 +54,8 @@ jobs:
           mkdir -p godot/.godot
           echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
           python tools/body_normals_061.py --godot godot --out body-skin-results
+      - name: Lab 062 geometric capture
+        run: python tools/body_union_062.py --godot godot --out body-union-results
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,3 +66,15 @@ jobs:
             body-skin-results/review.png
             body-skin-results/stand-review.png
             body-skin-results/engine.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: body-union-062
+          path: |
+            body-union-results/*.gif
+            body-union-results/metrics.json
+            body-union-results/review.png
+            body-union-results/stand-review.png
+            body-union-results/pelvis-review.png
+            body-union-results/engine.log

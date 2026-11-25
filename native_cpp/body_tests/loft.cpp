@@ -68,6 +68,33 @@ int main(){
     assert(!r.render(c,{p,q}) && r.normal_pixels==0 && colors==r.color);
     c.normal_links={{0,1},{1,0}};assert(r.render(c,{p,q}));
     c.normal_links={{0,1}};q.material=1;c.materials.push_back(c.materials[0]);assert(r.render(c,{p,q}));
+    // 0.62: geometric depth gain, original owners/mask, no disconnected fusion.
+    c.normal_blend=0;c.normal_links.clear();q.material=0;
+    q.a={0,-6,.2};q.b={0,6,.2};
+    assert(!r.render(c,{p,q}));orig=r.pixels;colors=r.color;
+    c.union_band=1.4;c.union_links={{0,1}};
+    assert(!r.render(c,{p,q}) && r.union_pixels>0);
+    double maxgain=0;
+    for(size_t i=0;i<orig.size();++i){
+        assert(orig[i].part==r.pixels[i].part && orig[i].material==r.pixels[i].material);
+        double gain=r.pixels[i].depth-orig[i].depth;
+        assert(gain>=0 && gain<=c.union_band/4+1e-5);
+        maxgain=std::max(maxgain,gain);
+    }
+    assert(maxgain>0);
+    auto depth=r.pixels;auto united=r.color;
+    assert(!r.render(c,{p,q}) && united==r.color);
+    for(size_t i=0;i<depth.size();++i)assert(depth[i].depth==r.pixels[i].depth);
+    Primitive occluder;occluder.part=3;occluder.a={0,0,8};occluder.ra=3;
+    assert(!r.render(c,{p,q,occluder})&&r.pixels[center].part==3&&r.pixels[center].depth==11);
+    q.a[2]=q.b[2]=10;
+    assert(!r.render(c,{p,q}) && r.union_pixels==0);
+    c.union_links={{0,1},{1,0}};assert(r.render(c,{p,q}));
+    c.union_links={{0,1}};q.material=1;assert(r.render(c,{p,q}));
+    c.union_links.clear();c.union_band=0;q.material=0;
+    q.a[2]=q.b[2]=.2;
+    assert(!r.render(c,{p,q}) && r.color==colors);
+    std::cout<<"FRONT_UNION_062_OK bounded depth, ownership, occlusion, determinism, depth gate\n";
     std::cout<<"NORMAL_BLEND_OK immutable geometry, determinism, depth gate, material and link validation\n";
     std::cout<<"LOFT_OK gradients, axial width, rotation, depth swap, full fold, invalid profiles\n";
 }
