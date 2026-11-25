@@ -36,3 +36,6 @@ Read README.md, docs/ROADMAP.md and original/pixelfx/skills/pixelfx/SKILL.md fir
 ## Lab combat animation skill (mandatory for animation R&D)
 - Before any Lab combat animation or reference transfer, read `skills/lab-combat-animation/SKILL.md` and its two reference files alongside latest `docs/MOTION_HANDOFF_RU.md`. This repository skill records validated techniques, owner preferences, failure modes, and the reference-to-motion procedure. It supplements, not replaces, the Creature SDK skill.
 - At each meaningful checkpoint update the handoff. Update the skill/ledger when a reusable lesson or stable owner decision changes; distinguish measured results, owner approval, and hypotheses. Do not trigger redundant CI for documentation-only changes. Latest owner decisions supersede historical ones above. Current previews ×1.1 and ×0.5; no editor packages unless requested; no Project N changes.
+
+## Isolated Astra body raster assignment
+On experiment/astra-body-raster-054 ONLY, docs/ASTRA_BODY_RASTER_TASK_RU.md and docs/BODY_RASTER_CONTRACT.md define authorized work. This exception is limited to rendering kernel and technical tests; existing animation R&D rules continue on experiment/motion-temporal-rd. No merge, no Project N changes. Do not redo animations or original runtime port. Read task first.

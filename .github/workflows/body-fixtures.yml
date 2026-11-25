@@ -1,0 +1,28 @@
+name: Lab body fixture check
+on:
+  push:
+    branches: [experiment/astra-body-raster-054]
+    paths:
+      - 'godot/tests/fixtures/body_raster/poses.json'
+      - 'godot/tests/body_fixture_verify.gd'
+      - '.github/workflows/body-fixtures.yml'
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lab-godot
+          key: lab-godot-linux-4.4.1
+      - run: |
+          mkdir -p ~/.cache/lab-godot
+          if [ ! -x ~/.cache/lab-godot/godot ]; then
+            curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+            unzip -qo /tmp/godot.zip -d ~/.cache/lab-godot
+            mv ~/.cache/lab-godot/Godot_v4.4.1-stable_linux.x86_64 ~/.cache/lab-godot/godot
+          fi
+          ~/.cache/lab-godot/godot --headless --path godot --script res://tests/body_fixture_verify.gd
