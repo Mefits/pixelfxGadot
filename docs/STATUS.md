@@ -57,3 +57,5 @@ Build source: f8a812f2c7e4d3d073a998dcaf883dd23b09d93a. Godot 4.4.1, Windows/Lin
 This is an isolated animation research track, not a new VFX runtime release. Owner prefers D (recorded mocap, edited timing and poses); prefers corrected joint bending of 0.44. Native Godot 4.4.1 capture/SDK validation: [run 45656732943](https://github.com/Mefits/pixelfxGadot/actions/runs/45656732943), source commit ef66930557602f33560d08650020bf1aa1e329fa. No in-game N integration, no claim of target anime quality or performance. The remaining Astra archive is not fully imported. See [MOTION_HANDOFF_RU.md](MOTION_HANDOFF_RU.md) for the current plan and exact recovery paths.
 
 - Owner addition: Lab 0.46 explicitly includes key reduction vs limited cadence comparison (24/15/8 poses per second plus authored holds); planned, not implemented. See handoff.
+
+- Astra archival import: [d279ad1](https://github.com/Mefits/pixelfxGadot/commit/d279ad1081fdd7147dddaf19ba6f677a9e052e11), 8 original source files verified by Git blob hashes; 19 remain archive-only. Active code unchanged.
