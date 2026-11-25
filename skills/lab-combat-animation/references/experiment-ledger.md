@@ -68,3 +68,6 @@ Owner chose density ×3, black outline 3 raster px, adjustable later. A fitted, 
 
 ## 0.55b — character-specific geometry test
 Classic Sasuke Part I as fan-art reference. Native procedural recipe adds material/volume details to unchanged FK. Recognizable overall silhouette and palette in actual Godot capture; hair, high collar, angular clothing cut and face still need art refinement. Fixed camera crops high-kick extremity; avoid interpreting as geometry failure. Density 3, outline 3 retained. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45696364357). Owner review pending.
+
+## 0.55c — separate garment geometry from anatomy
+Owner pointed out curved neutral legs and balloon-like clothing. Corrected only neutral pose using fixed rest offsets; old pose retained. New native cut_tube gives tapered flat axial ends and adjustable cross-section (2/4 in comparison), preserves z buffer. Actual Godot image shows clear flatter shorts and cuffs, but shoulder gaps and excessively rigid shirt need correction. Do not interpret static pose approval as dynamic acceptance. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45697691674). No rig/N changes.
