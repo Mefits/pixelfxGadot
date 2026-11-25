@@ -173,6 +173,22 @@ class PixelFXBodyRaster : public godot::RefCounted {
                 p.ra = r.number(d.get("ra", Variant()), "ra");
                 p.rb = r.number(d.get("rb", Variant()), "rb");
                 p.bulge = r.number(d.get("bulge", 0), "bulge");
+            } else if(type==Variant("loft")){
+                p.shape=body::Shape::Loft;
+                r.tuple(d,"a",p.a); r.tuple(d,"b",p.b);
+                p.profile=r.number(d.get("profile",2),"profile");
+                Variant raw=r.get(d,"sections",Variant::ARRAY);
+                if(!r.error.is_empty())return failure(r.error);
+                Array sections=raw;
+                if(sections.size()<2 || sections.size()>24)return failure("expected 2..24 sections");
+                p.sections.reserve(sections.size());
+                for(int j=0;j<sections.size();j++){
+                    if(sections[j].get_type()!=Variant::ARRAY)return failure("expected section array");
+                    Array v=sections[j];
+                    if(v.size()!=5)return failure("section requires t,left,right,depth,offset_z");
+                    p.sections.push_back({r.number(v[0],"t"),r.number(v[1],"left"),r.number(v[2],"right"),
+                                          r.number(v[3],"depth"),r.number(v[4],"offset_z")});
+                }
             } else if (type == Variant("triangle")) {
                 p.shape = body::Shape::Triangle;
                 r.tuple(d,"a",p.a); r.tuple(d,"b",p.b); r.tuple(d,"c",p.v2);
@@ -198,7 +214,7 @@ class PixelFXBodyRaster : public godot::RefCounted {
             }
             if (!r.error.is_empty())
                 return failure(String("primitive ") + String::num_int64(i) + ": " + r.error);
-            shapes.push_back(p);
+            shapes.push_back(std::move(p));
         }
         auto start = std::chrono::steady_clock::now();
         if (const char *error = raster.render(c, shapes))

@@ -1,6 +1,7 @@
 // Geometry and finish adapted from patch-gg/pixelfx rig.js (5294518), MIT.
 // Copyright (c) 2026 Patch and Hugo Duprez. See LICENSE-PixelFX.txt.
 #pragma once
+#include "body_loft.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -10,7 +11,7 @@
 namespace body {
 using Vec = std::array<double, 3>;
 using Ramp = std::array<uint32_t, 4>;
-enum class Shape { Sphere, Sweep, Ellipsoid, CutTube, Triangle };
+enum class Shape { Sphere, Sweep, Ellipsoid, CutTube, Triangle, Loft };
 struct Primitive {
     Shape shape = Shape::Sphere;
     Vec a{}, b{}, radii{1, 1, 1};
@@ -18,6 +19,7 @@ struct Primitive {
     std::array<double, 9> basis{1, 0, 0, 0, 1, 0, 0, 0, 1};
     double ra = 1, rb = 1, bulge = 0;
     double depth_ratio = 1, profile = 2;
+    std::vector<Section> sections;
     int part = 1, material = 0, frame = -1, group = 0, dim = 0;
 };
 struct Config {
@@ -68,6 +70,26 @@ class Raster {
                 return "invalid center or ownership";
             double r = p.ra;
             int stamps = 1;
+            if (p.shape == Shape::Loft) {
+                const double length=std::hypot(p.b[0]-p.a[0],p.b[1]-p.a[1]);
+                if (!point(p.b)||length<.001||p.sections.size()<2||p.sections.size()>24||
+                    !(p.profile>=2 && p.profile<=6))return "invalid loft frame or section count";
+                double previous=-3;
+                for(const Section &v:p.sections){
+                    if(!(v.t>=-2 && v.t<=3 && v.t-previous>=1e-5)||
+                        !radius(v.left)||!radius(v.right)||!radius(v.depth)||!bounded(v.offset_z,512))
+                        return "invalid loft section";
+                    previous=v.t;
+                }
+                for(size_t j=1;j<p.sections.size();j++){
+                    const auto &a=p.sections[j-1], &b=p.sections[j];
+                    double diameter=length*(b.t-a.t)+2*std::max({a.left,a.right,b.left,b.right});
+                    double side=std::ceil(diameter*c.density)+3;
+                    cost+=std::min(side,double(c.width))*std::min(side,double(c.height));
+                }
+                if(cost>16000000)return "loft work budget exceeded";
+                continue;
+            }
             if (p.shape == Shape::Triangle) {
                 if (!point(p.b) || !point(p.v2)) return "invalid triangle positions";
                 for (const auto &n : {p.na,p.nb,p.nc})
@@ -205,6 +227,22 @@ class Raster {
             const double norm = std::sqrt(dot(n,n));
             plot(i,p.a[2]+r*p.depth_ratio*t,norm?dot(n,c.light)/norm:0,p);
         });
+    }
+    void loft(const Config &c,const Primitive &p) {
+        const double dx=p.b[0]-p.a[0],dy=p.b[1]-p.a[1],len=std::hypot(dx,dy);
+        const double ux=dx/len,uy=dy/len;
+        for(size_t j=1;j<p.sections.size();j++){
+            const Section &a=p.sections[j-1], &b=p.sections[j];
+            const double mid=(a.t+b.t)*.5;
+            const Vec center{p.a[0]+dx*mid,p.a[1]+dy*mid,0};
+            const double radius=(b.t-a.t)*len*.5+std::max({a.left,a.right,b.left,b.right});
+            const LoftSpan span{len,ux,uy,p.a[2],p.b[2],p.profile,a,b};
+            stamp(c,center,radius,[&](int i,double x,double y){
+                LoftHit h;
+                if(span.sample(mid*len+x*ux+y*uy,-x*uy+y*ux,h))
+                    plot(i,h.front,dot(h.normal,c.light),p);
+            });
+        }
     }
     // Optional 2.5D triangle surface. Integer sample centers, inclusive shared
     // edges, deterministic existing depth rule; degenerate projections emit nothing.
@@ -364,6 +402,8 @@ class Raster {
                 ellipsoid(c, p);
             else if (p.shape == Shape::Sphere)
                 sphere(c, p, p.a, p.ra);
+            else if (p.shape == Shape::Loft)
+                loft(c,p);
             else if (p.shape == Shape::CutTube)
                 cut_tube(c,p);
             else if (p.shape == Shape::Triangle)
