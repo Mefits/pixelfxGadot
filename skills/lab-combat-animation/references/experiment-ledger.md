@@ -77,3 +77,6 @@ Owner rejected 0.55c and emphasized that rounded anatomy attachments also need w
 
 ## 0.57 — weighted skin test
 Generic indexed mesh with 2-bone weights, bounded correction on elbow/knee rows; native capture passed. Art not accepted. Bind identity exact; 17.54 mean projected orientation reversals and max edge ratio 56.09 (diagnostic, short rest edges amplify). C lowers mean collapsed faces 1.97→1.59 but does not fix shoulder/hip/neck distortion. Do not equate zero bind error with good deformation. Recommend architecture work on anatomical joint frames, depth and corrective constraints before clothing. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45700158471).
+
+## 0.59 — anatomical loft profiles
+Owner authorized three anatomy variants on Astra 0.58. OLD exact 0.58; A lean, B athletic, C anime. Shared shortened visual neck (head geometry only), trapezius and hip profiles, flat sole foot loft. Native 192 pose test passed, 19 pose volume proxy and actual captures verified. Silhouettes connected, proportion differences subtle; shoulders and pelvis still have visible shading seams. Do not conflate geometric overlap with seamless normals. Preserve render-head offset when adding details. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45704261733). No owner approval yet.
