@@ -69,6 +69,11 @@ var play_button:Button
 var delete_button:Button
 var delete_lane:int=0
 var shortcut_hint:Label
+var bag_toggle:CheckButton
+var bag_distance:SpinBox
+var export_json_dialog:FileDialog
+var speed_select:OptionButton
+var playback_speed:float=1.0
 
 func _button(parent: Control,label: String,fn: Callable) -> Button:
     var b:=Button.new()
@@ -221,6 +226,27 @@ func _ready() -> void:
     ghost.button_pressed=true
     aids.add_child(ghost)
     ghost.toggled.connect(func(_v:bool):_sync())
+    var lab_row:=HBoxContainer.new()
+    side.add_child(lab_row)
+    bag_toggle=CheckButton.new()
+    bag_toggle.text="Груша"
+    lab_row.add_child(bag_toggle)
+    bag_toggle.toggled.connect(func(v:bool):preview.bag_visible=v;preview.rd_skin=v;_sync())
+    bag_distance=_spin(lab_row,15,60,.5,func(v:float):preview.bag_x=v;preview.queue_redraw())
+    bag_distance.value=36
+    bag_distance.tooltip_text="Расстояние до передней поверхности груши, пиксели рига"
+    speed_select=OptionButton.new()
+    lab_row.add_child(speed_select)
+    for label in ["×0.5","×1","×1.1"]:speed_select.add_item(label)
+    speed_select.select(1)
+    speed_select.item_selected.connect(func(i:int):playback_speed=[.5,1.0,1.1][i])
+    _button(side,"Экспорт правок JSON",_begin_json_export)
+    export_json_dialog=FileDialog.new()
+    export_json_dialog.access=FileDialog.ACCESS_FILESYSTEM
+    export_json_dialog.file_mode=FileDialog.FILE_MODE_SAVE_FILE
+    export_json_dialog.filters=PackedStringArray(["*.json ; Анимация Lab"])
+    add_child(export_json_dialog)
+    export_json_dialog.file_selected.connect(func(path:String):_export_json(path))
     var actions:=HBoxContainer.new()
     actions.position=Vector2(16,443)
     actions.size=Vector2(576,32)
@@ -343,6 +369,13 @@ func _ready() -> void:
         clip_select.disabled=true
         fighter_select.disabled=true
         status.text="Шаблон библиотеки: отдельная копия, не банк бойца."
+        if str(catalog_entry.name).begins_with("Lab 0.48"):
+            rate.value=60
+            ghost.button_pressed=false
+            fx_visible.button_pressed=false
+            bag_toggle.set_pressed_no_signal(true)
+            preview.bag_visible=true
+            preview.rd_skin=true
     _choose(name_id)
     advanced_mode=UI.advanced("animation")
     _apply_mode()
@@ -655,6 +688,23 @@ func _save() -> void:
     else:
         status.text="Ошибка: неверные данные анимации."
 
+func _begin_json_export()->void:
+    playing=false
+    if edited_pose:_key()
+    export_json_dialog.current_file="Lab_combo_edited.json"
+    export_json_dialog.popup_centered_ratio(.75)
+
+func _export_json(path:String)->bool:
+    if edited_pose:_key()
+    var label:String=str(catalog_entry.get("name","Lab animation"))
+    var entry:Dictionary=CAT.entry("lab_user_edit","animation",label,{"slot":name_id,"clip":bank[name_id]},"authored")
+    if not CAT.valid(entry):status.text="Экспорт: неверный клип";return false
+    var file:=FileAccess.open(path,FileAccess.WRITE)
+    if file==null:status.text="Не удалось записать JSON";return false
+    file.store_string(JSON.stringify(entry,"  ",true,true));file.close()
+    status.text="JSON сохранён: "+path.get_file()
+    return true
+
 func _go(path: String) -> void:
     if dirty:
         var ok:bool=_save_draft() if not catalog_entry.is_empty() else CLIPS.save_bank(bank,_path())
@@ -697,7 +747,7 @@ func _input(e:InputEvent)->void:
 
 func _process(dt: float) -> void:
     if not playing:return
-    time+=dt
+    time+=dt*playback_speed
     var d: float=bank[name_id].duration
     if time>=d:
         if bank[name_id].loop:time=fposmod(time,d)
