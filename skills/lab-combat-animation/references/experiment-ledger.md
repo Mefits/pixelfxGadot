@@ -62,3 +62,6 @@ Same Naruto Run pose data, original C++ reference versus fuller organic geometry
 
 ## 0.54d — isolate raster density and normalize outline
 Use same organic primitives at densities 1/2/3/4; match nominal outline in rig space by outline_pixels=density, display scale=3/density. Black outline is owner preference, no artificial internal seams. At current preview scale x3→x4 gives small visual gain but kernel p95 1.758→3.231ms on same Linux capture. Density is configurable, not permanent artistic decision. [Native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45694757882). Await owner review.
+
+## 0.55a — procedural character geometry
+Owner chose density ×3, black outline 3 raster px, adjustable later. A fitted, B shinobi vest, C loose costume use same FK and material/volume recipes in body_style_055.gd. Native Godot capture passed, actual review inspected. More clothing volume changes silhouette without reauthoring the animation; small details are obscured by pose, and rigid scarf is not cloth physics. Test neutral and combat poses before art acceptance. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45695496484). Await owner review.
