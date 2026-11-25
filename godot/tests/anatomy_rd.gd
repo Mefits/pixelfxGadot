@@ -2,6 +2,7 @@ extends SceneTree
 const RIG=preload("res://addons/creature/rig.gd")
 const POSE=preload("res://lab/anatomy_rd/pose.gd")
 const INK=preload("res://lab/temporal_rd/ink.gd")
+const CLEAN_INK=preload("res://lab/anatomy_rd/ink_readable.gd")
 const VAL=preload("res://addons/creature/sdk_validate.gd")
 const WIDTH=360
 const HEIGHT=225
@@ -16,12 +17,14 @@ class Board extends Node2D:
     var pairs:Array=[]
     var stance:Array=[]
     var tick:int=0
-    func paint_actor(s:Dictionary,at:Vector2,flip:float)->void:
+    var skin_comparison:bool=false
+    func paint_actor(s:Dictionary,at:Vector2,flip:float,clean:bool=false)->void:
         var q:={}
         for id in s.points:
             q[id]=Vector2(s.points[id][0],s.points[id][1])
         draw_set_transform(at,0,Vector2(flip*SCALE,SCALE))
-        INK.actor(self,q,0,"hand_near")
+        if clean:CLEAN_INK.actor(self,q,0,"hand_near")
+        else:INK.actor(self,q,0,"hand_near")
         draw_set_transform(Vector2.ZERO)
     func _draw()->void:
         if not stance.is_empty():
@@ -29,14 +32,14 @@ class Board extends Node2D:
                 var x:=float(i*240)
                 draw_rect(Rect2(x,0,240,HEIGHT),Color("#273b4b"))
                 draw_line(Vector2(x+8,FLOOR),Vector2(x+232,FLOOR),Color("#738a8f"))
-                paint_actor(stance[i],Vector2(x+120,FLOOR),1.0)
+                paint_actor(stance[i],Vector2(x+120,FLOOR),1.0,skin_comparison and i==2)
             return
         for i in pairs.size():
             var x:=float(i*WIDTH)
             draw_rect(Rect2(x,0,WIDTH,HEIGHT),Color("#273b4b"))
             draw_line(Vector2(x+8,FLOOR),Vector2(x+WIDTH-8,FLOOR),Color("#738a8f"))
-            paint_actor(pairs[i][1],Vector2(x+ORIGIN+GAP*SCALE,FLOOR),-1.0)
-            paint_actor(pairs[i][0],Vector2(x+ORIGIN,FLOOR),1.0)
+            paint_actor(pairs[i][1],Vector2(x+ORIGIN+GAP*SCALE,FLOOR),-1.0,skin_comparison and i==1)
+            paint_actor(pairs[i][0],Vector2(x+ORIGIN,FLOOR),1.0,skin_comparison and i==1)
             # No VFX hiding posture. A small contact mark only on event frame.
             if tick==HIT:
                 var h:Array=pairs[i][0].points.hand_near
@@ -116,6 +119,22 @@ func run()->void:
         await RenderingServer.frame_post_draw
         var img:=root.get_texture().get_image()
         if img.get_size()!=size or img.save_png(out.path_join("%03d.png"%t))!=OK:quit(1);return
+    board.skin_comparison=true
+    board.stance=[POSE.sample(rig,old[0],0,ZERO),bb[0],bb[0]]
+    board.queue_redraw()
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var clean_still:=root.get_texture().get_image()
+    if clean_still.get_size()!=size or clean_still.save_png(out.path_join("stance_skin.png"))!=OK:quit(1);return
+    board.stance=[]
+    for t in range(LAST+1):
+        board.pairs=[[bb[t],br[t]],[bb[t],br[t]]]
+        board.tick=t
+        board.queue_redraw()
+        await process_frame
+        await RenderingServer.frame_post_draw
+        var clean_frame:=root.get_texture().get_image()
+        if clean_frame.get_size()!=size or clean_frame.save_png(out.path_join("skin_%03d.png"%t))!=OK:quit(1);return
     var hand:=point(bb[HIT],"hand_near")
     var torso:=point(br[HIT],"chest")
     var contact:=hand.distance_to(Vector2(GAP-torso.x,torso.y))

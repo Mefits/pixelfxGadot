@@ -24,5 +24,14 @@ def main():
     frames=[imgs[0]]*12+imgs+[imgs[-1]]*12
     gif(frames,out/"punch.gif",60);gif(frames,out/"punch-half.gif",30)
     label(Image.open(out/"stance.png").convert("RGB"),["Lab 0.43","A - old bend rules","B - new bend rules"]).save(out/"stance-review.png")
+    skin_files=sorted(out.glob("skin_*.png"))
+    assert len(skin_files)==43
+    skins=[label(Image.open(f).convert("RGB"),["B - original skin","C - connected neck and hands"]) for f in skin_files]
+    skin_frames=[skins[0]]*12+skins+[skins[-1]]*12
+    gif(skin_frames,out/"skin.gif",60);gif(skin_frames,out/"skin-half.gif",30)
+    single=[im.crop((im.width//2,27,im.width,im.height)) for im in skins]
+    gif([single[0]]*12+single+[single[-1]]*12,out/"punch-clean.gif",60)
+    gif([single[0]]*12+single+[single[-1]]*12,out/"punch-clean-half.gif",30)
+    label(Image.open(out/"stance_skin.png").convert("RGB"),["Lab 0.43","B - corrected pose","C - same pose, new skin"]).save(out/"stance-skin-review.png")
     print(log)
 if __name__=="__main__":main()

@@ -39,6 +39,7 @@ jobs:
           path: |
             anatomy-results/*.gif
             anatomy-results/stance-review.png
+            anatomy-results/stance-skin-review.png
             anatomy-results/*.json
             anatomy-results/engine.log
             godot/tests/anatomy_rd.gd
