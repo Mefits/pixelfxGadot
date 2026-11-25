@@ -2,6 +2,10 @@ name: Lab temporal motion R&D
 on:
   push:
     branches: [experiment/motion-temporal-rd]
+    paths:
+      - 'godot/tests/temporal_rd.gd'
+      - 'godot/lab/temporal_rd/**'
+      - 'tools/temporal_rd.py'
 permissions:
   contents: read
 jobs:
