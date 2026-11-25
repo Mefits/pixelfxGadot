@@ -71,3 +71,6 @@ Classic Sasuke Part I as fan-art reference. Native procedural recipe adds materi
 
 ## 0.55c — separate garment geometry from anatomy
 Owner pointed out curved neutral legs and balloon-like clothing. Corrected only neutral pose using fixed rest offsets; old pose retained. New native cut_tube gives tapered flat axial ends and adjustable cross-section (2/4 in comparison), preserves z buffer. Actual Godot image shows clear flatter shorts and cuffs, but shoulder gaps and excessively rigid shirt need correction. Do not interpret static pose approval as dynamic acceptance. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45697691674). No rig/N changes.
+
+## 0.56 — connected surface prototype
+Owner rejected 0.55c and emphasized that rounded anatomy attachments also need work. Native triangle input works with common Z-buffer and outline; old oracle passed. Pose-space strips remove shoulder/hip bulges and are faster to rasterize, but still show thin neck/torso and angular pelvis transitions. This is proof of raster architecture, not artistic acceptance or full skinning. Next investigate indexed bind-pose mesh, explicit weights and joint correctives rather than more separate primitives. See docs/BODY_SURFACE_RD.md and [native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45699553309).
