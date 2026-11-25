@@ -62,7 +62,9 @@ def review(out,clips):
         for c in clips:
             clip=c["clip"];duration=json.loads((out/(clip+".json")).read_text())["payload"]["clip"]["duration"];ticks=round(duration*60)
             for t in range(0,ticks,2):
-                frames.append(labelled(out/f"{clip}-{t:03}.png"))
+                im=labelled(out/f"{clip}-{t:03}.png")
+                ImageDraw.Draw(im).text((W*4-125,7),f"{clip} {t:03}",fill="white")
+                frames.append(im)
                 elapsed+=min(2,ticks-t)/(60*speed);ends.append(round(elapsed*100)*10)
         frames[0].save(out/name,save_all=True,append_images=frames[1:],duration=np.diff([0,*ends]).tolist(),loop=0,disposal=1)
         with Image.open(out/name) as im:
