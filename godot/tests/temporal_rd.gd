@@ -7,8 +7,9 @@ const INK=preload("res://lab/temporal_rd/ink.gd")
 const TIPS=["hand_near","hand_far","foot_near","foot_far"]
 const CHAINS={"hand_near":["shoulder_near","elbow_near"],"hand_far":["shoulder_far","elbow_far"],"foot_near":["thigh_near","knee_near"],"foot_far":["thigh_far","knee_far"]}
 const TILE=192
+const HEIGHT=224
 const ZOOM=2.4
-const FLOOR_Y=174.0
+const FLOOR_Y=204.0
 const ORIGIN_X=108.0
 
 static func sample(rig,m:Dictionary,t:float,v:Array)->Dictionary:
@@ -35,7 +36,8 @@ static func sample(rig,m:Dictionary,t:float,v:Array)->Dictionary:
         var chain:Array=CHAINS[tip]
         var span:float=rig.joints[rig.ids[chain[1]]].offset.length()+rig.joints[rig.ids[tip]].offset.length()
         var delta:Vector2=(xy-rig.point(chain[0]))/span
-        targets[tip]=[delta.x,delta.y,1.0 if i in [0,2] else -1.0]
+        var pole:=float(m.get("near_leg_pole",1.0)) if i==2 else (1.0 if i==0 else -1.0)
+        targets[tip]=[delta.x,delta.y,pole]
         wanted[tip]=xy
     pose.angles.head=-torso*.45
     rig.evaluate(pose)
@@ -76,11 +78,11 @@ class Board extends Node2D:
             for id in samples[i].points:
                 var a:Array=samples[i].points[id]
                 q[id]=Vector2(a[0],a[1])
-            draw_rect(Rect2(col,0,TILE,TILE),Color("#273b4b"))
+            draw_rect(Rect2(col,0,TILE,HEIGHT),Color("#273b4b"))
             draw_line(Vector2(col+4,FLOOR_Y),Vector2(col+TILE-4,FLOOR_Y),Color("#738a8f"))
-            draw_rect(Rect2(col,TILE,TILE,TILE),Color.BLACK)
+            draw_rect(Rect2(col,HEIGHT,TILE,HEIGHT),Color.BLACK)
             for row in 2:
-                draw_set_transform(Vector2(col+ORIGIN_X,FLOOR_Y+row*TILE),0,Vector2.ONE*ZOOM)
+                draw_set_transform(Vector2(col+ORIGIN_X,FLOOR_Y+row*HEIGHT),0,Vector2.ONE*ZOOM)
                 INK.actor(self,q,row,active)
                 draw_set_transform(Vector2.ZERO)
 
@@ -97,7 +99,7 @@ func run()->void:
         var candidates:Array=m.candidates
         var folder:=out.path_join(m.id)
         DirAccess.make_dir_recursive_absolute(folder)
-        var size:=Vector2i(TILE*candidates.size(),TILE*2)
+        var size:=Vector2i(TILE*candidates.size(),HEIGHT*2)
         root.content_scale_size=size
         root.size=size
         board.active=m.tip

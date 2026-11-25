@@ -5,8 +5,9 @@ import numpy as np
 from PIL import Image,ImageDraw
 ROOT=Path(__file__).resolve().parents[1]
 TILE=192
+HEIGHT=224
 Z=2.4
-ORIGIN=np.array([108.,174.])
+ORIGIN=np.array([108.,204.])
 ZERO=[0,0,0,0,0]
 PROBES=[ZERO,[-7,-20,-8,5,1],[7,20,8,-5,1],[-8,12,7,7,0],[8,-12,-7,-7,0],[0,-18,10,4,1],[0,18,-10,-4,1]]
 REVISIONS={"rise":[[3,10,10,-5,1],[11,30,6,-5,1],[7,14,13,-2,1],[7,26,3,-8,1]],"sweep":[[4,-22,-5,-7,0],[12,-2,-9,-7,0],[8,-18,-2,-4,0],[8,-6,-12,-10,0]],"brace":[[-11,-30,-6,5,1],[-3,-10,-10,5,1],[-7,-26,-3,8,1],[-7,-14,-13,2,1]]}
@@ -32,6 +33,19 @@ def candidates(m):
                     k[6][7]=[17,-low];k[6][2]=-13
                     # Preserve strike event and desired anchor (26,-7), far foot stays fixed.
                     add("low%d tilt%d load%d"%(low,tilt,load),"trajectory",ZERO,b)
+        for lean in [-26,-38]:
+            for lift in [2,4]:
+                b=copy.deepcopy(m);k=b["keys"]
+                b["near_leg_pole"]=-1.0
+                k[1][7]=[-14,-2];k[2][7]=[-18,-2]
+                k[1][2]=-15;k[2][2]=-13
+                k[3][1]=-1;k[3][2]=-10-lift;k[3][7]=[14,-2]
+                k[4][1]=0;k[5][1]=0
+                for i in [4,5]:
+                    k[i][2]=-10-lift;k[i][3]=-8;k[i][4]=lean
+                    k[i][5]=[10,-30];k[i][6]=[-12,-32]
+                k[6][7]=[17,-2];k[6][2]=-13
+                add("knee-forward lean%d lift%d"%(lean,lift),"trajectory",ZERO,b)
     elif m["id"]=="brace":
         for early in [1,2]:
             for tilt in [-24,-32]:
@@ -56,11 +70,11 @@ def trace(r,tip):return np.array([s["points"][tip] for s in r])
 def masks(images,i,tip):
     visible=[]
     for t,im in enumerate(images):
-        a=np.asarray(im.crop((i*TILE,TILE,(i+1)*TILE,2*TILE)).convert("RGB"))
+        a=np.asarray(im.crop((i*TILE,HEIGHT,(i+1)*TILE,2*HEIGHT)).convert("RGB"))
         red=(a[:,:,0]>200)&(a[:,:,1]<60)&(a[:,:,2]<60)
         # Actual visible distal limb within 4 art pixels of the intended tip.
         x,y=tip[t]*Z+ORIGIN
-        yy,xx=np.ogrid[:TILE,:TILE]
+        yy,xx=np.ogrid[:HEIGHT,:TILE]
         region=(xx-x)**2+(yy-y)**2<=(4*Z)**2
         visible.append(float((red&region).sum()/max(1,region.sum())))
     return np.array(visible)
@@ -70,7 +84,8 @@ def assess(m,r,images,i):
     vis=masks(images,i,tip)
     plant=max(x["plant"] for x in r)
     anchor=max(x["anchor"] for x in r[b:c+1]) if m["id"] in ("rise","sweep") else 0.
-    f={"plant_error":plant,"contact_error":anchor,"tip_render_visible":float(vis[a:b+1].mean())}
+    floor=max(0.,max(float(trace(r,j)[:,1].max()) for j in ["knee_near","knee_far","foot_near","foot_far"]))
+    f={"plant_error":plant,"contact_error":anchor,"tip_render_visible":float(vis[a:b+1].mean()),"floor_joint_penetration":floor}
     if m["id"]=="sweep":
         thigh=trace(r,"thigh_near"); knee=trace(r,"knee_near")
         phase=tip[a:b+1]
@@ -93,7 +108,8 @@ def assess(m,r,images,i):
     else:
         f.update(vertical_travel=float(tip[a,1]-tip[b,1]))
         score=.5*np.clip(f["vertical_travel"]/30,0,1)+.5*f["tip_render_visible"]
-    f.update(score=float(score),eligible=plant<=.6 and anchor<=.6)
+    # A floor joint below the support plane is a separate measurable defect. Keep original scores comparable.
+    f.update(score=float(score),floor_adjusted_score=float(score-.12*np.clip(floor/4,0,1)),eligible=plant<=.6 and anchor<=.6)
     return f
 def gif(frames,path,rate):
     # GIF's centisecond clock, with no drift.
@@ -106,7 +122,7 @@ def main():
     for m in config:m["candidates"]=candidates(m)
     path=out/"config.json";path.write_text(json.dumps(config,indent=2))
     raw=out/"raw";raw.mkdir()
-    cmd=(["xvfb-run","-a","-s","-screen 0 4096x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/temporal_rd.gd","--",str(path),str(raw)]
+    cmd=(["xvfb-run","-a","-s","-screen 0 5120x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/temporal_rd.gd","--",str(path),str(raw)]
     proc=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180);log=proc.stdout.decode("utf8","replace");(out/"engine.log").write_text(log)
     if proc.returncode or "TEMPORAL_OK" not in log or "SCRIPT ERROR" in log:raise RuntimeError(log[-5000:])
     summary={}
@@ -118,7 +134,7 @@ def main():
             ranks.append(dict(index=i,name=c["name"],kind=c["kind"],**assess(c["motif"],tracks[i],images,i)))
         old=[r for r in ranks if r["kind"]=="old" and r["eligible"]];new=[r for r in ranks if r["kind"]=="trajectory" and r["eligible"]]
         old_best=max(old,key=lambda r:r["score"]) if old else ranks[0]
-        new_best=max(new,key=lambda r:r["score"]) if new else old_best
+        new_best=max(new,key=lambda r:r["floor_adjusted_score"]) if new else old_best
         astra=1 if mid!="evade" else 0
         # Rise is deliberately frozen as positive control.
         selected=astra if mid=="rise" else new_best["index"]
@@ -127,9 +143,9 @@ def main():
         if mid=="rise":labels[-1]="Control kept"
         frames=[]
         for t in [0]*5+list(range(len(images)))+[len(images)-1]*7:
-            im=Image.new("RGB",(TILE*len(idx),TILE+26),"#172635");draw=ImageDraw.Draw(im)
+            im=Image.new("RGB",(TILE*len(idx),HEIGHT+26),"#172635");draw=ImageDraw.Draw(im)
             for j,i in enumerate(idx):
-                im.paste(images[t].crop((i*TILE,0,(i+1)*TILE,TILE)),(j*TILE,26));draw.text((j*TILE+8,7),labels[j],fill="white")
+                im.paste(images[t].crop((i*TILE,0,(i+1)*TILE,HEIGHT)),(j*TILE,26));draw.text((j*TILE+8,7),labels[j],fill="white")
             frames.append(im)
         gif(frames,out/(mid+".gif"),60);gif(frames,out/(mid+"-half.gif"),30)
         (out/(mid+"-sdk.json")).write_bytes((folder/("clip_%02d.json"%selected)).read_bytes())
