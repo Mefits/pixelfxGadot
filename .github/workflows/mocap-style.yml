@@ -1,0 +1,45 @@
+name: Lab mocap style R&D
+on:
+  push:
+    branches: [experiment/motion-temporal-rd]
+    paths:
+      - 'godot/tests/mocap_style.gd'
+      - 'tools/mocap_style.py'
+      - '.github/workflows/mocap-style.yml'
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lab-godot
+          key: lab-godot-linux-4.4.1
+      - name: Godot 4.4.1
+        run: |
+          mkdir -p ~/.cache/lab-godot
+          if [ ! -x ~/.cache/lab-godot/godot ]; then
+            curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+            unzip -qo /tmp/godot.zip -d ~/.cache/lab-godot
+            mv ~/.cache/lab-godot/Godot_v4.4.1-stable_linux.x86_64 ~/.cache/lab-godot/godot
+          fi
+          echo "$HOME/.cache/lab-godot" >> "$GITHUB_PATH"
+      - name: Native capture and rank
+        run: |
+          python -m pip install numpy pillow
+          python tools/mocap_style.py --godot godot --xvfb --out mocap-style-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mocap-style
+          path: |
+            mocap-style-results/*.gif
+            mocap-style-results/*.json
+            mocap-style-results/review.png
+            mocap-style-results/engine.log
+            mocap-style-results/source.bvh
+            godot/tests/mocap_style.gd
+            tools/mocap_style.py
