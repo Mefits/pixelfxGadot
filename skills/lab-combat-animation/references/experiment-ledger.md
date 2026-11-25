@@ -59,3 +59,6 @@ Unmodified locked PixelFX JS rig via verified QuickJS artifact, endpoint retarge
 
 ## 0.54c — first native organic skin comparison
 Same Naruto Run pose data, original C++ reference versus fuller organic geometry with seams disabled at density 1 and 3. B/C share geometry. Actual capture C visibly reduces stair-step contour; disabling all seams can lose depth cues and joins across depths are not supported. Do not call it seamless everywhere. Preserve unchanged FK and compare density independently of shape. [Native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45692175229), a484b69476a1f941b27d9f2a98baa3627432c518. Artistic approval pending.
+
+## 0.54d — isolate raster density and normalize outline
+Use same organic primitives at densities 1/2/3/4; match nominal outline in rig space by outline_pixels=density, display scale=3/density. Black outline is owner preference, no artificial internal seams. At current preview scale x3→x4 gives small visual gain but kernel p95 1.758→3.231ms on same Linux capture. Density is configurable, not permanent artistic decision. [Native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45694757882). Await owner review.
