@@ -54,8 +54,9 @@ static func hold_clip(original:Dictionary,indices:Array)->Dictionary:
         result.keys.append(original.keys[k].duplicate(true))
     return result
 
-static func choose_exposures(rate:int,last:int,contact:int,support:Array)->Array:
+static func choose_exposures(rate:int,last:int,contact:int,support:Array,events:Array=[],holds:Array=[])->Array:
     var fixed:Dictionary={0:true,last:true,contact:true}
+    for e in events:fixed[int(e.tick)]=true
     # Contact and support transitions must never be dropped.
     for k in range(1,support.size()):
         if support[k]!=support[k-1]:
@@ -71,7 +72,8 @@ static func choose_exposures(rate:int,last:int,contact:int,support:Array)->Array
     else:
         # Smooth setup, skip transitional drawings in acceleration, hold the
         # contact silhouette, then recover with more spaced drawings.
-        for k in [3,6,9,12,14,17,20,24,28,32,35]:
+        for k in (holds if not holds.is_empty() else [3,6,9,12,14,17,20,24,28,32,35]):
+            k=int(k)
             if k<=last:fixed[k]=true
     var indices:=fixed.keys()
     indices.sort()
@@ -204,9 +206,12 @@ func run()->void:
             keys.append({"t":t/60.0,"pose":p})
         
         count=maxi(count,poses.size())
-        var clip:={"duration":float(keys.size()-1)/60.0,"loop":false,"easing":"linear","keys":keys,"events":[{"t":float(v.contact)/60.0,"kind":"strike","anchor":"hand_near"}]}
+        var events:Array=[]
+        for e in v.get("events",[{"tick":v.contact,"anchor":"hand_near"}]):
+            events.append({"t":float(e.tick)/60.0,"kind":"strike","anchor":e.anchor})
+        var clip:={"duration":float(keys.size()-1)/60.0,"loop":false,"easing":"linear","keys":keys,"events":events}
         var original:=clip.duplicate(true)
-        var exposure_indices:Array=choose_exposures(int(v.get("cadence",0)),keys.size()-1,int(v.contact),support_frames)
+        var exposure_indices:Array=choose_exposures(int(v.get("cadence",0)),keys.size()-1,int(v.contact),support_frames,v.get("events",[]),v.get("holds",[]))
         if int(v.get("cadence",0))!=0:clip=hold_clip(original,exposure_indices)
         var sampled:Array=[]
         var max_sampler_error:=0.0
@@ -232,7 +237,7 @@ func run()->void:
         if not VALID.new().validate(entry).ok:push_error("Invalid SDK "+str(i));quit(1);return
         var file:=FileAccess.open(out.path_join("clip_"+str(i)+".json"),FileAccess.WRITE)
         file.store_string(JSON.stringify(entry));file.close()
-        if v.has("cadence") and int(v.cadence)==0:
+        if v.has("cadence") and int(v.cadence)==0 and not v.get("combo",false):
             var reduced:=reduce_clip(rig,original,support_frames,int(v.contact),.6)
             var reduced_entry:=entry.duplicate(true)
             reduced_entry.id="mocap_f_reduced"
@@ -243,7 +248,12 @@ func run()->void:
             reduced_file.store_string(JSON.stringify(reduced_entry));reduced_file.close()
             var reduced_report:=FileAccess.open(out.path_join("reduction-report.json"),FileAccess.WRITE)
             reduced_report.store_string(JSON.stringify({"original_keys":original.keys.size(),"reduced_keys":reduced.clip.keys.size(),"max_error_px":reduced.max_error_px,"tolerance_px":reduced.tolerance_px}));reduced_report.close()
-        report.append({"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"sdk_keys":clip.keys.size(),"exposure_indices":exposure_indices,"exposure_count":exposure_indices.size(),"cadence_error_px":max_cadence_error,"cadence_support_error_px":max_cadence_support,"cadence_floor_px":max_cadence_floor,"cadence_max_step_px":max_cadence_step,"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
+        var event_checks:Array=[]
+        for e in events:
+            var tick:=roundi(float(e.t)*60)
+            var wrist:Vector2=sampled[tick][e.anchor]
+            event_checks.append({"tick":tick,"anchor":e.anchor,"point":[wrist.x,wrist.y],"error_px":wrist.distance_to(poses[tick][e.anchor])})
+        report.append({"event_checks":event_checks,"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"sdk_keys":clip.keys.size(),"exposure_indices":exposure_indices,"exposure_count":exposure_indices.size(),"cadence_error_px":max_cadence_error,"cadence_support_error_px":max_cadence_support,"cadence_floor_px":max_cadence_floor,"cadence_max_step_px":max_cadence_step,"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
     for t in count:
         board.pts=[]
         for v in all_points:board.pts.append(v[mini(t,v.size()-1)])

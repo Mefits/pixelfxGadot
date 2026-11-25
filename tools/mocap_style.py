@@ -164,14 +164,67 @@ def cadence046(frames,meta):
         out.append(v)
     return out
 
+def combo047(frames,meta):
+    # First strike is F from the exact ACCAD source; remaining strikes are
+    # authored extensions, not claimed as additional recorded mocap.
+    f=variants046(frames,meta)[3]
+    seq=copy.deepcopy(f["frames"][:23])
+    start=seq[-1]
+    def pose(x,y,tilt,hip,near,far):
+        p=copy.deepcopy(start)
+        p.update(root=[x,y],tilt=tilt,hip_extra=hip)
+        p["targets"]["hand_near"]=[*near,1]
+        p["targets"]["hand_far"]=[*far,1]
+        # The two recorded planted ankles remain locked in the retargeter.
+        p["feet"]=[[a[0],0] for a in start["feet"]]
+        return p
+    # Cross: retract right while loading the left, no return to idle.
+    # Uppercut: sink during left recovery, then drive right fist upward.
+    # Positions are normalized target rays, never changes to bone length.
+    authored=[
+        (22,start),
+        (26,pose(3.5,-2.4,-7,-6,(.38,.18),(.27,.02))),
+        (28,pose(3.0,-2.1,-10,-7,(.22,.10),(.24,.06))),
+        (32,pose(7.2,-3.9,28,7,(.26,.21),(1.05,-.10))),
+        (34,pose(7.0,-3.8,26,6,(.25,.18),(1.03,-.10))),
+        (40,pose(2.6,.0,-14,-6,(.08,.62),(.47,-.09))),
+        (42,pose(3.0,-.3,-10,-4,(.22,.55),(.42,-.12))),
+        (46,pose(7.5,-4.5,12,5,(.66,-.73),(.34,.12))),
+        (48,pose(7.2,-4.3,10,4,(.64,-.72),(.34,.12))),
+        (54,pose(5.5,-2.8,2,0,(.36,-.12),(.48,.05))),
+        (64,pose(5.0,-3.0,-3,0,(.50,.02),(.55,.03))),
+    ]
+    for (a,lo),(b,hi) in zip(authored,authored[1:]):
+        for k in range(a+1,b+1):
+            u=(k-a)/(b-a)
+            # Near-linear attack travel, eased load/recovery. Identical across lanes.
+            if b not in (32,46):u=u*u*(3-2*u)
+            blend=lambda x,y:(np.array(x)*(1-u)+np.array(y)*u).tolist()
+            p=copy.deepcopy(lo)
+            p.update(root=blend(lo["root"],hi["root"]),tilt=lo["tilt"]*(1-u)+hi["tilt"]*u,
+                     hip_extra=lo.get("hip_extra",0)*(1-u)+hi.get("hip_extra",0)*u,
+                     feet=blend(lo["feet"],hi["feet"]))
+            for tip in p["targets"]:
+                p["targets"][tip]=blend(lo["targets"][tip][:2],hi["targets"][tip][:2])+[lo["targets"][tip][2]]
+            seq.append(p)
+    assert len(seq)==65 and seq[:23]==f["frames"][:23]
+    events=[{"tick":20,"anchor":"hand_near"},{"tick":32,"anchor":"hand_far"},{"tick":46,"anchor":"hand_near"}]
+    out=[]
+    for label,rate in [("F / full",0),("24 poses/s",24),("15 poses/s",15),("Authored holds",-1)]:
+        v=copy.deepcopy(f)
+        v.update(label=label,frames=copy.deepcopy(seq),cadence=rate,combo=True,events=events,
+                 holds=[0,3,6,9,12,14,17,20,23,26,28,32,35,38,40,42,46,49,53,57,61,64])
+        out.append(v)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b"],default="46b");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47"],default="47");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -185,11 +238,12 @@ def main():
     seq=[imgs[0]]*12+imgs+[imgs[-1]]*12
     gif(seq,out/"comparison.gif",60);gif(seq,out/"comparison-half.gif",30)
     # Browser-safe 1.2x review: minimum 20ms delay, retain the contact sample.
-    if a.stage=="46b":
-        select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1})
-        fast=[imgs[0]]*5+[imgs[i] for i in select]+[imgs[-1]]*5
+    if a.stage in ("46b","47"):
+        select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
+        fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*3),"#142332")
-    for row,i in enumerate([0,config[0]["contact"],len(imgs)-1]):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
+    review_ticks=[0,20,28,32,40,46,64] if a.stage=="47" else [0,config[0]["contact"],len(imgs)-1]
+    sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
+    for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
 if __name__=="__main__":main()
