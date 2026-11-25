@@ -7,7 +7,7 @@ const INK=preload("res://lab/temporal_rd/ink.gd")
 const TIPS=["hand_near","hand_far","foot_near","foot_far"]
 const CHAINS={"hand_near":["shoulder_near","elbow_near"],"hand_far":["shoulder_far","elbow_far"],"foot_near":["thigh_near","knee_near"],"foot_far":["thigh_far","knee_far"]}
 const TILE=192
-const ZOOM=2.8
+const ZOOM=2.4
 const FLOOR_Y=174.0
 const ORIGIN_X=108.0
 

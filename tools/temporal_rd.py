@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image,ImageDraw
 ROOT=Path(__file__).resolve().parents[1]
 TILE=192
-Z=2.8
+Z=2.4
 ORIGIN=np.array([108.,174.])
 ZERO=[0,0,0,0,0]
 PROBES=[ZERO,[-7,-20,-8,5,1],[7,20,8,-5,1],[-8,12,7,7,0],[8,-12,-7,-7,0],[0,-18,10,4,1],[0,18,-10,-4,1]]
@@ -106,7 +106,7 @@ def main():
     for m in config:m["candidates"]=candidates(m)
     path=out/"config.json";path.write_text(json.dumps(config,indent=2))
     raw=out/"raw";raw.mkdir()
-    cmd=(["xvfb-run","-a"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/temporal_rd.gd","--",str(path),str(raw)]
+    cmd=(["xvfb-run","-a","-s","-screen 0 4096x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/temporal_rd.gd","--",str(path),str(raw)]
     proc=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180);log=proc.stdout.decode("utf8","replace");(out/"engine.log").write_text(log)
     if proc.returncode or "TEMPORAL_OK" not in log or "SCRIPT ERROR" in log:raise RuntimeError(log[-5000:])
     summary={}
