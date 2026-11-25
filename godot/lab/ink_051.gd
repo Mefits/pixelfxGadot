@@ -22,7 +22,15 @@ static func joined(c:CanvasItem,a:Vector2,b:Vector2,d:Vector2,w0:float,w1:float,
     poly(c,[a+n0*w0,b+m,b-m,a-n0*w0],upper)
     poly(c,[b+m,d+n1*w2,d-n1*w2,b-m],lower)
 
-static func limb(c:CanvasItem,q:Dictionary,side:String,arm:bool,fit:bool)->void:
+# Local shoe coordinates relative to ankle. Positive pitch raises heel
+# when the front sole is held on the ground. No skeletal segment scaling.
+static func shoe_points(ankle:Vector2,pitch:float)->Array:
+    var points:Array=[]
+    for p in [Vector2(-2,-2.7),Vector2(1,-2.7),Vector2(2,-1.1),Vector2(4,-.9),Vector2(4,0),Vector2(-2,0)]:
+        points.append(ankle+p.rotated(deg_to_rad(pitch)))
+    return points
+
+static func limb(c:CanvasItem,q:Dictionary,side:String,arm:bool,fit:bool,feet:Dictionary={})->void:
     var base:String=("shoulder_" if arm else "thigh_")+side
     var mid:String=("elbow_" if arm else "knee_")+side
     var tip:String=("hand_" if arm else "foot_")+side
@@ -46,12 +54,12 @@ static func limb(c:CanvasItem,q:Dictionary,side:String,arm:bool,fit:bool)->void:
         poly(c,[d-axis*2.0+n*1.45,d+axis*1.7+n*1.85,d+axis*2.3,d+axis*1.7-n*1.85,d-axis*2.0-n*1.45],glove)
     else:
         # Preserve original foot outline and horizontal tip for this experiment.
-        poly(c,[d+Vector2(-2,-2.7),d+Vector2(1,-2.7),d+Vector2(2,-1.1),d+Vector2(4,-.9),d+Vector2(4,0),d+Vector2(-2,0)],EDGE)
+        poly(c,shoe_points(d,float(feet.get(tip,0))),EDGE)
 
-static func actor(c:CanvasItem,q:Dictionary,fit:bool)->void:
-    limb(c,q,"far",false,fit)
+static func actor(c:CanvasItem,q:Dictionary,fit:bool,feet:Dictionary={})->void:
+    limb(c,q,"far",false,fit,feet)
     limb(c,q,"far",true,fit)
-    limb(c,q,"near",false,fit)
+    limb(c,q,"near",false,fit,feet)
     var h:Vector2=q.hips
     var s:Vector2=q.chest
     var axis:Vector2=(s-h).normalized()

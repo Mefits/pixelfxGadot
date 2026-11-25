@@ -35,6 +35,7 @@ class Board extends Node2D:
     var pts:Array=[]
     var skins:Array=[]
     var shells:Array=[]
+    var foot_angles:Array=[]
     var bags:Array=[]
     func _draw()->void:
         for i in pts.size():
@@ -49,7 +50,7 @@ class Board extends Node2D:
                 draw_circle(Vector2(41,-6),5,Color("#75634f"))
                 draw_line(Vector2(36,-48),Vector2(36,-10),Color("#c0aa87"),.65)
                 for y in [-47,-33,-19]:draw_line(Vector2(36,y),Vector2(46,y),Color("#a58b67"),.45)
-            if int(shells[i])>0:INK51.actor(self,pts[i],int(shells[i])==2)
+            if int(shells[i])>0:INK51.actor(self,pts[i],int(shells[i])==2,foot_angles[i])
             elif skins[i]:INK46.actor(self,pts[i],0,"hand_near")
             else:INK.actor(self,pts[i],0,"hand_near")
             draw_set_transform(Vector2.ZERO)
@@ -156,6 +157,7 @@ func run()->void:
         board.shells.append(v.get("skin51",0))
         board.bags.append(v.get("bag",false))
     var all_points:Array=[]
+    var all_foot_angles:Array=[]
     var report:Array=[]
     var count:=0
     for i in cfg.size():
@@ -171,6 +173,11 @@ func run()->void:
         var max_bone_error:=0.0
         var locks:Dictionary={}
         var support_frames:Array=[]
+        var toe_frames:Array=[]
+        var foot_samples:Array=[]
+        var max_sole_pen:=0.0
+        var max_toe_error:=0.0
+        var max_heel_lift:=0.0
         for t in v.frames.size():
             var f:Dictionary=v.frames[t]
             var tilt:float=clampf(f.tilt,-65,65)
@@ -178,9 +185,14 @@ func run()->void:
             var p:=CLIPS.pose({"hips":tilt*.25+hip_extra,"chest":tilt*.75-hip_extra,"head":-tilt*.45},f.root[0],f.root[1])
             if f.has("shoulder_turn"):p.angles["shoulder_turn"]=f.shoulder_turn
             if f.has("pelvis_turn"):p.angles["pelvis_turn"]=f.pelvis_turn
+            if f.has("foot_pitch_near"):
+                p.angles["foot_pitch_near"]=f.foot_pitch_near
+                p.angles["foot_pitch_far"]=f.foot_pitch_far
             p=solve(rig,p,f.targets)
             # Foot correction uses actual source ankle height and a fixed planted point.
             var goals:Dictionary={}
+            var toe_goals:Dictionary={}
+            var feet:Dictionary={"foot_near":float(f.get("foot_pitch_near",0)),"foot_far":float(f.get("foot_pitch_far",0))}
             for j in 2:
                 var tip:String=["foot_near","foot_far"][j]
                 var foot:Array=f.feet[j]
@@ -188,10 +200,17 @@ func run()->void:
                 if support:
                     if not locks.has(tip):locks[tip]=Vector2(rig.point(tip).x,0)
                     goals[tip]=locks[tip]
+                    if int(v.get("foot51",0))==2:
+                        var toe:Vector2=locks[tip]+Vector2(4,0)
+                        toe_goals[tip]=toe
+                        goals[tip]=toe-Vector2(4,0).rotated(deg_to_rad(float(feet[tip])))
                 else:
                     locks.erase(tip)
                     if rig.point(tip).y>0:goals[tip]=Vector2(rig.point(tip).x,0)
-            support_frames.append(locks.duplicate())
+            var support_targets:Dictionary={}
+            for tip in locks:support_targets[tip]=goals[tip]
+            support_frames.append(support_targets)
+            toe_frames.append(toe_goals)
             var shift:=Vector2.ZERO
             for iteration in 12:
                 for tip in goals:
@@ -211,6 +230,9 @@ func run()->void:
                 targets[tip]=[ray.x,ray.y,f.targets[tip][2]]
             p=solve(rig,p,targets)
             var penetration:=maxf(0,maxf(rig.point("foot_near").y,rig.point("foot_far").y))
+            if int(v.get("foot51",0))>0:
+                for tip in feet:
+                    for vertex in INK51.shoe_points(rig.point(tip),float(feet[tip])):penetration=maxf(penetration,vertex.y)
             max_pen=maxf(max_pen,penetration)
             p.root[1]-=penetration
             rig.evaluate(p)
@@ -224,7 +246,7 @@ func run()->void:
                 # Avoid locked-out elbow, preserve current bend pole, no scaling.
                 ray=ray.limit_length(.985)
                 p=solve(rig,p,{tip:[ray.x,ray.y,f.targets[tip][2]]})
-            for tip in locks:max_support_error=maxf(max_support_error,rig.point(tip).distance_to(locks[tip]))
+            for tip in locks:max_support_error=maxf(max_support_error,rig.point(tip).distance_to(goals[tip]))
             for joint in rig.joints:
                 if not joint.parent.is_empty():
                     max_bone_error=maxf(max_bone_error,absf(rig.point(joint.id).distance_to(rig.point(joint.parent))-joint.offset.length()))
@@ -258,9 +280,20 @@ func run()->void:
                 if t>0:max_cadence_step=maxf(max_cadence_step,rig.point(id).distance_to(sampled[-1][id]))
             for tip in support_frames[t]:max_cadence_support=maxf(max_cadence_support,rig.point(tip).distance_to(support_frames[t][tip]))
             max_cadence_floor=maxf(max_cadence_floor,maxf(rig.point("foot_near").y,rig.point("foot_far").y))
+            var pose_angles:Dictionary=CLIPS.sample(clip,t/60.0,false).angles
+            var pitches:Dictionary={"foot_near":float(pose_angles.get("foot_pitch_near",0)),"foot_far":float(pose_angles.get("foot_pitch_far",0))}
+            foot_samples.append(pitches)
+            for tip in pitches:
+                for vertex in INK51.shoe_points(rig.point(tip),float(pitches[tip])):max_sole_pen=maxf(max_sole_pen,vertex.y)
+            for tip in toe_frames[t]:
+                var toe:Vector2=rig.point(tip)+Vector2(4,0).rotated(deg_to_rad(float(pitches[tip])))
+                var heel:Vector2=rig.point(tip)+Vector2(-2,0).rotated(deg_to_rad(float(pitches[tip])))
+                max_toe_error=maxf(max_toe_error,toe.distance_to(toe_frames[t][tip]))
+                max_heel_lift=maxf(max_heel_lift,-heel.y)
             sampled.append(rig.points.duplicate())
         if max_sampler_error>.001:push_error("Sampler mismatch");quit(1);return
         all_points.append(sampled)
+        all_foot_angles.append(foot_samples)
         var entry:={"schema":1,"id":"mocap_style_"+str(i),"name":v.label,"kind":"animation","source":"authored","payload":{"slot":"strike","clip":clip}}
         if not VALID.new().validate(entry).ok:push_error("Invalid SDK "+str(i));quit(1);return
         var file:=FileAccess.open(out.path_join("clip_"+str(i)+".json"),FileAccess.WRITE)
@@ -288,6 +321,13 @@ func run()->void:
                 var fist:Vector2=wrist+Vector2(4,-.9) if str(e.anchor).begins_with("foot") else wrist+(wrist-elbow).normalized()*2.3
                 check["shoulder"]=[shoulder.x,shoulder.y]
                 check["chest"]=[sampled[tick]["chest"].x,sampled[tick]["chest"].y]
+                if str(e.anchor).begins_with("foot") and v.has("foot51"):
+                    var pitch:float=foot_samples[tick][e.anchor]
+                    var outline:Array=INK51.shoe_points(wrist,pitch)
+                    fist=outline[0]
+                    for vertex in outline:
+                        if vertex.x>fist.x:fist=vertex
+                    check["foot_pitch_deg"]=pitch
                 check["fist_tip"]=[fist.x,fist.y]
                 check["bag_front_gap_px"]=36.0-fist.x
                 check["limb_extension_px"]=shoulder.distance_to(wrist)
@@ -296,10 +336,12 @@ func run()->void:
                 check["pelvis_turn_deg"]=float(keys[tick].pose.angles.get("pelvis_turn",0))
                 check["shoulder_turn_deg"]=float(keys[tick].pose.angles.get("shoulder_turn",0))
             event_checks.append(check)
-        report.append({"event_checks":event_checks,"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"sdk_keys":clip.keys.size(),"exposure_indices":exposure_indices,"exposure_count":exposure_indices.size(),"cadence_error_px":max_cadence_error,"cadence_support_error_px":max_cadence_support,"cadence_floor_px":max_cadence_floor,"cadence_max_step_px":max_cadence_step,"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
+        report.append({"max_sole_pen_px":max_sole_pen,"max_toe_error_px":max_toe_error,"max_heel_lift_px":max_heel_lift,"event_checks":event_checks,"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"sdk_keys":clip.keys.size(),"exposure_indices":exposure_indices,"exposure_count":exposure_indices.size(),"cadence_error_px":max_cadence_error,"cadence_support_error_px":max_cadence_support,"cadence_floor_px":max_cadence_floor,"cadence_max_step_px":max_cadence_step,"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
     for t in count:
         board.pts=[]
+        board.foot_angles=[]
         for v in all_points:board.pts.append(v[mini(t,v.size()-1)])
+        for v in all_foot_angles:board.foot_angles.append(v[mini(t,v.size()-1)])
         board.queue_redraw()
         await process_frame
         await RenderingServer.frame_post_draw
