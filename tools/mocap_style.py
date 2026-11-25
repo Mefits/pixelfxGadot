@@ -248,14 +248,33 @@ def bag048(frames,meta):
         out.append(v)
     return out
 
+def shoulder049(frames,meta):
+    # Compare equal clocks and target goals; only shoulder geometry changes.
+    base=bag048(frames,meta)[1]
+    out=[]
+    for label,mode in [("A / fixed shoulders","fixed"),("B / centered","center"),("C / turning shoulders","turn")]:
+        v=copy.deepcopy(base)
+        v.update(label=label,shoulder_mode=mode)
+        for i,f in enumerate(v["frames"]):
+            if mode=="center":
+                f["shoulder_turn"]=45.0
+            elif mode=="turn":
+                # Projection swaps which shoulder leads. Keep the original
+                # first jab and last rising punch, turn during their transition.
+                f["shoulder_turn"]=float(np.interp(i,[0,22,26,32,34,40,44,64],[0,0,28,90,90,30,0,0]))
+                # A slight shoulder-turn envelope smoothing is applied at
+                # authoring knots by the normal pose interpolation.
+        out.append(v)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48"],default="48");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49"],default="49");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -273,7 +292,7 @@ def main():
         select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
         fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    if a.stage=="48":
+    if a.stage in ("48","49"):
         # Keep all strike frames, 20+ ms delays, exact rounded 1.1x cycle.
         select=sorted(set(range(0,len(imgs),2))|{len(imgs)-1}|{e["tick"] for e in config[0]["events"]})
         spans=[(imgs[0],12)]+[(imgs[k],(select[j+1]-k if j+1<len(select) else 1)) for j,k in enumerate(select)]+[(imgs[-1],12)]
@@ -286,8 +305,16 @@ def main():
             delays.append(10*(round((elapsed+n)*100/66)-round(elapsed*100/66)));elapsed+=n
         assert min(delays)>=20
         merged[0][0].save(out/"comparison-1p1.gif",save_all=True,append_images=[im for im,_ in merged[1:]],duration=delays,loop=0,disposal=2)
-    review_ticks=[0,20,28,32,40,46,64] if a.stage in ("47","48") else [0,config[0]["contact"],len(imgs)-1]
+    review_ticks=[0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
     for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
+    if a.stage=="49":
+        entry=json.loads((out/"clip_2.json").read_text())
+        full=entry["payload"]["clip"]["keys"]
+        # Editable artistic knots, NOT error-bounded compression. Includes every strike.
+        ticks=[0,9,14,17,20,22,26,28,32,34,40,42,46,48,54,64]
+        entry["payload"]["clip"]["keys"]=[full[k] for k in ticks]
+        entry.update(id="lab049_combo_min",name="Lab 0.49 C - minimal")
+        (out/"Lab049_Combo_Minimal.json").write_text(json.dumps(entry,indent=2))
 if __name__=="__main__":main()

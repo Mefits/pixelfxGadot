@@ -1,5 +1,6 @@
 extends SceneTree
 const RIG=preload("res://addons/creature/rig.gd")
+const RIG49=preload("res://lab/anatomy_rd/rig_049.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const VALID=preload("res://addons/creature/sdk_validate.gd")
 const INK=preload("res://lab/anatomy_rd/ink_readable.gd")
@@ -155,6 +156,7 @@ func run()->void:
     var count:=0
     for i in cfg.size():
         var v:Dictionary=cfg[i]
+        rig=RIG49.make() if v.has("shoulder_mode") else RIG.humanoid()
         var poses:Array=[]
         var keys:Array=[]
         var max_pen:=0.0
@@ -170,6 +172,7 @@ func run()->void:
             var tilt:float=clampf(f.tilt,-65,65)
             var hip_extra:float=f.get("hip_extra",0.0)
             var p:=CLIPS.pose({"hips":tilt*.25+hip_extra,"chest":tilt*.75-hip_extra,"head":-tilt*.45},f.root[0],f.root[1])
+            if f.has("shoulder_turn"):p.angles["shoulder_turn"]=f.shoulder_turn
             p=solve(rig,p,f.targets)
             # Foot correction uses actual source ankle height and a fixed planted point.
             var goals:Dictionary={}
@@ -279,6 +282,7 @@ func run()->void:
                 var elbow:Vector2=sampled[tick][chain[1]]
                 var fist:Vector2=wrist+(wrist-elbow).normalized()*2.3
                 check["shoulder"]=[shoulder.x,shoulder.y]
+                check["chest"]=[sampled[tick]["chest"].x,sampled[tick]["chest"].y]
                 check["fist_tip"]=[fist.x,fist.y]
                 check["bag_front_gap_px"]=36.0-fist.x
                 check["arm_extension_px"]=shoulder.distance_to(wrist)
