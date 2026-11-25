@@ -1,5 +1,9 @@
 # PixelFX Godot Toolkit — v0.2 development
 
+## Активная лаборатория анимаций — Lab 0.45
+
+**[Актуальная передача проекта следующему агенту](docs/MOTION_HANDOFF_RU.md)**. Ветка `experiment/motion-temporal-rd`: исправленные суставы 0.44, перенос реального мокапа ACCAD, сравнение A/B/C/D. Пользователь выбрал D как базу дальнейшей стилизации. Не путать с замороженным Lab 0.42 и отдельным Project N. [Нативный сравнительный рендер 0.45](https://github.com/Mefits/pixelfxGadot/actions/runs/45656732943/artifacts/15042302641) (артефакт Actions имеет срок хранения).
+
 Godot 4 toolkit using [original PixelFX](https://github.com/patch-gg/pixelfx), pinned in a Git submodule. No substitute rendering algorithms in the offline path.
 
 ## Запуск
