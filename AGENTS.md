@@ -32,3 +32,7 @@ Read README.md, docs/ROADMAP.md and original/pixelfx/skills/pixelfx/SKILL.md fir
 - Owner addition: mandatory Lab 0.46 cadence comparison after anatomy/pose review; see handoff. Compare 24/15/8 unique poses per second and authored individual holds against unchanged 0.45 D, independent of simulation and hit timing. Distinguish compression from artistic exposure. Read archived Astra compiler before implementing. No N changes.
 
 - Original Astra key reduction and retarget source is available in `archive/astra-motion-rd-042` (d279ad1081fdd7147dddaf19ba6f677a9e052e11). Read the exact compiler and adapter from that branch; no automatic merge. See import manifest: 8 verified originals, 19 still archive-only.
+
+## Lab combat animation skill (mandatory for animation R&D)
+- Before any Lab combat animation or reference transfer, read `skills/lab-combat-animation/SKILL.md` and its two reference files alongside latest `docs/MOTION_HANDOFF_RU.md`. This repository skill records validated techniques, owner preferences, failure modes, and the reference-to-motion procedure. It supplements, not replaces, the Creature SDK skill.
+- At each meaningful checkpoint update the handoff. Update the skill/ledger when a reusable lesson or stable owner decision changes; distinguish measured results, owner approval, and hypotheses. Do not trigger redundant CI for documentation-only changes. Latest owner decisions supersede historical ones above. Current previews ×1.1 and ×0.5; no editor packages unless requested; no Project N changes.
