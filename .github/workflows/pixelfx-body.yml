@@ -1,0 +1,58 @@
+name: Lab original PixelFX body R&D
+on:
+  push:
+    branches: [experiment/motion-temporal-rd]
+    paths:
+      - 'godot/tests/pixelfx_body_compare.gd'
+      - 'tools/pixelfx_body_compare.py'
+      - '.github/workflows/pixelfx-body.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: PixelFX-Godot-Toolkit-Complete
+          run-id: 45397546384
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/verified-pixelfx
+      - name: Install only verified original runtime
+        run: |
+          test -s /tmp/verified-pixelfx/godot/generated/original_bundle.txt
+          test -s /tmp/verified-pixelfx/godot/addons/pixelfx/bin/libpixelfx.linux.x86_64.so
+          mkdir -p godot/generated godot/addons/pixelfx/bin
+          cp /tmp/verified-pixelfx/godot/generated/original_bundle.txt godot/generated/
+          cp /tmp/verified-pixelfx/godot/addons/pixelfx/bin/libpixelfx.linux.x86_64.so godot/addons/pixelfx/bin/
+          cp /tmp/verified-pixelfx/godot/addons/pixelfx/pixelfx.gdextension godot/addons/pixelfx/
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lab-godot
+          key: lab-godot-linux-4.4.1
+      - name: Godot 4.4.1
+        run: |
+          mkdir -p ~/.cache/lab-godot
+          if [ ! -x ~/.cache/lab-godot/godot ]; then
+            curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+            unzip -qo /tmp/godot.zip -d ~/.cache/lab-godot
+            mv ~/.cache/lab-godot/Godot_v4.4.1-stable_linux.x86_64 ~/.cache/lab-godot/godot
+          fi
+          echo "$HOME/.cache/lab-godot" >> "$GITHUB_PATH"
+      - name: Native capture
+        run: |
+          python -m pip install numpy pillow
+          godot --headless --path godot --editor --import
+          python tools/pixelfx_body_compare.py --godot godot --out pixelfx-body-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pixelfx-body
+          path: |
+            pixelfx-body-results/*.gif
+            pixelfx-body-results/*.json
+            pixelfx-body-results/review.png
+            pixelfx-body-results/engine.log
