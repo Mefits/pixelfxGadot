@@ -222,7 +222,165 @@ func _fields() -> void:
     var legacy: Dictionary=P.demo()
     check(P.valid(legacy),"Legacy remains valid")
 
+func _bindings() -> void:
+    var bindings=preload("res://addons/creature/vfx_bindings.gd")
+    var runtime=preload("res://addons/creature/vfx_runtime.gd")
+    var clips=preload("res://addons/creature/clips.gd")
+    var combat=preload("res://addons/creature/combat.gd")
+    var layer: Dictionary=P.layer("glow")
+    layer.duration=.5
+    var preset0: Dictionary={"schema":1,"name":"Integration","seed":19,"layers":[layer]}
+    var bank: Dictionary={"strike":preset0,"kick":preset0}
+    check(bindings.valid(bank),"Binding validates")
+    check(not bindings.valid({"unknown":preset0}),"Unknown binding rejected")
+    check(bindings.save_bank(bank,"user://test_creature_bindings.json"),"Save binding")
+    var loaded: Dictionary=bindings.load_bank("user://test_creature_bindings.json")
+    check(bindings.valid(loaded) and loaded.has("strike"),"Load binding")
+    var fx=runtime.new(loaded)
+    check(not fx.spawn("cast",null,"",Vector2(80,70),Vector2(100,70),1),"Missing role falls back")
+    check(fx.spawn("strike",null,"",Vector2(80,70),Vector2(100,70),-1),"Spawn custom")
+    check(runtime.sample(fx.active[0],"target",0)==Vector2(-20,0),"Mirrored local target")
+    var paint=PAINT.new(240,160)
+    paint.dot(5,5,0xffffffff)
+    fx.draw(paint,128.0)
+    check(paint.color[5*240+5]!=0,"Append preserves earlier pixels")
+    for i in range(75):fx.advance()
+    check(fx.active.is_empty(),"Instance expires")
+    var w=combat.new(clips.defaults())
+    w.custom_vfx=runtime.new(bank)
+    w.a.pos.x=100
+    w.b.pos.x=125
+    var vanilla=combat.new(clips.defaults())
+    vanilla.a.pos.x=100
+    vanilla.b.pos.x=125
+    var saw_custom: bool=false
+    var frozen: bool=false
+    for i in range(100):
+        var input: Dictionary={"kick":i==0}
+        var age_before: float=-1
+        if w.hitstop>0 and not w.custom_vfx.active.is_empty():
+            age_before=float(w.custom_vfx.active[0].age)
+        w.step(combat.DT,input,{})
+        vanilla.step(combat.DT,input,{})
+        if not w.custom_vfx.active.is_empty():
+            saw_custom=true
+            check(w.custom_vfx.active[0].anchor=="foot_near","Kick uses authored limb")
+            if age_before>=0:
+                check(is_equal_approx(float(w.custom_vfx.active[0].age),age_before),"Freeze custom VFX")
+                frozen=true
+    check(saw_custom and frozen and w.hits==vanilla.hits and w.b.hp==vanilla.b.hp,"Visual binding does not alter combat")
+    print("Binding integration checks complete")
+
+# JSON has one numeric type; compare values recursively rather than Variant identity.
+# Require all keys, ordered arrays and exact nonnumeric values.
+func _json_equal(a: Variant,b: Variant) -> bool:
+    if a is int or a is float:
+        return (b is int or b is float) and absf(float(a)-float(b))<=1e-10*maxf(1.0,absf(float(a)))
+    if a is Dictionary:
+        if not b is Dictionary or a.size()!=b.size():return false
+        for key in a:
+            if not b.has(key) or not _json_equal(a[key],b[key]):return false
+        return true
+    if a is Array:
+        if not b is Array or a.size()!=b.size():return false
+        for i in range(a.size()):
+            if not _json_equal(a[i],b[i]):return false
+        return true
+    return typeof(a)==typeof(b) and a==b
+
+func _marker_integration() -> void:
+    var C=preload("res://addons/creature/clips.gd")
+    var W=preload("res://addons/creature/combat.gd")
+    var FX=preload("res://addons/creature/vfx_runtime.gd")
+    var bank: Dictionary=C.defaults()
+    var p: Dictionary=P.demo(8)
+    var event: Dictionary={"t":.08,"kind":"vfx","anchor":"hand_far","preset":p.duplicate(true)}
+    bank.strike.events.append(event)
+    bank.strike.events.append({"t":.19,"kind":"vfx","anchor":"foot_near","preset":P.demo(7)})
+    check(C.valid(bank),"Embedded VFX valid")
+    check(C.save_bank(bank,"user://test_vfx_markers.json"),"Save clip markers")
+    var loaded: Dictionary=C.load_bank("user://test_vfx_markers.json")
+    check(_json_equal(bank,loaded),"Whole animation bank survives JSON roundtrip")
+    if loaded.strike.events.size()==3:
+        var renderer=R.new()
+        var paint=PAINT.new(240,160)
+        var anchors: Dictionary={"origin":Vector2(80,80),"hand":Vector2(80,80),"target":Vector2(145,80)}
+        for index in [1,2]:
+            var before: Dictionary=bank.strike.events[index].preset
+            var after: Dictionary=loaded.strike.events[index].preset
+            check(P.valid(after) and _json_equal(before,after),"Embedded preset data survives save")
+            for sample in [.13,.37,.59]:
+                renderer.render(paint,before,sample,anchors,128)
+                var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+                renderer.render(paint,after,sample,anchors,128)
+                check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Embedded preset color/light pixel parity")
+    else:check(false,"Embedded marker count survives save")
+    var invalid: Dictionary=bank.duplicate(true)
+    invalid.strike.events[1].preset.layers[0].size=-2
+    check(not C.valid(invalid),"Reject invalid embedded preset")
+    var w=W.new(loaded)
+    w.custom_vfx=FX.new()
+    var vanilla=W.new(C.defaults())
+    for world in [w,vanilla]:
+        world.a.pos.x=100
+        world.b.pos.x=125
+    var hand_seen: bool=false
+    var foot_seen: bool=false
+    for i in range(100):
+        var input: Dictionary={"strike":i==0}
+        w.step(W.DT,input,{})
+        vanilla.step(W.DT,input,{})
+        for item in w.custom_vfx.active:
+            if item.anchor=="hand_far":hand_seen=true
+            if item.anchor=="foot_near":foot_seen=true
+    check(hand_seen and foot_seen,"Independent visual cues on two joints")
+    check(w.hits==vanilla.hits and w.b.hp==vanilla.b.hp,"Visual cues do not add damage")
+    var loop_clip: Dictionary=bank.walk.duplicate(true)
+    loop_clip.events=[{"t":0.0,"kind":"vfx","anchor":"foot_near","preset":p},{"t":.3,"kind":"vfx","anchor":"foot_far","preset":p}]
+    check(C.visual_events_between(loop_clip,-.000001,.01).size()==1,"Start cue fires once")
+    check(C.visual_events_between(loop_clip,.59,.61).size()==1,"Loop boundary cue")
+    check(C.visual_events_between(loop_clip,.61,.62).is_empty(),"No repeated boundary")
+    check(C.visual_events_between(loop_clip,.61,.62,false).is_empty(),"Nonloop cue does not repeat")
+
+func _preview_and_quick() -> void:
+    var C=preload("res://addons/creature/clips.gd")
+    var V=preload("res://addons/creature/vfx_preview.gd")
+    var Q=preload("res://addons/pixelfx/composer/quick_adjust.gd")
+    var clip: Dictionary=C.defaults().strike
+    var p: Dictionary=P.demo(5)
+    clip.events.append({"t":.05,"kind":"vfx","anchor":"hand_near","preset":p})
+    var view=V.new()
+    var paint=PAINT.new(144,108)
+    var origin:=Vector2(72,84)
+    var target:=Vector2(112,58)
+    view.draw(paint,clip,.18,origin,target)
+    check(view.active==1 and paint.color.count(0)<paint.color.size(),"Animation preview visible")
+    var pixels: PackedByteArray=paint.rgba_bytes()+paint.rgba_bytes(true)
+    view.draw(paint,clip,.3,origin,target)
+    check(pixels!=paint.rgba_bytes()+paint.rgba_bytes(true),"Preview tracks pose time")
+    view.draw(paint,clip,.18,origin,target)
+    check(pixels==paint.rgba_bytes()+paint.rgba_bytes(true),"Reverse scrub deterministic")
+    view.draw(paint,clip,0,origin,target)
+    check(view.active==0 and paint.color.count(0)==paint.color.size(),"Before cue empty")
+    view.draw(paint,clip,4,origin,target)
+    check(view.active==0,"Preview effect expires")
+    for i in range(12):
+        var source: Dictionary=P.demo(i)
+        var snapshot: Dictionary=source.duplicate(true)
+        check(Q.scaled(source,1,1,1,0)==source,"Identity quick transform")
+        var changed: Dictionary=Q.scaled(source,1.5,1.25,1.5,90)
+        check(P.valid(changed) and source==snapshot,"Quick transform preserves source and schema")
+        check(changed.layers.size()==source.layers.size(),"Quick retains layer count")
+        check(float(changed.layers[0].size)>=float(source.layers[0].size),"Quick scales size")
+        check(P.valid(Q.scaled(source,2,2,2,-180)),"Quick limits")
+    var curve_p: Dictionary=P.demo(6)
+    var changed: Dictionary=Q.scaled(curve_p,1,.5,1,0)
+    check(is_equal_approx(float(changed.layers[0].curves.alpha[1][1]),.5),"Quick scales custom opacity curve")
+
 func _run() -> void:
+    _preview_and_quick()
+    _marker_integration()
+    _bindings()
     _fields()
     _organics()
     _trails()

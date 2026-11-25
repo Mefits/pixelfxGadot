@@ -19,6 +19,8 @@ func _run() -> void:
     var ed=ED.instantiate()
     root.add_child(ed)
     await process_frame
+    ed.advanced_mode=true
+    ed._apply_mode()
     ed._seek(.2)
     check(ed.pose.angles.has("shoulder_near"),"Editor sampled attack")
     var n: int=ed.bank.strike.keys.size()
@@ -90,7 +92,7 @@ func _run() -> void:
     ed._seek(.2)
     ed.selected="chest"
     ed._sync()
-    var pivot: Vector2=(ed.rig.point("chest")+ed.preview.origin)*4
+    var pivot: Vector2=(ed.rig.point("chest")+ed.preview.origin)*(ed.picture.size.x/144.0)
     var old_angle: float=ed.pose.angles.get("chest",0)
     var rot_press:=InputEventMouseButton.new()
     rot_press.button_index=MOUSE_BUTTON_RIGHT
@@ -112,6 +114,60 @@ func _run() -> void:
     check(ed.fighter_select.get_global_rect().end.x<=960,"Fighter chooser inside viewport")
     check(ed.root_y.get_global_rect().end.x<=960,"Root controls inside viewport")
     await capture(dir.path_join("pose-workshop.png"))
+    ed._seek(.05)
+    ed.selected="hand_near"
+    ed.vfx_select.select(5)
+    ed._add_vfx_event()
+    ed._seek(.18)
+    check(ed.fx_preview.active==1,"Pose preview active")
+    check(ed.fx_surface.painter.color.count(0)<ed.fx_surface.painter.color.size(),"Pose preview pixels")
+    var old_effect: Dictionary=ed.bank.strike.events.filter(func(e):return e.kind=="vfx")[0].preset.duplicate(true)
+    for i in range(ed.bank.strike.events.size()):
+        if ed.bank.strike.events[i].kind=="vfx":ed.event_list.select(i);break
+    ed._quick_open()
+    ed.quick_dialog.fields.size.value=1.5
+    ed.quick_dialog._apply()
+    ed.quick_dialog.hide()
+    check(ed.bank.strike.events.filter(func(e):return e.kind=="vfx")[0].preset!=old_effect,"Quick marker edit")
+    ed._undo()
+    check(ed.bank.strike.events.filter(func(e):return e.kind=="vfx")[0].preset==old_effect,"Quick marker undo")
+    await capture(dir.path_join("pose-vfx-preview.png"))
+    ed.fx_visible.button_pressed=false
+    check(not ed.fx_surface.visible,"Preview hide")
+    var before_mode:Dictionary=ed.bank.duplicate(true)
+    ed.advanced_mode=false
+    ed._apply_mode()
+    check(not ed.event_list.is_visible_in_tree() and ed.play_button.is_visible_in_tree(),"Simple mode hides technical controls but keeps transport")
+    ed.advanced_mode=true
+    ed._apply_mode()
+    check(ed.bank==before_mode and ed.event_list.is_visible_in_tree(),"Mode switch preserves data")
+    var space:=InputEventKey.new()
+    space.physical_keycode=KEY_SPACE
+    space.pressed=true
+    ed.playing=false
+    ed._input(space)
+    check(ed.playing,"Space starts animation")
+    ed._input(space)
+    check(not ed.playing,"Space pauses animation")
+    ed._seek(.2)
+    var del:=InputEventKey.new()
+    del.physical_keycode=KEY_DELETE
+    del.pressed=true
+    var before_delete:Dictionary=ed.bank.strike.duplicate(true)
+    ed._input(del)
+    check(ed.bank.strike.keys.size()==before_delete.keys.size()-1,"Delete selected pose")
+    ed._undo()
+    check(ed.bank.strike==before_delete,"Undo keyboard deletion")
+    ed._event_selected(0)
+    ed._input(del)
+    check(ed.bank.strike.events.size()==before_delete.events.size()-1 and ed.bank.strike.keys.size()==before_delete.keys.size(),"Delete selected event not pose")
+    ed._undo()
+    ed.angle.get_line_edit().grab_focus()
+    ed._input(del)
+    check(ed.bank.strike==before_delete,"Text input protects animation")
+    ed.angle.get_line_edit().release_focus()
+    await process_frame
+    check(ed.play_button.get_global_rect().end.y<=ed.timeline.get_global_rect().position.y,"Transport above timeline")
     ed.dirty=false
     root.remove_child(ed)
     ed.queue_free()
@@ -119,6 +175,12 @@ func _run() -> void:
     root.add_child(arena)
     await process_frame
     arena.set_physics_process(false)
+    arena.advanced_mode=true
+    arena._apply_mode()
+    arena._unhandled_input(space)
+    check(arena.paused,"Combat Space pause")
+    arena._unhandled_input(space)
+    check(not arena.paused,"Combat Space resume")
     arena.world.a.pos.x=100
     arena.world.b.pos.x=180
     for i in range(28):

@@ -3,6 +3,8 @@ extends Control
 signal value_changed(value: float)
 signal marker_selected(lane: int,index: int)
 signal marker_moved(lane: int,index: int,time: float)
+var selected_lane:int=-1
+var selected_index:int=-1
 var drag_lane: int=-1
 var drag_index: int=-1
 var press_x: float=0
@@ -32,9 +34,12 @@ func _draw() -> void:
         var x: float=at(key.t)
         var c: Color=Color("#f1f7fc") if absf(float(key.t)-value)<.0001 else Color("#79b9d4")
         draw_colored_polygon(PackedVector2Array([Vector2(x,14),Vector2(x+5,20),Vector2(x,26),Vector2(x-5,20)]),c)
-    for event in clip.get("events",[]):
+    var events:Array=clip.get("events",[])
+    for i in range(events.size()):
+        var event:Dictionary=events[i]
         var x: float=at(event.t)
-        draw_colored_polygon(PackedVector2Array([Vector2(x,28),Vector2(x+5,37),Vector2(x-5,37)]),Color("#e9ad62"))
+        var color:Color=Color.WHITE if selected_lane==1 and selected_index==i else (Color("#bd92f7") if event.kind=="vfx" else Color("#e9ad62"))
+        draw_colored_polygon(PackedVector2Array([Vector2(x,28),Vector2(x+5,37),Vector2(x-5,37)]),color)
     draw_line(Vector2(at(value),0),Vector2(at(value),size.y),Color.WHITE,1)
     if moving_marker:
         var x: float=at(drag_time)
@@ -70,7 +75,10 @@ func _gui_input(e: InputEvent) -> void:
             if drag_index>=0:
                 drag_time=float(arr[drag_index].t)
                 value_changed.emit(drag_time)
+                selected_lane=lane
+                selected_index=drag_index
                 marker_selected.emit(lane,drag_index)
+                queue_redraw()
                 accept_event()
                 return
         _seek(e.position.x)

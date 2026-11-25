@@ -1,8 +1,9 @@
 extends RefCounted
 const RIG=preload("res://addons/creature/rig.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
+const ABILITY=preload("res://addons/creature/ability.gd")
 const FLOOR: float=146.0
-const ATTACKS=["strike","cross","heavy","kick","air_strike","cast"]
+const ATTACKS=["strike","cross","heavy","kick","air_strike","cast","ability"]
 var rig=RIG.humanoid()
 var bank: Dictionary
 var pos: Vector2
@@ -24,6 +25,9 @@ var previous_cast: bool=false
 var previous_jump: bool=false
 var previous_heavy: bool=false
 var previous_kick: bool=false
+var previous_ability: bool=false
+var ability: Dictionary={}
+var ability_clip: Dictionary={}
 var confirmed: bool=false
 var last_hit_time: float=-1
 var chain: int=0
@@ -48,8 +52,16 @@ func point(id: String) -> Vector2:
     var q: Vector2=rig.point(id)
     return pos+Vector2(q.x*facing,q.y)
 
+func set_ability(profile: Dictionary) -> bool:
+    if state=="ability":return false
+    var compiled: Dictionary=ABILITY.compile(profile)
+    if compiled.is_empty():return false
+    ability=profile.duplicate(true)
+    ability_clip=compiled
+    return true
+
 func clip() -> Dictionary:
-    return bank[state]
+    return ability_clip if state=="ability" else bank[state]
 
 func start(name: String,stage: int=0) -> void:
     blend_from=current_pose.duplicate(true)
@@ -67,7 +79,11 @@ func capture_input(input: Dictionary) -> void:
     var jump: bool=input.get("jump",false)
     var heavy: bool=input.get("heavy",false)
     var kick: bool=input.get("kick",false)
-    if modern and heavy and not previous_heavy:
+    var special: bool=input.get("ability",false)
+    if modern and special and not previous_ability and not ability_clip.is_empty():
+        queued="ability"
+        buffer=.23
+    elif modern and heavy and not previous_heavy:
         queued="heavy"
         buffer=.23
     elif modern and kick and not previous_kick:
@@ -85,6 +101,7 @@ func capture_input(input: Dictionary) -> void:
     previous_jump=jump
     previous_heavy=heavy
     previous_kick=kick
+    previous_ability=special
 
 func _consume(name: String,stage: int=1) -> void:
     var chosen: String=name
@@ -104,6 +121,7 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
     hitstun=maxf(0,hitstun-dt)
     var locked: bool=state in ATTACKS and t<float(clip().duration)
     var next_attack: String=queued if modern and buffer>0 else ("strike" if not modern and strike else ("cast" if not modern and cast else ""))
+    if next_attack=="ability" and (ability_clip.is_empty() or pos.y<FLOOR-.1):next_attack=""
     if modern and locked and state in ["strike","cross"] and confirmed and chain<3 and t>=last_hit_time+.065 and t>=float(clip().duration)*.53 and next_attack in ["strike","cast"] and not block and hitstun<=0:
         _consume(next_attack,chain+1)
         locked=true
@@ -122,7 +140,7 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
         velocity.x=move_toward(velocity.x,target,dt*650) if modern else target
     else:
         guard=false
-        velocity.x=move_toward(velocity.x,0,dt*(220 if modern else 150))
+        if state!="ability":velocity.x=move_toward(velocity.x,0,dt*(220 if modern else 150))
     if modern and state in ["strike","cross","heavy","kick","air_strike"] and hitstun<=0:
         var impact: float=float(clip().duration)*.43
         for e in clip().events:
@@ -131,6 +149,18 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
         if t>=maxf(0,impact-.075) and t<impact+.065:
             var drive: float=105 if state=="heavy" else (85 if state=="kick" else (78 if state=="cross" else 65))
             velocity.x=move_toward(velocity.x,facing*drive,dt*1200)
+    if state=="ability":
+        var phase: String=ABILITY.phase_at(ability,t)
+        if phase=="dash" and hitstun<=0:
+            # Lock facing at activation; never drive through the target.
+            var gap: float=(enemy_x-pos.x)*facing
+            var desired: float=float(ability.dash_speed)
+            if ability.has("dash_accel"):
+                desired=move_toward(maxf(0,velocity.x*facing),desired,float(ability.dash_accel)*dt)
+            var speed: float=minf(desired,maxf(0,gap-16.0)/dt)
+            velocity.x=facing*speed
+        else:
+            velocity.x=0
     buffer=maxf(0,buffer-dt)
     jump_buffer=maxf(0,jump_buffer-dt)
     velocity.y+=dt*340
@@ -142,18 +172,28 @@ func step(dt: float,move: float,jump: bool,strike: bool,cast: bool,block: bool,e
     var old: float=t if t>0.0 else -0.000001
     t+=dt
     var c: Dictionary=clip()
+    var due: Array=[]
     if state in ATTACKS:
         for marker in CLIPS.events_between(c,old,t):
-            if not rig.ids.has(marker.anchor):continue
-            var e: Dictionary=marker.duplicate(true)
-            rig.evaluate(CLIPS.sample(c,float(marker.t),false))
-            e["world_anchor"]=point(marker.anchor)
-            e["world_chest"]=point("chest")
-            e["direction"]=facing
-            e["attack_time"]=float(marker.t)
-            e["chain"]=chain
-            e["attack_kind"]=state
-            events.append(e)
+            if marker.kind!="vfx":due.append({"marker":marker,"absolute":float(marker.t)})
+    due.append_array(CLIPS.visual_events_between(c,old,t,not state in ATTACKS))
+    due.sort_custom(func(a,b):return float(a.absolute)<float(b.absolute))
+    for entry in due:
+        var marker: Dictionary=entry.marker
+        if not rig.ids.has(marker.anchor):continue
+        var e: Dictionary=marker.duplicate()
+        rig.evaluate(CLIPS.sample(c,float(marker.t),false))
+        e["world_anchor"]=point(marker.anchor)
+        e["world_chest"]=point("chest")
+        e["direction"]=facing
+        e["attack_time"]=float(marker.t)
+        e["chain"]=chain
+        e["attack_kind"]=state
+        if state=="ability" and e.kind=="strike":
+            e["ability_damage"]=int(ability.damage)
+            e["ability_reach"]=float(ability.reach)
+            e["ability_impact"]=ability.get("impact",{})
+        events.append(e)
     current_pose=CLIPS.sample(c,t)
     if blend_time>0:
         blend_time=maxf(0,blend_time-dt)

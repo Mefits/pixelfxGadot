@@ -17,6 +17,8 @@ var modern: bool=true
 var last_impact: Vector2=Vector2.ZERO
 var impact_time: float=0
 var sim_steps: int=0
+# Optional visual observer; combat works unchanged without it.
+var custom_vfx=null
 
 func _init(bank: Dictionary,second: Dictionary={}) -> void:
     a=F.new(93,1,Color("#5aafdc"),bank)
@@ -50,6 +52,7 @@ func _tick(left: Dictionary,right: Dictionary) -> void:
         var m: float=clampf((a.pos.x+b.pos.x)*.5,23.5,296.5)
         a.pos.x=m-d*7.5
         b.pos.x=m+d*7.5
+    if custom_vfx!=null:custom_vfx.advance()
     # Snapshot both event outcomes before damage changes either pose or guard.
     var outcomes: Array=[]
     for e in a.events:_event(a,b,e,outcomes)
@@ -69,10 +72,19 @@ func _tick(left: Dictionary,right: Dictionary) -> void:
             hitstop=maxf(hitstop,.035 if h.blocked else (.108 if h.amount>=25 else (.085 if h.amount>=20 else .058)))
             impact_time=.18
             last_impact=h.p
-            flashes.append({"kind":"block" if h.blocked else "impact","a":h.p,"b":h.p,"age":0.0,"life":.16,"direction":h.direction})
+            var role: String="block" if h.blocked else "impact"
+            var custom: bool=false
+            if not h.blocked and custom_vfx!=null and not h.get("ability_impact",{}).is_empty():
+                custom=custom_vfx.spawn_preset(h.ability_impact,null,"",h.p,h.p,h.direction)
+            if not custom:custom=_custom(role,null,"",h.p,h.p,h.direction)
+            flashes.append({"kind":role,"a":h.p,"b":h.p,"age":0.0,"life":.16,"direction":h.direction,"custom":custom})
     for i in range(flashes.size()-1,-1,-1):
         flashes[i].age+=DT
         if flashes[i].age>=flashes[i].life:flashes.remove_at(i)
+
+func _custom(role: String,owner,anchor: String,at: Vector2,target: Vector2,direction: int) -> bool:
+    if custom_vfx==null:return false
+    return custom_vfx.spawn(role,owner,anchor,at,target,direction)
 
 func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
     var hand: Vector2=e.world_anchor
@@ -81,14 +93,18 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
     # Test direction from the attacker, not an already extended limb.
     # Reach remains measured at the authored contact anchor.
     var forward: bool=(chest.x-float(e.world_chest.x))*direction>=0
+    if e.kind=="vfx":
+        if custom_vfx!=null:
+            custom_vfx.spawn_preset(e.preset,src,e.anchor,hand,chest,direction)
+        return
     var amount: int=0
     match e.kind:
         "charge":
-            flashes.append({"kind":"charge","a":hand,"b":hand,"age":0.0,"life":.3,"owner":src,"anchor":e.anchor})
+            flashes.append({"kind":"charge","a":hand,"b":hand,"age":0.0,"life":.3,"owner":src,"anchor":e.anchor,"custom":_custom("charge",src,e.anchor,hand,chest,direction)})
         "strike":
-            flashes.append({"kind":"strike","a":hand,"b":hand+Vector2(direction*9,-3),"age":0.0,"life":.15})
-            if forward and hand.distance_to(chest)<=19 and dst.hp>0:
-                amount=25 if e.attack_kind=="heavy" else (17 if e.attack_kind=="kick" else (15 if e.attack_kind=="air_strike" else 13))
+            flashes.append({"kind":"strike","a":hand,"b":hand+Vector2(direction*9,-3),"age":0.0,"life":.15,"custom":_custom(e.attack_kind,src,e.anchor,hand,chest,direction)})
+            if forward and hand.distance_to(chest)<=float(e.get("ability_reach",19.0)) and dst.hp>0:
+                amount=int(e.get("ability_damage",25 if e.attack_kind=="heavy" else (17 if e.attack_kind=="kick" else (15 if e.attack_kind=="air_strike" else 13))))
         "cast":
             var target: Vector2=hand+Vector2(direction*104,0)
             # Point-blank targets may be between chest and extended casting hand.
@@ -96,6 +112,6 @@ func _event(src,dst,e: Dictionary,outcomes: Array) -> void:
             if forward and absf(chest.x-hand.x)<=104 and absf(chest.y-hand.y)<=26 and dst.hp>0:
                 target=chest
                 amount=20
-            flashes.append({"kind":"cast","a":hand,"b":target,"age":0.0,"life":.21})
+            flashes.append({"kind":"cast","a":hand,"b":target,"age":0.0,"life":.21,"custom":_custom("cast",src,e.anchor,hand,target,direction)})
     if amount>0:
-        outcomes.append({"src":src,"dst":dst,"amount":amount,"direction":direction,"blocked":dst.guard and direction==-dst.facing,"time":e.attack_time,"chain":e.chain,"p":chest})
+        outcomes.append({"src":src,"dst":dst,"amount":amount,"direction":direction,"blocked":dst.guard and direction==-dst.facing,"time":e.attack_time,"chain":e.chain,"p":chest,"ability_impact":e.get("ability_impact",{})})

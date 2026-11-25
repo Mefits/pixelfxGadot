@@ -1,8 +1,17 @@
 name: Animation Creature Lab
 on:
   push:
-    branches: [feature/animation-creature-lab]
+    branches: [feature/animation-creature-lab, feature/creature-vfx-integration]
+    paths:
+      - '.github/workflows/creature.yml'
+      - 'docs/CI_CHECKPOINT.md'
   workflow_dispatch:
+    inputs:
+      sdk_acceptance:
+        description: 'Run deferred experimental SDK black-box acceptance'
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -12,7 +21,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -29,9 +38,16 @@ jobs:
           cp -a godot/lab/*.gd /tmp/complete/godot/lab/
           cp -a godot/lab/*.tscn /tmp/complete/godot/lab/
           cp godot/tests/creature*.gd /tmp/complete/godot/tests/
-          cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md docs/VFX_WORKSHOP.md docs/TOOLKIT_RU.md /tmp/complete/docs/
+          cp docs/CREATURE_LAB.md docs/PHYSICS_LAB.md docs/VFX_WORKSHOP.md docs/TOOLKIT_RU.md docs/SDK_DEFERRED.md /tmp/complete/docs/
           cp SKILL.md AGENTS.md PORTABLE.md /tmp/complete/
           printf '%s\n' "$GITHUB_SHA" > /tmp/complete/CREATURE_REVISION.txt
+          python3 tools/build_creature_runtime.py --project /tmp/complete/godot --example portable_example --licenses /tmp/complete
+          cp -a portable_example /tmp/complete/
+          cp tools/build_creature_runtime.py tools/check_creature_schema.py tools/creature_sdk.py tools/test_creature_sdk.py /tmp/complete/tools/
+          cp -a godot/sdk /tmp/complete/godot/
+          mkdir -p /tmp/complete/skills
+          cp -a skills/creature-sdk /tmp/complete/skills/
+          cp -a sdk_acceptance /tmp/complete/
       - name: Install Godot
         run: |
           curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
@@ -42,45 +58,91 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          failed=0
+          verify() {
+            local logfile="$1"; shift
+            if ! "$@" 2>&1 | tee "/tmp/$logfile.log"; then failed=1; fi
+            if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/$logfile.log"; then failed=1; fi
+          }
           cd /tmp/complete/godot
-          godot --headless --editor --import 2>&1 | tee /tmp/import.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/import.log
-          timeout 30s godot --headless --script res://tests/creature.gd 2>&1 | tee /tmp/test.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/test.log
-          timeout 30s godot --headless --script res://tests/creature_combat_motion.gd 2>&1 | tee /tmp/combat_motion.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/combat_motion.log
-          timeout 30s godot --headless --script res://tests/creature_combat_variety.gd 2>&1 | tee /tmp/combat_variety.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/combat_variety.log
-          timeout 30s godot --headless --script res://tests/creature_physics.gd 2>&1 | tee /tmp/physics.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/physics.log
-          timeout 30s godot --headless --script res://tests/creature_motion.gd 2>&1 | tee /tmp/motion.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/motion.log
-          timeout 30s godot --headless --script res://tests/creature_hybrid.gd 2>&1 | tee /tmp/hybrid.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/hybrid.log
-          timeout 30s godot --headless --script res://tests/creature_evolution.gd 2>&1 | tee /tmp/evolution.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/evolution.log
-          timeout 30s godot --headless --script res://tests/creature_vfx.gd 2>&1 | tee /tmp/vfx.log
-          ! grep -E 'SCRIPT ERROR|Parse Error' /tmp/vfx.log
-          for scene in pose_workshop combat_lab physics_lab vfx_workshop; do
-            godot --headless res://lab/$scene.tscn --quit-after 120 2>&1 | tee /tmp/$scene.log
-            ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/$scene.log
+          verify import godot --headless --editor --import
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+          for test in creature creature_combat_motion creature_combat_variety creature_physics creature_motion creature_hybrid creature_evolution creature_vfx creature_sdk; do
+            verify "$test" timeout 45s godot --headless --script res://tests/$test.gd
           done
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_visual.gd 2>&1 | tee /tmp/visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_physics_visual.gd 2>&1 | tee /tmp/physics_visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/physics_visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_intent_visual.gd 2>&1 | tee /tmp/intent_visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/intent_visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_vfx_visual.gd 2>&1 | tee /tmp/vfx_visual.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/vfx_visual.log
-          timeout 40s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/creature_launcher.gd 2>&1 | tee /tmp/launcher.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/launcher.log
+          for scene in pose_workshop combat_lab physics_lab vfx_workshop; do
+            verify "$scene" timeout 30s godot --headless res://lab/$scene.tscn --quit-after 120
+          done
+          for test in creature_visual creature_physics_visual creature_intent_visual creature_vfx_visual creature_launcher; do
+            verify "$test" timeout 60s xvfb-run -a godot --path . --resolution 960x540 --script res://tests/$test.gd
+          done
+          if [ "$failed" -ne 0 ]; then exit 1; fi
           rm -rf .godot
           find . -name '*.import' -delete
+      - name: Cross-check canonical fixtures with standard JSON Schema
+        run: |
+          python3 -m venv /tmp/schema-venv
+          /tmp/schema-venv/bin/pip install --quiet jsonschema==4.23.0 Pillow==11.3.0
+          /tmp/schema-venv/bin/python tools/check_creature_schema.py /tmp/complete/godot/addons/creature/template.schema.json /tmp/sdk-fixtures
+      - name: Verify portable ZIPs in independent clean Godot projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CREATURE_EXPORT_TEST_DIR=/tmp/export-tests
+          mkdir -p "$CREATURE_EXPORT_TEST_DIR" /tmp/standalone
+          cd /tmp/complete/godot
+          godot --headless --editor --import 2>&1 | tee /tmp/export-import.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/export-import.log
+          timeout 60s godot --headless --script res://tests/creature_export.gd 2>&1 | tee /tmp/export-test.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/export-test.log
+          test "$(find "$CREATURE_EXPORT_TEST_DIR" -name '*.zip' | wc -l)" -eq 5
+          for zip in "$CREATURE_EXPORT_TEST_DIR"/*.zip; do
+            name="$(basename "$zip" .zip)"
+            dest="/tmp/standalone/$name"
+            mkdir -p "$dest"
+            unzip -q "$zip" -d "$dest"
+            test ! -d "$dest/lab"
+            cd "$dest"
+            timeout 45s godot --headless --editor --import 2>&1 | tee "/tmp/standalone-$name-import.log"
+            ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/standalone-$name-import.log"
+            timeout 45s godot --headless -- --smoke 2>&1 | tee "/tmp/standalone-$name.log"
+            grep DEMO_SMOKE_OK "/tmp/standalone-$name.log"
+            ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' "/tmp/standalone-$name.log"
+          done
+          rm -rf /tmp/complete/godot/.godot
+          find /tmp/complete/godot -name '*.import' -delete
+      - name: Full SDK black-box acceptance via public commands
+        if: github.event_name == 'workflow_dispatch' && inputs.sdk_acceptance == true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/complete/godot
+          godot --headless --editor --import 2>&1 | tee /tmp/sdk-final-import.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/sdk-final-import.log
+          /tmp/schema-venv/bin/python /tmp/complete/tools/test_creature_sdk.py --project /tmp/complete/godot --out /tmp/sdk-acceptance 2>&1 | tee /tmp/sdk-acceptance.log
+          grep SDK_BLACK_BOX_OK /tmp/sdk-acceptance.log
+          test -f /tmp/sdk-acceptance/acceptance.json
+          rm -rf /tmp/complete/godot/.godot /tmp/sdk-acceptance/clean_project/.godot
+          find /tmp/complete/godot -name '*.import' -delete
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.sdk_acceptance == true
+        with:
+          name: Creature-SDK-Acceptance-Evidence
+          path: /tmp/sdk-acceptance/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Animation-Creature-Test-Logs
+          path: /tmp/*.log
       - uses: actions/upload-artifact@v4
         with:
           name: Animation-Creature-Previews
           path: /tmp/complete/reports/*.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Creature-Standalone-Examples
+          path: /tmp/export-tests/*.zip
       - uses: actions/upload-artifact@v4
         with:
           name: Animation-Creature-Lab-Complete

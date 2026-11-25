@@ -12,7 +12,7 @@ var cursor_u: float=-1
 func _ready() -> void:
     custom_minimum_size=Vector2(225,142)
     mouse_filter=Control.MOUSE_FILTER_STOP
-    focus_mode=Control.FOCUS_NONE
+    focus_mode=Control.FOCUS_CLICK
 
 func configure(data: Array,limits: Array,enabled: bool) -> void:
     points=data.duplicate(true)
@@ -85,6 +85,7 @@ func _gui_input(e: InputEvent) -> void:
                 accept_event()
                 return
             if not _plot().grow(8).has_point(e.position):return
+            grab_focus()
             chosen=_nearest(e.position)
             if chosen<0 and points.size()<P.MAX_POINTS:
                 var pt: Array=_point(e.position)
@@ -119,3 +120,11 @@ func _gui_input(e: InputEvent) -> void:
         points[dragging]=pt
         _publish()
         accept_event()
+
+func delete_chosen()->bool:
+    if not active or chosen<=0 or chosen>=points.size()-1:return false
+    points.remove_at(chosen)
+    chosen=-1
+    dragging=-1
+    _publish()
+    return true

@@ -1,4 +1,14 @@
 extends Node2D
+const ABILITIES=preload("res://addons/creature/physical_ability.gd")
+const ANATOMY=preload("res://addons/creature/anatomy.gd")
+const CAT=preload("res://addons/creature/catalog.gd")
+var catalog_entry:Dictionary={}
+var ability_entry:Dictionary={}
+var ability_list:Array=[]
+var ability_picker:OptionButton
+var special_label:Label
+var special_flash:Dictionary={}
+var special_flash_until:int=0
 const UI=preload("res://lab/ui_ru.gd")
 const CREATURE=preload("res://addons/creature/physical_creature.gd")
 const INTENT=preload("res://lab/intent_panel.gd")
@@ -38,6 +48,10 @@ var trail: Array[Vector2]=[]
 var track_clock: float=0
 var dragging: bool=false
 var selected: int=-1
+var pause_button:Button
+var mode_button:Button
+var advanced_mode:bool=false
+var advanced_buttons:Array[Button]=[]
 
 func _ready() -> void:
     var layer:=CanvasLayer.new()
@@ -45,7 +59,7 @@ func _ready() -> void:
     ui_layer=layer
     var title:=Label.new()
     title.position=Vector2(18,10)
-    title.text="ФИЗИКА И ЭВОЛЮЦИЯ / физическое тело"
+    title.text="ФИЗИКА И ЭВОЛЮЦИЯ"
     title.add_theme_font_size_override("font_size",22)
     layer.add_child(title)
     hud=Label.new()
@@ -53,8 +67,8 @@ func _ready() -> void:
     hud.add_theme_font_size_override("font_size",13)
     layer.add_child(hud)
     info=Label.new()
-    info.position=Vector2(18,505)
-    info.text="A/D ходьба · W/пробел прыжок · F удар · ↑↓ лазание · H атака · M комната · G мишень · R сброс · Esc меню"
+    info.position=Vector2(18,98)
+    info.text="A/D ходьба · W прыжок · F удар · E способность · ↑↓ лазание · G мишень · Space пауза"
     info.add_theme_font_size_override("font_size",13)
     layer.add_child(info)
     mutation_label=Label.new()
@@ -65,19 +79,51 @@ func _ready() -> void:
     motion_label.position=Vector2(18,62)
     motion_label.add_theme_font_size_override("font_size",13)
     layer.add_child(motion_label)
+    var pending:Variant=get_tree().get_meta(CAT.HANDOFF,{})
+    if pending is Dictionary and pending.get("kind")=="ability" and ABILITIES.valid(pending.get("payload")):
+        ability_entry=CAT.consume(get_tree(),"ability")
+        var anatomy:Dictionary=ANATOMY.templates()[4 if ability_entry.payload.type=="grab" else 0]
+        catalog_entry=CAT.entry("","creature",anatomy.name,anatomy)
+    else:catalog_entry=CAT.consume(get_tree(),"creature")
+    ability_picker=OptionButton.new()
+    ability_picker.position=Vector2(628,10)
+    ability_picker.size=Vector2(218,30)
+    ability_picker.fit_to_longest_item=false
+    ability_picker.clip_text=true
+    layer.add_child(ability_picker)
+    ability_picker.item_selected.connect(_choose_ability)
+    var edit:=Button.new()
+    edit.position=Vector2(852,10)
+    edit.size=Vector2(90,30)
+    edit.text="Настройка"
+    layer.add_child(edit)
+    edit.pressed.connect(_edit_ability)
+    special_label=Label.new()
+    special_label.position=Vector2(18,80)
+    special_label.add_theme_font_size_override("font_size",12)
+    layer.add_child(special_label)
     _reset()
+    _refresh_abilities()
+    _build_toolbar()
 
 func _reset() -> void:
     if is_instance_valid(panel):panel.queue_free();panel=null
     tail=2
     mass=1
-    creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on)
+    if not catalog_entry.is_empty():
+        tail=int(catalog_entry.payload.tail)
+        mass=float(catalog_entry.payload.mass)
+        legs_on=bool(catalog_entry.payload.limbs)
+    creature=CREATURE.new(Vector2(135,440),boxes,tail,mass,legs_on,1.0,catalog_entry.get("payload",{}))
     creature.attack.set_track(TRACK.load_track())
-    creature.surface.enabled=walls_on
+    creature.surface.enabled=walls_on and not creature.upright
     creature.smooth_motion=motion_on
     creature.limbs.adaptive_gait=motion_on
     creature.contact_polish=contact_on
-    dummy={"id":"training","p":Vector2(183,446),"r":10.0,"hp":100}
+    dummy={"id":"training","p":Vector2(165 if ability_entry.get("payload",{}).get("type","")=="grab" else 183,446),"r":10.0,"hp":100}
+    if not ability_entry.is_empty():creature.special.configure(ability_entry.payload)
+    special_flash={}
+    if ability_picker!=null:_refresh_abilities()
     creature.attack.targets.append(dummy)
     trail.clear()
     dragging=false
@@ -85,7 +131,7 @@ func _reset() -> void:
 
 func _physics_process(dt: float) -> void:
     if creature==null:return
-    var pressed: bool=Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_SPACE)
+    var pressed: bool=Input.is_physical_key_pressed(KEY_W)
     var jump: bool=pressed and not jump_latch
     jump_latch=pressed
     var attack_pressed: bool=Input.is_physical_key_pressed(KEY_F)
@@ -105,6 +151,9 @@ func _physics_process(dt: float) -> void:
             climb=0
             strike=false
         creature.advance(dt*(.25 if slow else 1),axis,jump,false,climb,strike,pressed)
+        for event in creature.special.drain_events():
+            special_flash=event
+            special_flash_until=Time.get_ticks_msec()+240
         step_ms=(Time.get_ticks_usec()-start)/1000.0
         track_clock+=dt
         if track_clock>.035:
@@ -121,8 +170,13 @@ func _update_hud() -> void:
     var vel: Vector2=(Vector2(creature.body.nodes[0].v)+Vector2(creature.body.nodes[1].v))*.5
     var states: Dictionary={"wall":"лазание","ledge":"подтягивание","landing":"приземление","run":"бег","idle":"стойка","rise":"взлёт","fall":"падение","air":"воздух"}
     motion_label.text="%.0f px/с | %s | B мотор: %s · N контакты: %s | посадок %d"%[vel.x,states.get(creature.motion_state,""),"новый" if motion_on else "старый","новые" if contact_on else "старые",creature.landing_count]
-    mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · X медленно"%[creature.tail_count,creature.limb_scale,creature.mutations]
+    mutation_label.text="1/2 хвост (%d) · 3/4 масса · 5/6 лапы · 7/8 длина (×%.2f) · мутаций %d | Q лапы · C стены · V отладка · S сохранить"%[creature.tail_count,creature.limb_scale,creature.mutations]
     if Time.get_ticks_msec()<notice_until:mutation_label.text=notice
+    if not advanced_mode:
+        hud.text="Лапы %d · хвост %d · щупальца %d · масса ×%.1f · %s"%[creature.limbs.legs.size(),creature.tail_count,creature.branches.size(),creature.mass_scale,"ПАУЗА" if paused else "СИМУЛЯЦИЯ"]
+        mutation_label.text="Анатомия: 1/2 хвост · 3/4 масса · 5/6 лапы · 7/8 длина" if Time.get_ticks_msec()>=notice_until else notice
+    if special_label!=null:
+        special_label.text="E — "+str(ability_entry.get("name","выбери способность"))+" | "+str(creature.special.phase)+" · задержка %.2f с"%creature.special.cooldown
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO,ROOM),Color("#141d29"))
@@ -140,6 +194,14 @@ func _draw() -> void:
         draw_arc(dp,dummy.r,0,TAU,24,Color("#d19a80"),1)
         draw_rect(Rect2(dp+Vector2(-12,-15),Vector2(24,3)),Color("#273645"))
         draw_rect(Rect2(dp+Vector2(-12,-15),Vector2(24*float(dummy.hp)/100,3)),Color("#db9b73"))
+    if creature.special.active and creature.special.phase=="flight":
+        var pos:Vector2=creature.special.projectile
+        var tint:Color=Color("#a8e675") if creature.special.profile.type=="acid" else Color("#9be5ff")
+        draw_line(pos,pos-creature.special.velocity.normalized()*8,tint,2)
+        draw_circle(pos,3,tint)
+    if not special_flash.is_empty() and Time.get_ticks_msec()<special_flash_until:
+        var alpha:float=clampf(float(special_flash_until-Time.get_ticks_msec())/240,0,1)
+        draw_arc(special_flash.p,4+(1-alpha)*16,0,TAU,24,Color(.8,.95,.7,alpha),2)
     if debug and trail.size()>1:draw_polyline(PackedVector2Array(trail),Color("#537b8e"),1)
     if creature.limbs.enabled:
         for i in range(creature.limbs.legs.size()):
@@ -198,21 +260,22 @@ func _unhandled_input(e: InputEvent) -> void:
         match UI.physical_key(e):
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_R:_reset()
-            KEY_H:
-                if is_instance_valid(panel):panel.queue_free();panel=null
-                else:
-                    paused=false
-                    panel=INTENT.new(creature)
-                    ui_layer.add_child(panel)
+            KEY_S:_save_anatomy()
+            KEY_E:
+                if not is_instance_valid(panel) and not paused and not creature.special.begin(creature,dummy):
+                    notice="Способность недоступна: проверь дистанцию, тело и задержку"
+                    notice_until=Time.get_ticks_msec()+1600
+            KEY_H:_toggle_attack_panel()
             KEY_C:
                 walls_on=not walls_on
-                creature.surface.enabled=walls_on
+                creature.surface.enabled=walls_on and not creature.upright
                 if not walls_on:creature.surface.detach()
             KEY_M:
                 course=(course+1)%4
                 _set_course()
                 _reset()
             KEY_Q:
+                if creature.limbs.legs.is_empty():return
                 legs_on=not legs_on
                 creature.limbs.enabled=legs_on
                 creature.limbs.release_all()
@@ -229,7 +292,7 @@ func _unhandled_input(e: InputEvent) -> void:
             KEY_G:
                 dummy.p=get_global_mouse_position()
                 dummy.hp=100
-            KEY_P:paused=not paused
+            KEY_P,KEY_SPACE:_toggle_pause()
             KEY_X:slow=not slow
             KEY_1:_mutation(creature.change_tail(-1));selected=-1;dragging=false
             KEY_2:_mutation(creature.change_tail(1))
@@ -261,3 +324,127 @@ func _set_course() -> void:
 func _mutation(ok: bool) -> void:
     notice="Мутация применена" if ok else "Недоступно: занят, нет места или достигнут предел"
     notice_until=Time.get_ticks_msec()+1800
+
+func _save_anatomy()->void:
+    var profile:Dictionary=creature.anatomy_snapshot()
+    var value:Dictionary=catalog_entry if not catalog_entry.is_empty() else CAT.entry("","creature",profile.name,profile)
+    var saved:Dictionary=CAT.save_draft(value,profile)
+    if saved.is_empty():
+        notice="Не удалось сохранить анатомию"
+    else:
+        catalog_entry=saved
+        notice="Анатомия сохранена в библиотеке"
+    notice_until=Time.get_ticks_msec()+2500
+
+func _refresh_abilities()->void:
+    if ability_picker==null or creature==null:return
+    ability_list.clear()
+    ability_picker.clear()
+    ability_picker.add_item("Без способности")
+    var selected_index:int=0
+    for entry in CAT.scan():
+        if entry.kind!="ability" or not ABILITIES.valid(entry.payload):continue
+        ability_list.append(entry)
+        ability_picker.add_item(entry.name)
+        var index:int=ability_list.size()
+        ability_picker.set_item_disabled(index,not ABILITIES.compatible(entry.payload,creature))
+        if entry.id==ability_entry.get("id",""):selected_index=index
+    ability_picker.select(selected_index)
+
+func _choose_ability(index:int)->void:
+    if creature.special.active:
+        _refresh_abilities()
+        return
+    if index<=0:
+        ability_entry={}
+        creature.special.profile={}
+        return
+    var entry:Dictionary=ability_list[index-1]
+    if not ABILITIES.compatible(entry.payload,creature):return
+    ability_entry=entry.duplicate(true)
+    creature.special.configure(ability_entry.payload)
+
+func _edit_ability()->void:
+    if ability_entry.is_empty() or creature.special.active:return
+    var dlg:=ConfirmationDialog.new()
+    dlg.title="Настройка: "+str(ability_entry.name)
+    dlg.ok_button_text="Сохранить копию"
+    var body:=VBoxContainer.new()
+    dlg.add_child(body)
+    var fields:Dictionary={}
+    var specs:Array=[["duration","Длительность, с",.2,3,.05],["reach","Дальность, px",8,240,1],["power","Сила / скорость",20,280,1],["damage","Урон",0,60,1],["cooldown","Задержка, с",0,3,.05]]
+    var used:Dictionary={"grab":["duration","reach","power","cooldown"],"leap":["duration","reach","power","damage","cooldown"],"claw":["cooldown"],"bolt":["duration","reach","power","damage","cooldown"],"grow":["duration","cooldown"],"acid":["duration","reach","power","damage","cooldown"]}
+    for spec in specs:
+        if not spec[0] in used[ability_entry.payload.type]:continue
+        var row:=HBoxContainer.new()
+        body.add_child(row)
+        var label:=Label.new()
+        label.text=spec[1]
+        label.custom_minimum_size.x=180
+        row.add_child(label)
+        var spin:=SpinBox.new()
+        spin.min_value=spec[2]
+        spin.max_value=spec[3]
+        spin.step=spec[4]
+        spin.value=ability_entry.payload[spec[0]]
+        row.add_child(spin)
+        fields[spec[0]]=spin
+    add_child(dlg)
+    dlg.confirmed.connect(func():
+        var value:Dictionary=ability_entry.payload.duplicate(true)
+        for key in fields:value[key]=fields[key].value
+        var saved:Dictionary=CAT.save_draft(ability_entry,value)
+        if not saved.is_empty():
+            ability_entry=saved
+            creature.special.configure(value)
+            _refresh_abilities()
+        dlg.queue_free())
+    dlg.canceled.connect(dlg.queue_free)
+    dlg.popup_centered(Vector2i(370,240))
+
+func _tool(row:HBoxContainer,label:String,hint:String,action:Callable,primary:bool=false)->Button:
+    var b:=Button.new()
+    b.text=label
+    b.focus_mode=Control.FOCUS_NONE
+    row.add_child(b)
+    UI.action_button(b,hint,primary)
+    b.pressed.connect(action)
+    return b
+func _build_toolbar()->void:
+    var row:=HBoxContainer.new()
+    row.position=Vector2(18,505)
+    row.add_theme_constant_override("separation",5)
+    var compact:=Theme.new()
+    compact.default_font_size=13
+    row.theme=compact
+    ui_layer.add_child(row)
+    pause_button=_tool(row,"Пауза","Space / P",_toggle_pause,true)
+    _tool(row,"Сброс","R",_reset)
+    _tool(row,"Сохранить тело","S / Ctrl+S",_save_anatomy,true)
+    _tool(row,"Комната","M",func():course=(course+1)%4;_set_course();_reset())
+    _tool(row,"Редактор атаки","H",_toggle_attack_panel)
+    _tool(row,"Меню","Esc",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
+    mode_button=_tool(row,"Простой","Показать диагностику",_toggle_mode)
+    advanced_buttons.append(_tool(row,"Отладка","V",func():debug=not debug))
+    advanced_buttons.append(_tool(row,"Медленно","X",func():slow=not slow))
+    advanced_mode=UI.advanced("physics")
+    _apply_mode()
+func _toggle_pause()->void:
+    paused=not paused
+    if pause_button!=null:pause_button.text="Пуск" if paused else "Пауза"
+func _toggle_attack_panel()->void:
+    if is_instance_valid(panel):panel.queue_free();panel=null
+    else:
+        paused=false
+        pause_button.text="Пауза"
+        panel=INTENT.new(creature)
+        ui_layer.add_child(panel)
+func _toggle_mode()->void:
+    advanced_mode=not advanced_mode
+    UI.set_advanced("physics",advanced_mode)
+    _apply_mode()
+func _apply_mode()->void:
+    for b in advanced_buttons:b.visible=advanced_mode
+    mode_button.text="Расширенный" if advanced_mode else "Простой"
+    motion_label.visible=advanced_mode
+    _update_hud()

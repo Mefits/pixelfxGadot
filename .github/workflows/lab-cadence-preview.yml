@@ -1,0 +1,56 @@
+name: Lab native cadence preview
+on:
+  pull_request:
+    branches: [feature/animation-creature-lab]
+    paths:
+      - 'godot/tests/limited_preview.gd'
+      - 'godot/addons/creature/clips.gd'
+      - '.github/workflows/lab-cadence-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: godot-cache
+        with:
+          path: ~/.cache/lab-godot
+          key: lab-godot-linux-4.4.1
+      - name: Godot 4.4.1
+        run: |
+          mkdir -p ~/.cache/lab-godot
+          if [ ! -x ~/.cache/lab-godot/godot ]; then
+            curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+            unzip -qo /tmp/godot.zip -d ~/.cache/lab-godot
+            mv ~/.cache/lab-godot/Godot_v4.4.1-stable_linux.x86_64 ~/.cache/lab-godot/godot
+          fi
+          echo "$HOME/.cache/lab-godot" >> "$GITHUB_PATH"
+      - name: Render Lab native modules
+        run: |
+          set -euo pipefail
+          cd godot
+          timeout 90s xvfb-run -a godot --audio-driver Dummy --resolution 960x540 --script res://tests/limited_preview.gd 2>&1 | tee /tmp/lab-render.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|ERROR:' /tmp/lab-render.log
+          test "$(find ../reports/limited -name 'frame_*.png' | wc -l)" -eq 104
+      - name: GIF export
+        run: |
+          command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y ffmpeg)
+          mkdir -p preview
+          for rate in 60 30; do
+            ffmpeg -v error -framerate "$rate" -i reports/limited/frame_%03d.png -vf palettegen -y /tmp/palette.png
+            ffmpeg -v error -framerate "$rate" -i reports/limited/frame_%03d.png -i /tmp/palette.png -lavfi paletteuse=dither=bayer:bayer_scale=3 -loop 0 -y "preview/Lab_0.42_DF_${rate}fps.gif"
+          done
+          cp reports/limited/clips.json preview/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lab-042-native-GIF
+          path: preview/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Lab-042-render-log
+          path: /tmp/lab-render.log

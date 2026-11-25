@@ -2,6 +2,8 @@ extends RefCounted
 ## Procedural feet, independent from the visual skin. World-space planted contacts
 ## apply bounded forces to the body; analytical two-link IK is display geometry.
 var legs: Array[Dictionary]=[]
+var min_legs:int=4
+var upright:bool=false
 var enabled: bool=true
 var support_count: int=0
 var steps_taken: int=0
@@ -26,12 +28,14 @@ var landing_offset: float=0
 var recovery_steps: int=0
 var knee_avoids: int=0
 
-func setup(body) -> void:
+func setup(body,count:int=4) -> void:
     legs.clear()
-    for i in range(4):
-        var parent: int=0 if i<2 else 1
+    for i in range(mini(4,count)):
+        var parent: int=1 if upright else (0 if i<2 else 1)
         var hip: Vector2=body.nodes[parent].p
         legs.append({"parent":parent,"side":-1 if i%2==0 else 1,"group":i%2 if parent==0 else 1-i%2,"foot":hip+Vector2(0,rest_height),"knee":hip,"start":hip,"target":hip,"planted":false,"swing":false,"age":0.0})
+    while legs.size()<count:
+        if not add_pair(body):break
     support_count=0
     surface_normal=Vector2.UP
     phase=0
@@ -240,7 +244,7 @@ func add_pair(body) -> bool:
     return true
 
 func remove_pair() -> bool:
-    if legs.size()<=4:return false
+    if legs.size()<=min_legs:return false
     legs.resize(legs.size()-2)
     support_count=0
     for l in legs:

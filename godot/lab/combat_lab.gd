@@ -1,4 +1,6 @@
 extends Control
+const CAT=preload("res://addons/creature/catalog.gd")
+var catalog_entry:Dictionary={}
 const UI=preload("res://lab/ui_ru.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const COMBAT=preload("res://addons/creature/combat.gd")
@@ -8,7 +10,14 @@ const L=preload("res://addons/pixelfx/native/lightning.gd")
 const BATCH=preload("res://addons/pixelfx/native/batch.gd")
 const PAL=preload("res://addons/pixelfx/native/palette.gd")
 const RNG=preload("res://addons/pixelfx/native/rng.gd")
+const FX=preload("res://addons/creature/vfx_runtime.gd")
+const ABILITY=preload("res://addons/creature/ability.gd")
+const ABILITY_EDITOR=preload("res://lab/ability_dialog.gd")
+const BINDINGS=preload("res://addons/creature/vfx_bindings.gd")
 var world
+var ability_editor
+var phase_label: Label
+var ability_profile: Dictionary={}
 var canvas
 var surface
 var bolt=L.new()
@@ -29,6 +38,11 @@ var ai_clock: float=0
 var ai_action: int=0
 var vfx_ms: float=0
 var cpp: bool=false
+var paused:bool=false
+var pause_button:Button
+var advanced_mode:bool=false
+var mode_button:Button
+var advanced_buttons:Array[Button]=[]
 
 func _ready() -> void:
     var view:=SubViewport.new()
@@ -59,10 +73,29 @@ func _ready() -> void:
     detail.add_theme_font_size_override("font_size",13)
     add_child(detail)
     var info:=Label.new()
-    info.position=Vector2(24,492)
-    info.text="Игрок 1: A/D ходьба · W прыжок · F удар / в воздухе · H тяжёлый · J ногой · G магия · S блок\nИгрок 2: стрелки · K удар · L магия · O тяжёлый · P ногой | B бот · N динамика · X медл. · C эффекты · M трен. · R сброс · Tab редактор · Esc"
+    info.position=Vector2(24,510)
+    info.text="A/D ходьба · W прыжок · F удар · H тяжёлый · J ногой · G магия · S блок · E способность · Space пауза"
     info.add_theme_font_size_override("font_size",13)
     add_child(info)
+    catalog_entry=CAT.consume(get_tree(),"ability")
+    ability_profile=ABILITY.load_profile() if catalog_entry.is_empty() else catalog_entry.payload.duplicate(true)
+    phase_label=Label.new()
+    phase_label.position=Vector2(24,90)
+    phase_label.add_theme_font_size_override("font_size",13)
+    add_child(phase_label)
+    ability_editor=ABILITY_EDITOR.new()
+    add_child(ability_editor)
+    ability_editor.applied.connect(_apply_ability)
+    _reset()
+    _build_toolbar()
+
+func _apply_ability(profile: Dictionary) -> void:
+    if not catalog_entry.is_empty():
+        var saved:Dictionary=CAT.save_draft(catalog_entry,profile,profile.name)
+        if saved.is_empty():return
+        catalog_entry=saved
+    elif not ABILITY.save_profile(profile):return
+    ability_profile=profile
     _reset()
 
 func _bar(at: Vector2) -> ProgressBar:
@@ -83,6 +116,9 @@ func _bar(at: Vector2) -> ProgressBar:
 
 func _reset() -> void:
     world=COMBAT.new(CLIPS.fighter_bank(0),CLIPS.fighter_bank(1))
+    world.custom_vfx=FX.new(BINDINGS.load_bank())
+    world.custom_vfx.renderer.enable_acceleration(cpp)
+    world.a.set_ability(ability_profile)
     canvas.world=world
     world.modern=modern
     if training:
@@ -95,7 +131,9 @@ func _pressed(code: Key) -> bool:
 
 func _physics_process(dt: float) -> void:
     if world==null:return
-    var left: Dictionary={"move":float(_pressed(KEY_D))-float(_pressed(KEY_A)),"jump":_pressed(KEY_W),"strike":_pressed(KEY_F),"cast":_pressed(KEY_G),"heavy":_pressed(KEY_H),"kick":_pressed(KEY_J),"guard":_pressed(KEY_S)}
+    if paused:return
+    if ability_editor!=null and ability_editor.visible:return
+    var left: Dictionary={"move":float(_pressed(KEY_D))-float(_pressed(KEY_A)),"jump":_pressed(KEY_W),"strike":_pressed(KEY_F),"cast":_pressed(KEY_G),"heavy":_pressed(KEY_H),"kick":_pressed(KEY_J),"ability":_pressed(KEY_E),"guard":_pressed(KEY_S)}
     var right: Dictionary={"move":float(_pressed(KEY_RIGHT))-float(_pressed(KEY_LEFT)),"jump":_pressed(KEY_UP),"strike":_pressed(KEY_K),"cast":_pressed(KEY_L),"heavy":_pressed(KEY_O),"kick":_pressed(KEY_P),"guard":_pressed(KEY_DOWN)}
     if training:right={}
     elif bot:
@@ -120,6 +158,8 @@ func _update_hud() -> void:
     hp1.value=world.a.hp
     hp2.value=world.b.hp
     detail.text="Динамика: %s · %s · посл. серия %d (макс. %d) · блоков %d · F→F→G после попадания"%["новая" if modern else "старая","тренировка" if training else ("медленно" if slow else "бой"),world.combo,world.best_combo,world.blocks]
+    var phase: String=ABILITY.phase_at(world.a.ability,world.a.t) if world.a.state=="ability" else ""
+    phase_label.text="E — "+str(ability_profile.get("name","Способность"))+" · Q — настройка | "+str({"charge":"Заряд","dash":"Рывок","contact":"Контакт","recovery":"Восстановление","done":"Конец"}.get(phase,"Готова"))
     hud.text="БОЕВАЯ ЛАБОРАТОРИЯ | %s | здоровье %d : %d | попаданий %d | эффекты %.2f мс | %s"%["ТРЕНИРОВКА" if training else ("БОТ" if bot else "2 ИГРОКА"),world.a.hp,world.b.hp,world.hits,vfx_ms,"C++" if cpp else "GDScript"]
 
 func _vfx() -> void:
@@ -131,6 +171,7 @@ func _vfx() -> void:
         return
     var d=batch.begin(p)
     for f in world.flashes:
+        if f.get("custom",false):continue
         var k: float=1-f.age/f.life
         if f.kind=="charge":
             var a: Vector2=f.owner.point(f.anchor)
@@ -154,18 +195,22 @@ func _vfx() -> void:
             d.glow(p0.x,p0.y,12,color,.6*k)
     batch.finish()
     for f in world.flashes:
+        if f.get("custom",false):continue
         if f.kind=="cast":
             var a: Vector2=f.a
             var b: Vector2=f.b
             var k: float=1-f.age/f.life
             var r=RNG.new(int(f.age*30)+121)
             bolt.stroke(p,L.zigzag(r,a.x,a.y,b.x,b.y,.24,.5),k,palette,.65)
+    world.custom_vfx.draw(p,146.0)
     surface.present()
     vfx_ms=(Time.get_ticks_usec()-start)/1000.0
 
 func _unhandled_input(e: InputEvent) -> void:
     if e is InputEventKey and e.pressed and not e.echo:
         match UI.physical_key(e):
+            KEY_SPACE:_toggle_pause()
+            KEY_Q:ability_editor.open_for(ability_profile)
             KEY_B:bot=not bot
             KEY_R:_reset()
             KEY_V:debug=not debug
@@ -181,3 +226,43 @@ func _unhandled_input(e: InputEvent) -> void:
                 _reset()
             KEY_TAB:get_tree().change_scene_to_file("res://lab/pose_workshop.tscn")
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
+
+func _tool(row:HBoxContainer,label:String,hint:String,action:Callable,primary:bool=false)->Button:
+    var b:=Button.new()
+    b.text=label
+    b.focus_mode=Control.FOCUS_NONE
+    row.add_child(b)
+    UI.action_button(b,hint,primary)
+    b.pressed.connect(action)
+    return b
+func _build_toolbar()->void:
+    var row:=HBoxContainer.new()
+    row.position=Vector2(24,470)
+    row.add_theme_constant_override("separation",5)
+    var compact:=Theme.new()
+    compact.default_font_size=13
+    row.theme=compact
+    add_child(row)
+    pause_button=_tool(row,"Пауза","Space",_toggle_pause,true)
+    _tool(row,"Сброс","R",_reset)
+    _tool(row,"Способность","Q",func():ability_editor.open_for(ability_profile),true)
+    _tool(row,"Тренировка","M",func():training=not training;_reset())
+    _tool(row,"Анимации","Tab",func():get_tree().change_scene_to_file("res://lab/pose_workshop.tscn"))
+    _tool(row,"Меню","Esc",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
+    mode_button=_tool(row,"Простой","Переключить диагностические параметры",_toggle_mode)
+    advanced_buttons.append(_tool(row,"Бот","B",func():bot=not bot))
+    advanced_buttons.append(_tool(row,"Отладка","V",func():debug=not debug;canvas.debug=debug;canvas.queue_redraw()))
+    advanced_buttons.append(_tool(row,"Медленно","X",func():slow=not slow))
+    advanced_mode=UI.advanced("combat")
+    _apply_mode()
+func _toggle_pause()->void:
+    paused=not paused
+    if pause_button!=null:pause_button.text="Пуск" if paused else "Пауза"
+func _toggle_mode()->void:
+    advanced_mode=not advanced_mode
+    UI.set_advanced("combat",advanced_mode)
+    _apply_mode()
+func _apply_mode()->void:
+    for b in advanced_buttons:b.visible=advanced_mode
+    mode_button.text="Расширенный" if advanced_mode else "Простой"
+    detail.visible=advanced_mode

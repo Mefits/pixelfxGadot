@@ -11,6 +11,8 @@ func _run() -> void:
     root.add_child(scene)
     await process_frame
     await process_frame
+    scene.advanced_mode=true
+    scene._apply_mode()
     scene.playing=false
     scene.kind.select(P.TYPES.find("smoke"))
     scene._add_layer()
@@ -80,7 +82,7 @@ func _run() -> void:
     scene._seek(.3)
     await process_frame
     await process_frame
-    check(scene.inspector.get_tab_count()==3,"Inspector tabs")
+    check(scene.inspector.get_tab_count()==4,"Inspector tabs")
     check(not scene.field_rows.speed.visible,"Hide irrelevant speed")
     scene._capture_reference()
     scene._toggle_compare()
@@ -100,5 +102,46 @@ func _run() -> void:
     check(root.get_texture().get_image().save_png(dir.path_join("vfx-compare.png"))==OK,"Capture comparison")
     scene._toggle_compare()
     check(scene.picture.size==Vector2(480,320) and not scene.compare_picture.visible,"Restore full preview")
+    var before:Dictionary=scene.preset.duplicate(true)
+    scene.advanced_mode=false
+    scene._apply_mode()
+    check(scene.inspector.is_tab_hidden(2) and scene.play_button.is_visible_in_tree(),"Simple VFX mode")
+    scene.advanced_mode=true
+    scene._apply_mode()
+    check(not scene.inspector.is_tab_hidden(2) and scene.preset==before,"Mode does not mutate preset")
+    var space:=InputEventKey.new()
+    space.physical_keycode=KEY_SPACE
+    space.pressed=true
+    scene.playing=false
+    scene._input(space)
+    check(scene.playing,"Space plays VFX")
+    scene._input(space)
+    check(not scene.playing,"Space pauses VFX")
+    var del:=InputEventKey.new()
+    del.physical_keycode=KEY_DELETE
+    del.pressed=true
+    scene.list.grab_focus()
+    scene._input(del)
+    check(scene.preset.layers.size()==before.layers.size()-1,"Delete layer")
+    scene._undo()
+    check(scene.preset==before,"Undo layer delete")
+    scene.name_edit.grab_focus()
+    scene._input(del)
+    check(scene.preset==before,"Delete in text input does not remove layer")
+    scene.name_edit.release_focus()
+    scene.inspector.current_tab=2
+    scene._select_layer(0)
+    if not P.has_curve(scene.preset.layers[0],"size"):
+        scene.curve_channel=0
+        scene._toggle_curve()
+    scene.curve_channel=0
+    scene._sync_curve()
+    scene.graph.points=[[0,4],[.5,6],[1,8]]
+    scene._curve_changed(scene.graph.points)
+    scene.graph.chosen=1
+    scene.graph.grab_focus()
+    var count:int=scene.preset.layers.size()
+    scene._input(del)
+    check(scene.preset.layers.size()==count and scene.preset.layers[0].curves["size"].size()==2,"Delete curve point without deleting layer")
     print("VFX workshop GL failures: ",failures)
     quit(0 if failures==0 else 1)
