@@ -70,7 +70,7 @@ class Board extends Node2D:
             # Keep feet from clipping through the floor; flight and root track are shared.
             p.root[1]-=maxf(0,maxf(rig.point("foot_near").y,rig.point("foot_far").y))
             rig.evaluate(p)
-            draw_set_transform(Vector2(x+71,floor_y),0,Vector2(3.75,3.75))
+            draw_set_transform(Vector2(x+59,floor_y),0,Vector2(3.1,3.1))
             SKIN.draw_body(self,rig,Vector2.ZERO,1,Color("#5aafdc"),false)
             draw_set_transform(Vector2.ZERO)
             draw_rect(Rect2(x+15,y+414,432,5),Color("#405565"))
