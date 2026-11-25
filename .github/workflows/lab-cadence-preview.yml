@@ -35,22 +35,22 @@ jobs:
           cd godot
           timeout 90s xvfb-run -a godot --audio-driver Dummy --resolution 960x540 --script res://tests/limited_preview.gd 2>&1 | tee /tmp/lab-render.log
           ! grep -E 'SCRIPT ERROR|Parse Error|ERROR:' /tmp/lab-render.log
-          test "$(find ../reports/limited -name 'frame_*.png' | wc -l)" -eq 78
+          test "$(find ../reports/limited -name 'frame_*.png' | wc -l)" -eq 104
       - name: GIF export
         run: |
           command -v ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y ffmpeg)
           mkdir -p preview
           for rate in 60 30; do
             ffmpeg -v error -framerate "$rate" -i reports/limited/frame_%03d.png -vf palettegen -y /tmp/palette.png
-            ffmpeg -v error -framerate "$rate" -i reports/limited/frame_%03d.png -i /tmp/palette.png -lavfi paletteuse=dither=bayer:bayer_scale=3 -loop 0 -y "preview/Lab_0.39_ABDE_${rate}fps.gif"
+            ffmpeg -v error -framerate "$rate" -i reports/limited/frame_%03d.png -i /tmp/palette.png -lavfi paletteuse=dither=bayer:bayer_scale=3 -loop 0 -y "preview/Lab_0.41_ADE_${rate}fps.gif"
           done
           cp reports/limited/clips.json preview/
       - uses: actions/upload-artifact@v4
         with:
-          name: Lab-039-native-GIF
+          name: Lab-041-native-GIF
           path: preview/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Lab-039-render-log
+          name: Lab-041-render-log
           path: /tmp/lab-render.log
