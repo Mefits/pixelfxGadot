@@ -56,3 +56,6 @@ Owner supplied six Naruto run tiles, three repeating silhouettes with swapped le
 
 ## 0.54a — original renderer baseline
 Unmodified locked PixelFX JS rig via verified QuickJS artifact, endpoint retargeting of 0.53a C; actual capture proves renderer works in Godot, but geometry and pixel resolution differ from Lab. Volume and per-pixel depth are real; armor seams remain. Preserve exact Lab joint poses in next skin comparison rather than interpreting endpoint retarget mismatch as a renderer flaw. [Native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45684752375). Artistic approval pending.
+
+## 0.54c — first native organic skin comparison
+Same Naruto Run pose data, original C++ reference versus fuller organic geometry with seams disabled at density 1 and 3. B/C share geometry. Actual capture C visibly reduces stair-step contour; disabling all seams can lose depth cues and joins across depths are not supported. Do not call it seamless everywhere. Preserve unchanged FK and compare density independently of shape. [Native run](https://github.com/Mefits/pixelfxGadot/actions/runs/45692175229), a484b69476a1f941b27d9f2a98baa3627432c518. Artistic approval pending.
