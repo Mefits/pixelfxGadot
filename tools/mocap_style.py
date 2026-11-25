@@ -358,14 +358,58 @@ def foot051b(frames,meta):
         out.append(v)
     return out
 
+def reference051c(frames,meta):
+    base=foot051b(frames,meta)[2]
+    out=[]
+    # These are hand-authored side-view directions from the owner's still,
+    # not motion capture. Opposite arm is outstretched, near arm folded.
+    # hip/chest pitch -58 deg, kick axis -40 deg, leg extension .98.
+    # Keep previous and following punches and all three event ticks.
+    for label,mode in [("A / previous",0),("B / photo pose",1),("C / photo + support",2)]:
+        v=copy.deepcopy(base)
+        v.update(label=label,reference51=mode)
+        if mode:
+            # smooth phase envelope: load, chamber, high extension, retract, plant.
+            knots=[(0,0),(22,0),(25,.12),(30,.58),(34,.84),(38,1),(40,1),(44,.65),(48,.24),(52,0),(76,0)]
+            for i,f in enumerate(v["frames"]):
+                w=0.
+                for (a,x),(b,y) in zip(knots,knots[1:]):
+                    if a<=i<=b:
+                        u=(i-a)/(b-a);u=u*u*(3-2*u);w=x+(y-x)*u;break
+                if w<=0:continue
+                def mix(old,new):return (1-w)*old+w*new
+                f["tilt"]=mix(f["tilt"],-58.)
+                f["hip_extra"]=mix(f.get("hip_extra",0),-1.)
+                # Keep hip leading toward the kick. The photo has shoulders
+                # counter-turned; avoid dragging near hand across the face.
+                f["shoulder_turn"]=mix(f.get("shoulder_turn",0),15.)
+                f["pelvis_turn"]=mix(f.get("pelvis_turn",0),90.)
+                goal=[.98*np.cos(np.deg2rad(-40)),.98*np.sin(np.deg2rad(-40))]
+                # Retain the old chamber in early/late frames rather than
+                # instantly straighten the leg.
+                ext=float(np.interp(i,[22,30,34,38,40,46,52],[0,.12,.48,1,1,.08,0]))
+                for j in range(2):
+                    f["targets"]["foot_far"][j]=(1-ext)*f["targets"]["foot_far"][j]+ext*goal[j]
+                for tip,target in [("hand_near",(.36,.40)),("hand_far",(.93,-.10))]:
+                    for j in range(2):f["targets"][tip][j]=mix(f["targets"][tip][j],target[j])
+                f["foot_pitch_far"]=mix(f["foot_pitch_far"],-76.)
+                f["foot_pitch_near"]=mix(f["foot_pitch_near"],8.)
+                # Explicitly replace the previous waist-height world aim.
+                if f.get("aim_tip")=="foot_far":
+                    f.pop("aim_tip");f.pop("aim_point");f.pop("aim_weight")
+                if mode==2:
+                    f["reference_support_weight"]=w
+        out.append(v)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b"],default="51b");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b","51c"],default="51c");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=reference051c(frames,meta) if a.stage=="51c" else foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -383,7 +427,7 @@ def main():
         select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
         fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    if a.stage in ("48","49","50","51a","51b"):
+    if a.stage in ("48","49","50","51a","51b","51c"):
         # Keep all strike frames, 20+ ms delays, exact rounded 1.1x cycle.
         select=sorted(set(range(0,len(imgs),2))|{len(imgs)-1}|{e["tick"] for e in config[0]["events"]})
         spans=[(imgs[0],12)]+[(imgs[k],(select[j+1]-k if j+1<len(select) else 1)) for j,k in enumerate(select)]+[(imgs[-1],12)]
@@ -396,10 +440,12 @@ def main():
             delays.append(10*(round((elapsed+n)*100/66)-round(elapsed*100/66)));elapsed+=n
         assert min(delays)>=20
         merged[0][0].save(out/"comparison-1p1.gif",save_all=True,append_images=[im for im,_ in merged[1:]],duration=delays,loop=0,disposal=2)
-    review_ticks=[0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
+    review_ticks=[0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b","51c") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
     for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
+    if a.stage=="51c":
+        imgs[38].save(out/"contact-review.png")
     if a.stage=="51a":
         clips=[json.loads((out/f"clip_{i}.json").read_text())["payload"] for i in range(3)]
         assert clips[0]==clips[1]==clips[2], "Skin variants must not alter animation data"

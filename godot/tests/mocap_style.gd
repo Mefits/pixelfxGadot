@@ -207,6 +207,18 @@ func run()->void:
                 else:
                     locks.erase(tip)
                     if rig.point(tip).y>0:goals[tip]=Vector2(rig.point(tip).x,0)
+            # Photo C: position the support hip above the planted ankle
+            # with a slight knee bend. This is a kinematic support proxy,
+            # not an assertion of dynamic physical balance.
+            var reference_weight:float=float(f.get("reference_support_weight",0))
+            if reference_weight>0 and goals.has("foot_near") and not locks.has("foot_far"):
+                var ankle:Vector2=goals["foot_near"]
+                var hip:Vector2=rig.point("thigh_near")
+                var desired:Vector2=ankle+Vector2(.8,-21.4)
+                var delta:Vector2=(desired-hip)*reference_weight
+                p.root[0]+=delta.x
+                p.root[1]+=delta.y
+                rig.evaluate(p)
             var support_targets:Dictionary={}
             for tip in locks:support_targets[tip]=goals[tip]
             support_frames.append(support_targets)
@@ -332,7 +344,22 @@ func run()->void:
                 check["bag_front_gap_px"]=36.0-fist.x
                 check["limb_extension_px"]=shoulder.distance_to(wrist)
                 if str(e.anchor).begins_with("hand"):check["arm_extension_px"]=shoulder.distance_to(wrist)
-                else:check["hip"]=[shoulder.x,shoulder.y]
+                else:
+                    check["hip"]=[shoulder.x,shoulder.y]
+                    var q:Dictionary=sampled[tick]
+                    var torso:Vector2=q.chest-q.hips
+                    var leg:Vector2=wrist-shoulder
+                    var support_hip:Vector2=q.thigh_near
+                    var support_ankle:Vector2=q.foot_near
+                    check["torso_back_lean_deg"]=rad_to_deg(atan2(-torso.x,-torso.y))
+                    check["kick_elevation_deg"]=rad_to_deg(atan2(-leg.y,leg.x))
+                    check["support_hip_ankle_dx"]=support_hip.x-support_ankle.x
+                    check["support_leg_extension_px"]=support_hip.distance_to(support_ankle)
+                    check["ankle_y"]=wrist.y
+                    check["head_y"]=q.head.y
+                    check["contact_points"]={}
+                    for joint_id in q:
+                        check["contact_points"][joint_id]=[q[joint_id].x,q[joint_id].y]
                 check["pelvis_turn_deg"]=float(keys[tick].pose.angles.get("pelvis_turn",0))
                 check["shoulder_turn_deg"]=float(keys[tick].pose.angles.get("shoulder_turn",0))
             event_checks.append(check)

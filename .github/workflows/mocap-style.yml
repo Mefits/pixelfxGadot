@@ -44,6 +44,7 @@ jobs:
             mocap-style-results/*.gif
             mocap-style-results/*.json
             mocap-style-results/review.png
+            mocap-style-results/contact-review.png
             mocap-style-results/engine.log
             mocap-style-results/source.bvh
             godot/tests/mocap_style.gd
