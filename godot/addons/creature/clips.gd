@@ -42,8 +42,10 @@ static func sample(clip: Dictionary,time: float,wrap_loop: bool=true) -> Diction
             var a: Dictionary=keys[i-1].pose
             var b: Dictionary=keys[i].pose
             var u: float=clampf((t-float(keys[i-1].t))/maxf(.000001,float(keys[i].t)-float(keys[i-1].t)),0,1)
-            if clip.get("easing","smooth")=="smooth":
-                u=u*u*(3-2*u)
+            match keys[i].get("easing",clip.get("easing","smooth")):
+                "smooth":u=u*u*(3-2*u)
+                "accelerate":u=pow(u,2.15)
+                "hold", "snap":u=0.0
             var angles: Dictionary={}
             var ids: Array=a.angles.keys()
             for id in b.angles:
