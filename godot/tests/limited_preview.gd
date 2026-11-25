@@ -1,5 +1,5 @@
 extends SceneTree
-# Lab 0.41: reference-derived air combo; authored landing, ballistic root and A/D/E.
+# Lab 0.42: preserve D baseline, compare purpose-authored choreography with the same flight and landing.
 const RIG=preload("res://addons/creature/rig.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const SKIN=preload("res://addons/creature/skin.gd")
@@ -50,7 +50,25 @@ const BEATS=[
     [80,7,"foot_near"],[88,7,""],[94,-6,""],[100,-7,""],
     [106,-8,""],[114,-9,""],[126,-10,""],[140,-11,""],[158,-11,""]
 ]
-const OMIT=[8,26,45,68]
+# World-space segment directions (degrees, right=0, down=90).
+# [pelvis tilt, torso tilt, near upper/lower arm, far upper/lower arm, near upper/lower leg, far upper/lower leg].
+# F uses the same 22 exposure times as D; every changed airborne key has a deliberate silhouette.
+const STAGED={
+    26: [-14,-24,[145,8,108,-42,35,133,118,68]],
+    34: [20,39,[-7,1,135,30,115,58,132,84]],
+    40: [20,39,[-7,1,135,30,115,58,132,84]],
+    45: [4,9,[67,-45,117,25,61,135,130,77]],
+    50: [-21,-35,[82,-65,155,60,43,131,120,56]],
+    56: [18,36,[138,30,-26,-21,120,48,49,135]],
+    62: [18,36,[138,30,-26,-21,120,48,49,135]],
+    68: [-19,-22,[82,-38,97,2,-34,110,115,73]],
+    74: [-31,-38,[101,-18,130,15,-56,87,124,66]],
+    80: [-36,-48,[147,62,128,38,-11,-8,107,161]],
+    88: [-36,-48,[147,62,128,38,-11,-8,107,161]],
+    94: [-12,-14,[111,12,127,40,36,116,111,79]]
+}
+# The reference rig is planar: counter-rotation here is pelvis/torso tilt,
+# not a true out-of-plane twist. Both takes use the same native skin.
 class Board extends Node2D:
     var rig=RIG.humanoid()
     var clips:Array=[]
@@ -59,23 +77,23 @@ class Board extends Node2D:
     var t:float=0
     func _draw()->void:
         draw_rect(Rect2(0,0,960,540),Color("#14212b"))
-        draw_string(ThemeDB.fallback_font,Vector2(16,27),"LAB 0.41 / AIR COMBO + LANDING",HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color("#e6edf3"))
-        var labels:Array=["A  Smooth","D  Directed","E  Reduced"]
-        for i in range(3):
-            var x:float=12.0+316.0*i
-            draw_rect(Rect2(x,44,304,453),Color("#213542"))
+        draw_string(ThemeDB.fallback_font,Vector2(16,27),"LAB 0.42 / AIR COMBO CHOREOGRAPHY",HORIZONTAL_ALIGNMENT_LEFT,-1,20,Color("#e6edf3"))
+        var labels:Array=["D  Original choreography","F  Stronger staging"]
+        for i in range(2):
+            var x:float=12.0+474.0*i
+            draw_rect(Rect2(x,44,462,453),Color("#213542"))
             draw_string(ThemeDB.fallback_font,Vector2(x+11,70),labels[i],HORIZONTAL_ALIGNMENT_LEFT,-1,18,Color("#e6edf3"))
-            var subtitle:String="%d keys / smooth"%clips[i].keys.size() if i==0 else "%d keys / stepped air"%clips[i].keys.size()
+            var subtitle:String="%d keys / same cadence and landing"%clips[i].keys.size()
             draw_string(ThemeDB.fallback_font,Vector2(x+11,91),subtitle,HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("#aebec9"))
             var floor_y:float=405
-            draw_line(Vector2(x+10,floor_y),Vector2(x+294,floor_y),Color("#83988f"),1)
+            draw_line(Vector2(x+10,floor_y),Vector2(x+452,floor_y),Color("#83988f"),1)
             var p:Dictionary=get_tree()._sample_final(rig,clips[i],t,feet)
             rig.evaluate(p)
-            draw_set_transform(Vector2(x+42,floor_y),0,Vector2(2.8,2.8))
+            draw_set_transform(Vector2(x+82,floor_y),0,Vector2(3.6,3.6))
             SKIN.draw_body(self,rig,Vector2.ZERO,1,Color("#5aafdc"),false)
             draw_set_transform(Vector2.ZERO)
             var tx:float=x+12
-            var tw:float=280
+            var tw:float=438
             draw_rect(Rect2(tx,437,tw,5),Color("#405565"))
             draw_rect(Rect2(tx,437,tw*t/DURATION,5),Color("#78b7d3"))
             for k in clips[i].keys:
@@ -89,7 +107,7 @@ class Board extends Node2D:
             draw_line(Vector2(lx,429),Vector2(lx,451),Color("#7ad6b1"),2)
             draw_string(ThemeDB.fallback_font,Vector2(lx-10,482),"LAND",HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("#7ad6b1"))
         var phase:String="ANTICIPATION" if t*120<LAUNCH else ("FLIGHT" if t*120<LAND else ("ABSORB" if t*120<126 else "RECOVER"))
-        draw_string(ThemeDB.fallback_font,Vector2(16,521),"%s  |  %.0f ms  |  shared ballistic root, planted feet, same impact poses"%[phase,t*1000],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("#b4c2cc"))
+        draw_string(ThemeDB.fallback_font,Vector2(16,521),"%s  |  %.0f ms  |  same flight, timing and landing; different attack poses"%[phase,t*1000],HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color("#b4c2cc"))
 func _initialize()->void:
     call_deferred("_run")
 func _point(raw:Array,i:int)->Vector2:
@@ -214,9 +232,8 @@ func _build()->Dictionary:
     var rig=RIG.humanoid()
     rig.evaluate(CLIPS.pose(GUARD))
     var feet:Dictionary={"start":{"near":Vector2(rig.point("foot_near").x,0),"far":Vector2(rig.point("foot_far").x,0)},"end":{"near":Vector2(TRAVEL+9,0),"far":Vector2(TRAVEL-7,0)}}
-    var smooth:Dictionary={"duration":DURATION,"loop":false,"keys":[],"events":[],"easing":"smooth"}
-    var directed:Dictionary=smooth.duplicate(true)
-    var reduced:Dictionary=smooth.duplicate(true)
+    var directed:Dictionary={"duration":DURATION,"loop":false,"keys":[],"events":[],"easing":"smooth"}
+    var staged:Dictionary=directed.duplicate(true)
     var hits:Array=[]
     for beat in BEATS:
         var tick:int=int(beat[0])
@@ -228,19 +245,19 @@ func _build()->Dictionary:
             p.root=[r.x,r.y]
             p=_plant(rig,p,feet.start if tick==LAUNCH else feet.end)
             p.root=[0,0]
-        var k:Dictionary={"t":t,"pose":p,"easing":"smooth"}
-        smooth.keys.append(k)
-        var kd:Dictionary=k.duplicate(true)
-        # Shared smooth launch and landing; only airborne pose cadence differs.
-        kd.easing="snap" if tick>LAUNCH and tick<LAND else "smooth"
-        directed.keys.append(kd)
-        if not OMIT.has(tick):reduced.keys.append(kd.duplicate(true))
+        var k:Dictionary={"t":t,"pose":p,"easing":"snap" if tick>LAUNCH and tick<LAND else "smooth"}
+        directed.keys.append(k)
+        var ks:Dictionary=k.duplicate(true)
+        if STAGED.has(tick):
+            var data:Array=STAGED[tick]
+            ks.pose=CLIPS.pose(_world_pose(rig,float(data[0]),float(data[1]),data[2]))
+        staged.keys.append(ks)
         var anchor:String=String(beat[2])
         if not anchor.is_empty():
             hits.append(t)
             var ev:Dictionary={"t":t,"kind":"strike","anchor":anchor}
-            for clip in [smooth,directed,reduced]:clip.events.append(ev.duplicate(true))
-    return {"clips":[smooth,directed,reduced],"feet":feet,"hits":hits}
+            for clip in [directed,staged]:clip.events.append(ev.duplicate(true))
+    return {"clips":[directed,staged],"feet":feet,"hits":hits}
 func _run()->void:
     root.size=Vector2i(960,540)
     var board=Board.new()
@@ -256,9 +273,6 @@ func _run()->void:
     var baked:Array=[]
     var max_plant_error:float=0
     for clip in bundle.clips:
-        for t in bundle.hits:
-            if CLIPS.sample(clip,t,false).angles!=CLIPS.sample(bundle.clips[0],t,false).angles:
-                push_error("Impact pose drift");quit(1);return
         var export_clip:Dictionary={"duration":DURATION,"loop":false,"keys":[],"events":clip.events,"easing":"linear"}
         for tick in range(END+1):
             var t:float=float(tick)/120.0
@@ -273,10 +287,33 @@ func _run()->void:
                     max_plant_error=maxf(max_plant_error,rig.point("foot_"+side).distance_to(Vector2(targets[side])))
             export_clip.keys.append({"t":t,"pose":p})
         baked.append(export_clip)
+    var d:Dictionary=bundle.clips[0]
+    var f:Dictionary=bundle.clips[1]
+    if d.keys.size()!=f.keys.size() or d.events!=f.events:
+        push_error("Cadence mismatch");quit(1);return
+    for i in range(d.keys.size()):
+        var a:Dictionary=d.keys[i]
+        var b:Dictionary=f.keys[i]
+        if a.t!=b.t or a.easing!=b.easing:
+            push_error("Exposure mismatch");quit(1);return
+        if not STAGED.has(roundi(float(a.t)*120.0)) and a.pose!=b.pose:
+            push_error("Non-choreography pose changed");quit(1);return
+    # Attack direction is validated on the actual skeleton, not inferred from labels.
+    var reach:Array=[]
+    for ev in f.events:
+        var p:Dictionary=_sample_final(rig,f,float(ev.t),bundle.feet)
+        rig.evaluate(p)
+        var anchor:String=String(ev.anchor)
+        var tip:Vector2=rig.point(anchor)
+        var origin:Vector2=rig.point(("thigh_" if anchor.begins_with("foot") else "shoulder_")+anchor.get_slice("_",1))
+        var delta:Vector2=tip-origin
+        reach.append(delta.x)
+        if delta.x<17.0:
+            push_error("Staged strike fails forward extension: "+anchor+" "+str(delta));quit(1);return
     if bundle.hits.size()!=3 or max_plant_error>1.5:
         push_error("Contact/impact error: "+str(max_plant_error));quit(1);return
     var data=FileAccess.open(out.path_join("clips.json"),FileAccess.WRITE)
-    data.store_string(JSON.stringify({"labels":["A","D","E"],"authored":bundle.clips,"baked":baked,"max_plant_error":max_plant_error},"  ",true,true))
+    data.store_string(JSON.stringify({"labels":["D","F"],"authored":bundle.clips,"baked":baked,"max_plant_error":max_plant_error,"staged_strike_reach_px":reach},"  ",true,true))
     data.close()
     for i in range(FRAME_COUNT):
         board.t=clampf(float(i-7)/60.0,0,DURATION)
@@ -285,5 +322,5 @@ func _run()->void:
         await RenderingServer.frame_post_draw
         if root.get_texture().get_image().save_png(out.path_join("frame_%03d.png"%i))!=OK:
             push_error("PNG save failed");quit(1);return
-    print("LAB 0.41 native OK: %d frames; A/D/E %d/%d/%d keys; max planted foot error %.4f"%[FRAME_COUNT,board.clips[0].keys.size(),board.clips[1].keys.size(),board.clips[2].keys.size(),max_plant_error])
+    print("LAB 0.42 native OK: %d frames; D/F %d/%d keys; planted error %.4f; forward reaches "%[FRAME_COUNT,d.keys.size(),f.keys.size(),max_plant_error],reach)
     quit()
