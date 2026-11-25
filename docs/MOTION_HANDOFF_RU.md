@@ -234,3 +234,6 @@ Implementation 7cd1d573f293df32cdd8b4ca5cf90ff151271c10; [run 45700158471](https
 ## 0.58 · эксперимент Astra на отдельной ветке
 
 От базы 6713487 в experiment/astra-body-deformation-058 проверена объёмная оболочка с локальными поперечными сечениями, явными плечевыми и тазовыми соединителями и поправкой глубины на сгибе. 192 позы, полные контрольные клипы, реальные сравнения A/B/C и инструкция по созданию профиля — в [BODY_DEFORMATION_058_RU.md](BODY_DEFORMATION_058_RU.md). Геометрические тесты пройдены; художественная приёмка остаётся за владельцем.
+
+## 0.59 — Loft anatomy art profiles
+Owner authorized three anatomy profiles on 0.58, no clothing. Separate branch experiment/body-anatomy-059 from Astra d26e1b1; no merge or native kernel edits. OLD exact 0.58, A lean, B athletic, C stylized anime. New profiles soften trapezius, waist and hip contours; render-only head lowered 1.8–2 rig px and replace shoe ellipsoid with profiled foot following same pitch. All existing FK and clip data unchanged. Matched palette, density 3, black outline 3. Full 192 poses, masks and historical 18 pose overlap/volume proxy recorded. Artistic acceptance pending.
