@@ -256,3 +256,7 @@ Implementation 9e32199b43424001e4d49313829ed91d5baef936; [run 45709346263](https
 
 ## 0.62 — experimental geometric front union (pending verification)
 Owner rejected 061 lighting changes. A exact 060 B, B .9 and C 1.8 rig-unit smooth maximum depth band, explicit pelvis/trunk/thigh links only, normal blend disabled. Fade by actual ray interval overlap and whole-Loft boundary clearance; derive normals from corrected height, not 061 blending. XY silhouette and ownership fixed by design; not full 3D union. Original FK/IK, clips, upper body, light, palette, outline and density unchanged. Native regressions plus 192 real Godot samples requested by existing workflow (separate body-union-062 artifact). No aesthetic conclusion until actual captures checked. Next digitize reference contours and audit hip root placement; don't tune indefinitely or move real joints without owner approval.
+
+
+### 0.62 reference digitization / preliminary source audit
+See docs/body-pelvis-062-reference.json and docs/BODY_PELVIS_062_DIAGNOSTIC.md. 20 external slices, 7 internal thigh slices. Approximate visible contour only. At turn 0/90 the original root x=4 vs trunk half-width 4.089; estimated raw z=2 vs trunk surface z=1.108; even 060 B connector endpoint z=1.48 remains outside trunk-only interval. Supports testing visual proxy, not changing the game skeleton. Actual pose overlay and proxy comparison still pending. No new geometry profile, FK or lighting changes.

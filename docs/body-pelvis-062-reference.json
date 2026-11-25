@@ -1,0 +1,205 @@
+{
+  "source": "Owner supplied frontal reference, 1404x2048, 2026-11-26",
+  "method": "Manual edge windows; peak absolute horizontal gradient after 5-row mean and Gaussian sigma=1px. Interior edges selected by signed gradients within visually identified gap. Approximate 2D contours, not 3D or skeletal landmarks.",
+  "axis_x": 710,
+  "visible_gap_start_y_approx": 1122,
+  "chest_reference_y": 650,
+  "rows": [
+    {
+      "y": 650,
+      "outer_left": 515,
+      "outer_right": 904,
+      "width": 389,
+      "midpoint": 709.5,
+      "width_rel_chest": 1
+    },
+    {
+      "y": 700,
+      "outer_left": 534,
+      "outer_right": 885,
+      "width": 351,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.9023
+    },
+    {
+      "y": 750,
+      "outer_left": 554,
+      "outer_right": 865,
+      "width": 311,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.7995
+    },
+    {
+      "y": 800,
+      "outer_left": 565,
+      "outer_right": 854,
+      "width": 289,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.7429
+    },
+    {
+      "y": 825,
+      "outer_left": 566,
+      "outer_right": 853,
+      "width": 287,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.7378
+    },
+    {
+      "y": 850,
+      "outer_left": 564,
+      "outer_right": 856,
+      "width": 292,
+      "midpoint": 710,
+      "width_rel_chest": 0.7506
+    },
+    {
+      "y": 900,
+      "outer_left": 559,
+      "outer_right": 860,
+      "width": 301,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.7738
+    },
+    {
+      "y": 925,
+      "outer_left": 560,
+      "outer_right": 859,
+      "width": 299,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.7686
+    },
+    {
+      "y": 950,
+      "outer_left": 554,
+      "outer_right": 865,
+      "width": 311,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.7995
+    },
+    {
+      "y": 975,
+      "outer_left": 550,
+      "outer_right": 869,
+      "width": 319,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.8201
+    },
+    {
+      "y": 1000,
+      "outer_left": 543,
+      "outer_right": 877,
+      "width": 334,
+      "midpoint": 710,
+      "width_rel_chest": 0.8586
+    },
+    {
+      "y": 1050,
+      "outer_left": 529,
+      "outer_right": 890,
+      "width": 361,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.928
+    },
+    {
+      "y": 1100,
+      "outer_left": 522,
+      "outer_right": 897,
+      "width": 375,
+      "midpoint": 709.5,
+      "width_rel_chest": 0.964
+    },
+    {
+      "y": 1125,
+      "outer_left": 520,
+      "outer_right": 899,
+      "width": 379,
+      "midpoint": 709.5,
+      "inner_left": 707,
+      "inner_right": 714,
+      "gap": 7,
+      "left_thigh_width": 187,
+      "right_thigh_width": 185,
+      "width_rel_chest": 0.9743
+    },
+    {
+      "y": 1150,
+      "outer_left": 519,
+      "outer_right": 901,
+      "width": 382,
+      "midpoint": 710,
+      "inner_left": 704,
+      "inner_right": 715,
+      "gap": 11,
+      "left_thigh_width": 185,
+      "right_thigh_width": 186,
+      "width_rel_chest": 0.982
+    },
+    {
+      "y": 1200,
+      "outer_left": 517,
+      "outer_right": 902,
+      "width": 385,
+      "midpoint": 709.5,
+      "inner_left": 702,
+      "inner_right": 717,
+      "gap": 15,
+      "left_thigh_width": 185,
+      "right_thigh_width": 185,
+      "width_rel_chest": 0.9897
+    },
+    {
+      "y": 1250,
+      "outer_left": 518,
+      "outer_right": 901,
+      "width": 383,
+      "midpoint": 709.5,
+      "inner_left": 699,
+      "inner_right": 721,
+      "gap": 22,
+      "left_thigh_width": 181,
+      "right_thigh_width": 180,
+      "width_rel_chest": 0.9846
+    },
+    {
+      "y": 1300,
+      "outer_left": 520,
+      "outer_right": 900,
+      "width": 380,
+      "midpoint": 710,
+      "inner_left": 693,
+      "inner_right": 726,
+      "gap": 33,
+      "left_thigh_width": 173,
+      "right_thigh_width": 174,
+      "width_rel_chest": 0.9769
+    },
+    {
+      "y": 1350,
+      "outer_left": 522,
+      "outer_right": 897,
+      "width": 375,
+      "midpoint": 709.5,
+      "inner_left": 683,
+      "inner_right": 736,
+      "gap": 53,
+      "left_thigh_width": 161,
+      "right_thigh_width": 161,
+      "width_rel_chest": 0.964
+    },
+    {
+      "y": 1400,
+      "outer_left": 527,
+      "outer_right": 892,
+      "width": 365,
+      "midpoint": 709.5,
+      "inner_left": 671,
+      "inner_right": 749,
+      "gap": 78,
+      "left_thigh_width": 144,
+      "right_thigh_width": 143,
+      "width_rel_chest": 0.9383
+    }
+  ],
+  "other_reference": "357x560 three-quarter standing image. Qualitative only; not calibrated and not assumed the identical model. Continuous abdomen-to-hip and thigh mass, no exact depth estimate."
+}

@@ -90,3 +90,5 @@ On 0.60 B, same-ray normal mixing only between explicit linked same-material lof
 
 ## 0.62 — geometry, not shading (pending)
 Owner rejected 061 lighting. Test same-ray bounded smooth maximum for explicit pelvis connections on 060 B; preserve original mask, ownership and FK. Distinguish corrected front depth from 3D union, no silhouette expansion. Recompute normals from geometry, preserve lighting model. Compare .9/1.8 rig-unit bands, then reference digitization and rig audit. No aesthetic or technical acceptance yet.
+
+0.62 reference audit: explicit slice data and source-derived trunk/root check in docs/BODY_PELVIS_062_DIAGNOSTIC.md. Projected root near trunk edge at extreme turn; visual z proxy distinct from real FK. Never infer actual joint centers from silhouette; do not treat trunk-only containment as whole-body intersection.
