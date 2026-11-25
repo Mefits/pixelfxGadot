@@ -5,6 +5,11 @@ func _initialize()->void:
     call_deferred("run")
 func run()->void:
     var f:Dictionary=JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/body_raster/poses.json"))
+    var cycle:Array=f.clips[0].samples
+    if cycle[0].pose!=cycle[-1].pose or cycle[0].expected_xy!=cycle[-1].expected_xy:
+        push_error("Frozen run does not close")
+        quit(1)
+        return
     var rig=RIG.make()
     var max_error:float=0.0
     var samples:int=0

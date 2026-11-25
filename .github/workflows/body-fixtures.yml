@@ -1,5 +1,6 @@
 name: Lab body fixture check
 on:
+  workflow_dispatch:
   push:
     branches: [experiment/astra-body-raster-054]
     paths:
