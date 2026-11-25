@@ -214,7 +214,7 @@ func run()->void:
             if reference_weight>0 and goals.has("foot_near") and not locks.has("foot_far"):
                 var ankle:Vector2=goals["foot_near"]
                 var hip:Vector2=rig.point("thigh_near")
-                var desired:Vector2=ankle+Vector2(.8,-21.4)
+                var desired:Vector2=ankle+Vector2(float(f.get("reference_support_dx",.8)),-float(f.get("reference_support_height",21.4)))
                 var delta:Vector2=(desired-hip)*reference_weight
                 p.root[0]+=delta.x
                 p.root[1]+=delta.y
@@ -355,6 +355,10 @@ func run()->void:
                     check["kick_elevation_deg"]=rad_to_deg(atan2(-leg.y,leg.x))
                     check["support_hip_ankle_dx"]=support_hip.x-support_ankle.x
                     check["support_leg_extension_px"]=support_hip.distance_to(support_ankle)
+                    var knee:Vector2=q.knee_far
+                    var support_knee:Vector2=q.knee_near
+                    check["kick_knee_bend_deg"]=180.0-absf(rad_to_deg((shoulder-knee).angle_to(wrist-knee)))
+                    check["support_knee_bend_deg"]=180.0-absf(rad_to_deg((support_hip-support_knee).angle_to(support_ankle-support_knee)))
                     check["ankle_y"]=wrist.y
                     check["head_y"]=q.head.y
                     check["contact_points"]={}

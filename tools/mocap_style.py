@@ -405,14 +405,54 @@ def reference051c(frames,meta):
         out.append(v)
     return out
 
+def refine051c(frames,meta):
+    old=reference051c(frames,meta)[2]
+    a=copy.deepcopy(old)
+    a["label"]="A / previous"
+    out=[a]
+    for label,torso,upper,hip_dx in [("B / aligned", -49.,-37.,1.8),("C / forward drive",-34.,-15.,2.7)]:
+        v=copy.deepcopy(old)
+        v["label"]=label
+        for i,f in enumerate(v["frames"]):
+            w=float(f.get("reference_support_weight",0))
+            if w<=0:continue
+            # Replace the old target at the peak, blend the correction
+            # into chamber/recovery. The actual hip axis defines torso position.
+            f["tilt"]+=(upper+58.)*w
+            f["hip_extra"]+=(torso+58.-.25*(upper+58.))*w
+            f["shoulder_turn"]+=60.*w
+            f["reference_support_dx"]=.8+(hip_dx-.8)*w
+            f["reference_support_height"]=21.4+.62*w
+            # Slight forward preparation and hip advance; return to
+            # previous path before next punch.
+            if label.startswith("C"):
+                drive=float(np.interp(i,[22,26,30,34,38,44,52],[0,1,2.2,1.2,0,0,0]))
+                f["root"][0]+=drive
+                f["hip_extra"]+=float(np.interp(i,[22,27,31,35,38,52],[0,8,7,2,0,0]))
+            ext=float(np.interp(i,[22,30,34,38,40,46,52],[0,0,.45,1,1,0,0]))
+            # Almost fully extended knee (not hyperextension); the photo
+            # is a projected silhouette, not a 3D joint-angle measurement.
+            goal=[.997*np.cos(np.deg2rad(-40)),.997*np.sin(np.deg2rad(-40))]
+            for j in range(2):
+                f["targets"]["foot_far"][j]=(1-ext)*f["targets"]["foot_far"][j]+ext*goal[j]
+            # Far shoulder becomes the upper/leading shoulder. The straight
+            # arm points toward the target below the kicking line, near arm
+            # remains in guard with the elbow lower than the wrist.
+            for tip,goal in [("hand_far",(.965,-.20)),("hand_near",(.29,.19))]:
+                prev=f["targets"][tip]
+                f["targets"][tip]=[(1-w)*prev[j]+w*goal[j] for j in range(2)]+[prev[2]]
+            f["foot_pitch_far"]+=38.*w
+        out.append(v)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b","51c"],default="51c");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b","51c","51c2"],default="51c2");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=reference051c(frames,meta) if a.stage=="51c" else foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=refine051c(frames,meta) if a.stage=="51c2" else reference051c(frames,meta) if a.stage=="51c" else foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -430,7 +470,7 @@ def main():
         select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
         fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    if a.stage in ("48","49","50","51a","51b","51c"):
+    if a.stage in ("48","49","50","51a","51b","51c","51c2"):
         # Keep all strike frames, 20+ ms delays, exact rounded 1.1x cycle.
         select=sorted(set(range(0,len(imgs),2))|{len(imgs)-1}|{e["tick"] for e in config[0]["events"]})
         spans=[(imgs[0],12)]+[(imgs[k],(select[j+1]-k if j+1<len(select) else 1)) for j,k in enumerate(select)]+[(imgs[-1],12)]
@@ -443,11 +483,11 @@ def main():
             delays.append(10*(round((elapsed+n)*100/66)-round(elapsed*100/66)));elapsed+=n
         assert min(delays)>=20
         merged[0][0].save(out/"comparison-1p1.gif",save_all=True,append_images=[im for im,_ in merged[1:]],duration=delays,loop=0,disposal=2)
-    review_ticks=[0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b","51c") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
+    review_ticks=[0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b","51c","51c2") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
     for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
-    if a.stage=="51c":
+    if a.stage in ("51c","51c2"):
         imgs[38].save(out/"contact-review.png")
     if a.stage=="51a":
         clips=[json.loads((out/f"clip_{i}.json").read_text())["payload"] for i in range(3)]
