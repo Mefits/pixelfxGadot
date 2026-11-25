@@ -5,6 +5,7 @@ const CLIPS=preload("res://addons/creature/clips.gd")
 const VALID=preload("res://addons/creature/sdk_validate.gd")
 const INK=preload("res://lab/anatomy_rd/ink_readable.gd")
 const INK46=preload("res://lab/anatomy_rd/ink_046.gd")
+const INK51=preload("res://lab/ink_051.gd")
 const CHAINS={"hand_near":["shoulder_near","elbow_near"],"hand_far":["shoulder_far","elbow_far"],"foot_near":["thigh_near","knee_near"],"foot_far":["thigh_far","knee_far"]}
 static func solve(rig,pose:Dictionary,targets:Dictionary)->Dictionary:
     rig.evaluate(pose)
@@ -33,6 +34,7 @@ static func solve(rig,pose:Dictionary,targets:Dictionary)->Dictionary:
 class Board extends Node2D:
     var pts:Array=[]
     var skins:Array=[]
+    var shells:Array=[]
     var bags:Array=[]
     func _draw()->void:
         for i in pts.size():
@@ -47,7 +49,8 @@ class Board extends Node2D:
                 draw_circle(Vector2(41,-6),5,Color("#75634f"))
                 draw_line(Vector2(36,-48),Vector2(36,-10),Color("#c0aa87"),.65)
                 for y in [-47,-33,-19]:draw_line(Vector2(36,y),Vector2(46,y),Color("#a58b67"),.45)
-            if skins[i]:INK46.actor(self,pts[i],0,"hand_near")
+            if int(shells[i])>0:INK51.actor(self,pts[i],int(shells[i])==2)
+            elif skins[i]:INK46.actor(self,pts[i],0,"hand_near")
             else:INK.actor(self,pts[i],0,"hand_near")
             draw_set_transform(Vector2.ZERO)
 # Lab-only adapter: existing SDK accepts linear easing but not hold fields.
@@ -150,6 +153,7 @@ func run()->void:
     root.size=capture_size
     for v in cfg:
         board.skins.append(v.get("skin46",false))
+        board.shells.append(v.get("skin51",0))
         board.bags.append(v.get("bag",false))
     var all_points:Array=[]
     var report:Array=[]
