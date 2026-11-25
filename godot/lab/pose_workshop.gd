@@ -384,8 +384,8 @@ func _ready() -> void:
             turn_row.show()
         if str(catalog_entry.name).begins_with("Lab 0.48") or str(catalog_entry.name).begins_with("Lab 0.49"):
             rate.value=60
-            ghost.button_pressed=false
-            fx_visible.button_pressed=false
+            ghost.set_pressed_no_signal(false)
+            fx_visible.set_pressed_no_signal(false)
             bag_toggle.set_pressed_no_signal(true)
             preview.bag_visible=true
             preview.rd_skin=true
@@ -410,7 +410,9 @@ func _seek(v: float) -> void:
         keys.deselect_all()
         event_list.deselect_all()
         for i in range(bank[name_id].keys.size()):
-            if absf(float(bank[name_id].keys[i].t)-time)<.0001:keys.select(i);break
+            if absf(float(bank[name_id].keys[i].t)-time)<.0001:
+                if i<keys.item_count:keys.select(i)
+                break
     if timeline!=null:
         timeline.selected_lane=-1
         timeline.selected_index=-1
