@@ -80,3 +80,6 @@ Generic indexed mesh with 2-bone weights, bounded correction on elbow/knee rows;
 
 ## 0.59 — anatomical loft profiles
 Owner authorized three anatomy variants on Astra 0.58. OLD exact 0.58; A lean, B athletic, C anime. Shared shortened visual neck (head geometry only), trapezius and hip profiles, flat sole foot loft. Native 192 pose test passed, 19 pose volume proxy and actual captures verified. Silhouettes connected, proportion differences subtle; shoulders and pelvis still have visible shading seams. Do not conflate geometric overlap with seamless normals. Preserve render-head offset when adding details. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45704261733). No owner approval yet.
+
+## 0.60 — reference-guided pelvis
+Owner identified narrow waist and laterally attached thighs. Manual front silhouette measurements documented in docs/body-pelvis-060-reference.json; 3/4 qualitative only. OLD 059 C, A broadened trunk and hip, B additionally inserts proximal thigh with inward width offset and reduced local depth bias. 192 native poses verified; B min pelvic overlap 26.807 vs 18.652 baseline (19-pose sample), zero disconnected masks, but central lower torso protrudes in extreme kick and shading seams remain. Do not equate overlap with smooth shading. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45707647719). Owner review pending.
