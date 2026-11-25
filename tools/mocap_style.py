@@ -379,7 +379,10 @@ def reference051c(frames,meta):
                 if w<=0:continue
                 def mix(old,new):return (1-w)*old+w*new
                 f["tilt"]=mix(f["tilt"],-58.)
-                f["hip_extra"]=mix(f.get("hip_extra",0),-1.)
+                # FK positions the chest using the HIP rotation, not its
+                # own rotation. At full weight both actual torso axis and
+                # shoulder orientation must be -58 deg.
+                f["hip_extra"]=mix(f.get("hip_extra",0),-43.5)
                 # Keep hip leading toward the kick. The photo has shoulders
                 # counter-turned; avoid dragging near hand across the face.
                 f["shoulder_turn"]=mix(f.get("shoulder_turn",0),15.)
@@ -390,7 +393,7 @@ def reference051c(frames,meta):
                 ext=float(np.interp(i,[22,30,34,38,40,46,52],[0,.12,.48,1,1,.08,0]))
                 for j in range(2):
                     f["targets"]["foot_far"][j]=(1-ext)*f["targets"]["foot_far"][j]+ext*goal[j]
-                for tip,target in [("hand_near",(.36,.40)),("hand_far",(.93,-.10))]:
+                for tip,target in [("hand_near",(.36,.40)),("hand_far",(.90,-.23))]:
                     for j in range(2):f["targets"][tip][j]=mix(f["targets"][tip][j],target[j])
                 f["foot_pitch_far"]=mix(f["foot_pitch_far"],-76.)
                 f["foot_pitch_near"]=mix(f["foot_pitch_near"],8.)
