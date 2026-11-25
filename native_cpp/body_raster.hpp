@@ -10,12 +10,13 @@
 namespace body {
 using Vec = std::array<double, 3>;
 using Ramp = std::array<uint32_t, 4>;
-enum class Shape { Sphere, Sweep, Ellipsoid };
+enum class Shape { Sphere, Sweep, Ellipsoid, CutTube };
 struct Primitive {
     Shape shape = Shape::Sphere;
     Vec a{}, b{}, radii{1, 1, 1};
     std::array<double, 9> basis{1, 0, 0, 0, 1, 0, 0, 0, 1};
     double ra = 1, rb = 1, bulge = 0;
+    double depth_ratio = 1, profile = 2;
     int part = 1, material = 0, frame = -1, group = 0, dim = 0;
 };
 struct Config {
@@ -88,6 +89,13 @@ class Raster {
                         return "invalid sweep";
                     r = std::max(r, p.rb) + std::max(0., p.bulge);
                     stamps = steps(p) + 1;
+                } else if (p.shape == Shape::CutTube) {
+                    const double len = std::hypot(p.b[0]-p.a[0],p.b[1]-p.a[1]);
+                    if (!point(p.b) || !radius(p.rb) || p.a[2] != p.b[2] ||
+                        !(len >= .0001) || !(p.depth_ratio >= .1 && p.depth_ratio <= 2) ||
+                        !(p.profile >= 2 && p.profile <= 6))
+                        return "invalid coplanar cut tube";
+                    r = len * .5 + std::max(p.ra,p.rb);
                 } else if (p.shape != Shape::Sphere)
                     return "unknown shape";
             }
@@ -165,6 +173,25 @@ class Raster {
             Vec n{m[0] * x + m[1] * y + m[2] * z, m[3] * x + m[4] * y + m[5] * z,
                   m[6] * x + m[7] * y + m[8] * z};
             plot(i, p.a[2] + z, dot(n, c.light) / std::sqrt(dot(n, n)), p);
+        });
+    }
+    // New Sol shape (not an upstream PixelFX primitive). A tapered, flat-ended
+    // XY tube with superelliptic cross-section and analytic visible surface.
+    void cut_tube(const Config &c, const Primitive &p) {
+        const double dx = p.b[0]-p.a[0], dy = p.b[1]-p.a[1];
+        const double len = std::hypot(dx,dy), ux = dx/len, uy = dy/len;
+        const double vx = -uy, vy = ux, dr = (p.rb-p.ra)/len;
+        const Vec center{(p.a[0]+p.b[0])*.5,(p.a[1]+p.b[1])*.5,p.a[2]};
+        stamp(c,center,len*.5+std::max(p.ra,p.rb),[&](int i,double x,double y) {
+            const double s = x*ux+y*uy+len*.5;
+            if (s < 0 || s > len) return;
+            const double r = p.ra+dr*s, w = (x*vx+y*vy)/r;
+            if (std::abs(w)>1) return;
+            const double t = std::pow(std::max(0.,1-std::pow(std::abs(w),p.profile)),1/p.profile);
+            const double side = std::copysign(std::pow(std::abs(w),p.profile-1),w);
+            const Vec n{vx*side-ux*dr,vy*side-uy*dr,std::pow(t,p.profile-1)/p.depth_ratio};
+            const double norm = std::sqrt(dot(n,n));
+            plot(i,p.a[2]+r*p.depth_ratio*t,norm?dot(n,c.light)/norm:0,p);
         });
     }
     // At constant center Z, a sampled sweep has exact squared front height
@@ -305,6 +332,8 @@ class Raster {
                 ellipsoid(c, p);
             else if (p.shape == Shape::Sphere)
                 sphere(c, p, p.a, p.ra);
+            else if (p.shape == Shape::CutTube)
+                cut_tube(c,p);
             else
                 each_ball(p, steps(p), [&](const Vec &center, double r) { sphere(c, p, center, r); });
         }

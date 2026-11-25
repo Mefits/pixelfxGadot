@@ -183,6 +183,23 @@ int main(int argc, char **argv) {
     std::cout << "Two local smooth unions expand silhouette; unlinked and foreground surfaces preserved\n";
     c.organic = false;
     c.smooth = 0;
+    // Flat-ended cloth surface: exact support, profile, rotation and depth.
+    c.width = c.height = 33; c.ox = c.oy = 16; c.density = 1; c.outline = 0;
+    c.joins.clear();
+    auto cloth = sphere({-4,0,0},3,11);
+    cloth.shape = Shape::CutTube; cloth.b = {4,0,0}; cloth.rb = 3;
+    assert(!r.render(c,{cloth}));
+    assert(r.body_pixels()==63 && r.pixels[center].depth==3);
+    assert(!r.pixels[center-5].part && !r.pixels[center+5].part);
+    const auto round_depth = r.pixels[center+2*33].depth;
+    cloth.profile = 4;
+    assert(!r.render(c,{cloth}) && r.pixels[center+2*33].depth>round_depth);
+    cloth.a={0,-4,0}; cloth.b={0,4,0}; cloth.rb=2;
+    assert(!r.render(c,{cloth}) && !r.pixels[center+5*33].part);
+    assert(!r.render(c,{cloth,sphere({0,0,9},1,12)}) && r.pixels[center].part==12);
+    cloth.profile=7; assert(r.render(c,{cloth}));
+    cloth.profile=4; cloth.b=cloth.a; assert(r.render(c,{cloth}));
+    std::cout << "Cut tube flat ends, profile, rotation, depth and rejection OK\n";
     c.width = c.height = 512;
     sweep.ra = 256;
     sweep.b[0] = 1024;
