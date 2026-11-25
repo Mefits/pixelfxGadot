@@ -41,6 +41,90 @@ class Board extends Node2D:
             if skins[i]:INK46.actor(self,pts[i],0,"hand_near")
             else:INK.actor(self,pts[i],0,"hand_near")
             draw_set_transform(Vector2.ZERO)
+# Lab-only adapter: existing SDK accepts linear easing but not hold fields.
+# Duplicate the outgoing pose just before the next exposure; no runtime edits.
+static func hold_clip(original:Dictionary,indices:Array)->Dictionary:
+    var result:=original.duplicate(true)
+    result.keys=[]
+    for j in indices.size():
+        var k:int=indices[j]
+        if j>0:
+            var previous:int=indices[j-1]
+            result.keys.append({"t":float(original.keys[k].t)-1.0/6000.0,"pose":original.keys[previous].pose.duplicate(true)})
+        result.keys.append(original.keys[k].duplicate(true))
+    return result
+
+static func choose_exposures(rate:int,last:int,contact:int,support:Array)->Array:
+    var fixed:Dictionary={0:true,last:true,contact:true}
+    # Contact and support transitions must never be dropped.
+    for k in range(1,support.size()):
+        if support[k]!=support[k-1]:
+            fixed[k-1]=true
+            fixed[k]=true
+    if rate==0:
+        for k in range(last+1):fixed[k]=true
+    elif rate>0:
+        var j:=0
+        while float(j)*60.0/rate<last:
+            fixed[roundi(float(j)*60.0/rate)]=true
+            j+=1
+    else:
+        # Smooth setup, skip transitional drawings in acceleration, hold the
+        # contact silhouette, then recover with more spaced drawings.
+        for k in [3,6,9,12,14,17,20,24,28,32,35]:
+            if k<=last:fixed[k]=true
+    var indices:=fixed.keys()
+    indices.sort()
+    return indices
+
+# Astra-style geometric key reduction, independent of exposure selection.
+# Error is against the uncompressed clip using its actual sampler at 120Hz.
+static func reduce_clip(rig,original:Dictionary,support:Array,contact:int,tolerance:float)->Dictionary:
+    var keys:Array=original.keys
+    var fixed:Dictionary={0:true,keys.size()-1:true,contact:true}
+    if contact>0:fixed[contact-1]=true
+    for i in range(1,support.size()):
+        if support[i]!=support[i-1]:
+            fixed[i-1]=true
+            fixed[i]=true
+    var expected:Array=[]
+    for t in range((keys.size()-1)*2+1):
+        rig.evaluate(CLIPS.sample(original,t/120.0,false))
+        expected.append(rig.points.duplicate())
+    var bounds:=fixed.keys()
+    bounds.sort()
+    var work:Array=[]
+    for i in range(1,bounds.size()):work.append([bounds[i-1],bounds[i]])
+    var out:=original.duplicate(true)
+    while not work.is_empty():
+        var span:Array=work.pop_back()
+        var a:int=span[0]
+        var b:int=span[1]
+        out.keys=[keys[a],keys[b]]
+        var worst:=tolerance
+        var split:=-1
+        if b-a<2:continue
+        for tick in range(a*2+1,b*2):
+            rig.evaluate(CLIPS.sample(out,tick/120.0,false))
+            for id in rig.points:
+                var err:float=rig.point(id).distance_to(expected[tick][id])
+                if err>worst:
+                    worst=err
+                    split=clampi(roundi(tick/2.0),a+1,b-1)
+        if split>=0:
+            fixed[split]=true
+            work.append([a,split])
+            work.append([split,b])
+    var selected:=fixed.keys()
+    selected.sort()
+    out.keys=[]
+    for i in selected:out.keys.append(keys[i].duplicate(true))
+    var error:=0.0
+    for t in expected.size():
+        rig.evaluate(CLIPS.sample(out,t/120.0,false))
+        for id in rig.points:error=maxf(error,rig.point(id).distance_to(expected[t][id]))
+    return {"clip":out,"max_error_px":error,"tolerance_px":tolerance}
+
 func _initialize()->void:call_deferred("run")
 func run()->void:
     var args:=OS.get_cmdline_user_args()
@@ -68,6 +152,7 @@ func run()->void:
         var previous:Dictionary={}
         var max_bone_error:=0.0
         var locks:Dictionary={}
+        var support_frames:Array=[]
         for t in v.frames.size():
             var f:Dictionary=v.frames[t]
             var tilt:float=clampf(f.tilt,-65,65)
@@ -86,6 +171,7 @@ func run()->void:
                 else:
                     locks.erase(tip)
                     if rig.point(tip).y>0:goals[tip]=Vector2(rig.point(tip).x,0)
+            support_frames.append(locks.duplicate())
             var shift:=Vector2.ZERO
             for iteration in 12:
                 for tip in goals:
@@ -119,11 +205,26 @@ func run()->void:
         
         count=maxi(count,poses.size())
         var clip:={"duration":float(keys.size()-1)/60.0,"loop":false,"easing":"linear","keys":keys,"events":[{"t":float(v.contact)/60.0,"kind":"strike","anchor":"hand_near"}]}
+        var original:=clip.duplicate(true)
+        var exposure_indices:Array=choose_exposures(int(v.get("cadence",0)),keys.size()-1,int(v.contact),support_frames)
+        if int(v.get("cadence",0))!=0:clip=hold_clip(original,exposure_indices)
         var sampled:Array=[]
         var max_sampler_error:=0.0
+        var max_cadence_error:=0.0
+        var max_cadence_support:=0.0
+        var max_cadence_floor:=0.0
+        var max_cadence_step:=0.0
+        var held_index:=0
         for t in keys.size():
             rig.evaluate(CLIPS.sample(clip,t/60.0,false))
-            for id in rig.points:max_sampler_error=maxf(max_sampler_error,rig.point(id).distance_to(poses[t][id]))
+            while held_index+1<exposure_indices.size() and exposure_indices[held_index+1]<=t:held_index+=1
+            var expected_index:int=exposure_indices[held_index]
+            for id in rig.points:
+                max_sampler_error=maxf(max_sampler_error,rig.point(id).distance_to(poses[expected_index][id]))
+                max_cadence_error=maxf(max_cadence_error,rig.point(id).distance_to(poses[t][id]))
+                if t>0:max_cadence_step=maxf(max_cadence_step,rig.point(id).distance_to(sampled[-1][id]))
+            for tip in support_frames[t]:max_cadence_support=maxf(max_cadence_support,rig.point(tip).distance_to(support_frames[t][tip]))
+            max_cadence_floor=maxf(max_cadence_floor,maxf(rig.point("foot_near").y,rig.point("foot_far").y))
             sampled.append(rig.points.duplicate())
         if max_sampler_error>.001:push_error("Sampler mismatch");quit(1);return
         all_points.append(sampled)
@@ -131,7 +232,18 @@ func run()->void:
         if not VALID.new().validate(entry).ok:push_error("Invalid SDK "+str(i));quit(1);return
         var file:=FileAccess.open(out.path_join("clip_"+str(i)+".json"),FileAccess.WRITE)
         file.store_string(JSON.stringify(entry));file.close()
-        report.append({"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
+        if v.has("cadence") and int(v.cadence)==0:
+            var reduced:=reduce_clip(rig,original,support_frames,int(v.contact),.6)
+            var reduced_entry:=entry.duplicate(true)
+            reduced_entry.id="mocap_f_reduced"
+            reduced_entry.name="F reduced (linear)"
+            reduced_entry.payload.clip=reduced.clip
+            if not VALID.new().validate(reduced_entry).ok or float(reduced.max_error_px)>.6001:push_error("Reduction gate failed");quit(1);return
+            var reduced_file:=FileAccess.open(out.path_join("clip_reduced.json"),FileAccess.WRITE)
+            reduced_file.store_string(JSON.stringify(reduced_entry));reduced_file.close()
+            var reduced_report:=FileAccess.open(out.path_join("reduction-report.json"),FileAccess.WRITE)
+            reduced_report.store_string(JSON.stringify({"original_keys":original.keys.size(),"reduced_keys":reduced.clip.keys.size(),"max_error_px":reduced.max_error_px,"tolerance_px":reduced.tolerance_px}));reduced_report.close()
+        report.append({"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"sdk_keys":clip.keys.size(),"exposure_indices":exposure_indices,"exposure_count":exposure_indices.size(),"cadence_error_px":max_cadence_error,"cadence_support_error_px":max_cadence_support,"cadence_floor_px":max_cadence_floor,"cadence_max_step_px":max_cadence_step,"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
     for t in count:
         board.pts=[]
         for v in all_points:board.pts.append(v[mini(t,v.size()-1)])

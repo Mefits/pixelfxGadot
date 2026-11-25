@@ -155,14 +155,23 @@ def variants046(frames,meta):
     assert out[0]["frames"]==d["frames"] and out[1]["frames"]==d["frames"]
     return out
 
+def cadence046(frames,meta):
+    f=variants046(frames,meta)[3]
+    out=[]
+    for label,rate in [("F / full",0),("24 poses/s",24),("15 poses/s",15),("8 poses/s",8),("Authored holds",-1)]:
+        v=copy.deepcopy(f)
+        v.update(label=label,cadence=rate)
+        out.append(v)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46"],default="46");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b"],default="46b");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
-    if a.stage=="46" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
+    config=cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -175,6 +184,11 @@ def main():
     assert imgs
     seq=[imgs[0]]*12+imgs+[imgs[-1]]*12
     gif(seq,out/"comparison.gif",60);gif(seq,out/"comparison-half.gif",30)
+    # Browser-safe 1.2x review: minimum 20ms delay, retain the contact sample.
+    if a.stage=="46b":
+        select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1})
+        fast=[imgs[0]]*5+[imgs[i] for i in select]+[imgs[-1]]*5
+        gif(fast,out/"comparison-1p2.gif",36)
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*3),"#142332")
     for row,i in enumerate([0,config[0]["contact"],len(imgs)-1]):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
