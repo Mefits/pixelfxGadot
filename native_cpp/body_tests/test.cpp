@@ -200,6 +200,19 @@ int main(int argc, char **argv) {
     cloth.profile=7; assert(r.render(c,{cloth}));
     cloth.profile=4; cloth.b=cloth.a; assert(r.render(c,{cloth}));
     std::cout << "Cut tube flat ends, profile, rotation, depth and rejection OK\n";
+    // Shared edge has no raster cracks, arbitrary winding and explicit z.
+    c.width=c.height=33; c.ox=c.oy=16; c.density=1; c.outline=0;
+    auto tri=sphere({-4,-4,2},1,13); tri.shape=Shape::Triangle;
+    tri.b={4,-4,2}; tri.v2={4,4,2};
+    auto tri2=tri; tri2.b={4,4,2}; tri2.v2={-4,4,2};
+    assert(!r.render(c,{tri,tri2}) && r.body_pixels()==81);
+    auto pixels=r.color;
+    std::swap(tri.a,tri.b);
+    assert(!r.render(c,{tri,tri2}) && r.color==pixels);
+    assert(!r.render(c,{tri,tri2,sphere({0,0,5},1,14)}) && r.pixels[center].part==14);
+    tri.na={0,0,2}; assert(r.render(c,{tri}));
+    tri.na={0,0,1}; tri.v2=tri.a; assert(!r.render(c,{tri}) && r.body_pixels()==0);
+    std::cout << "Triangle shared edge, winding, depth and validation OK\n";
     c.width = c.height = 512;
     sweep.ra = 256;
     sweep.b[0] = 1024;

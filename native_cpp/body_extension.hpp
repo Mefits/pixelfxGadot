@@ -173,6 +173,10 @@ class PixelFXBodyRaster : public godot::RefCounted {
                 p.ra = r.number(d.get("ra", Variant()), "ra");
                 p.rb = r.number(d.get("rb", Variant()), "rb");
                 p.bulge = r.number(d.get("bulge", 0), "bulge");
+            } else if (type == Variant("triangle")) {
+                p.shape = body::Shape::Triangle;
+                r.tuple(d,"a",p.a); r.tuple(d,"b",p.b); r.tuple(d,"c",p.v2);
+                r.tuple(d,"na",p.na); r.tuple(d,"nb",p.nb); r.tuple(d,"nc",p.nc);
             } else if (type == Variant("cut_tube")) {
                 p.shape = body::Shape::CutTube;
                 r.tuple(d,"a",p.a);

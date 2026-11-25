@@ -16,3 +16,6 @@ Performance: separate CPU raster, bridge, texture upload submission; warmed p50/
 
 ## 0.55c opt-in extension (Sol, experimental)
 `cut_tube(a,b,ra,rb,profile=2,depth_ratio=1)` renders a linearly tapered, flat-ended coplanar tube. Same z at both endpoints; nonzero XY length, positive radii, profile 2..6 (superellipse exponent), depth ratio .1..2. Analytic front depth and normal, shared ownership and z-buffer. Flat end is an XY axial cut, not a general 3D cap renderer. Not eligible for organic sweep joins; use for clothing layered over skin. This is an extension, not upstream parity. Existing sphere/sweep/ellipsoid behavior unchanged.
+
+## 0.56 experimental triangle input
+`triangle` takes a,b,c XYZ and na,nb,nc unit XYZ normals. Orthographic integer sample centers, barycentric interpolated z and normalized normal, inclusive shared edges, existing plot tie rule. Degenerate XY projection emits nothing. Validation bounds position and normals and conservative work budget. Same material and part IDs across adjacent triangles. Existing shapes and reference oracle remain unchanged. Caller supplies deformed vertices; no skinning inside kernel, no full mesh or backface/collision guarantees.

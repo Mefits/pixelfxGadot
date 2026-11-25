@@ -10,10 +10,11 @@
 namespace body {
 using Vec = std::array<double, 3>;
 using Ramp = std::array<uint32_t, 4>;
-enum class Shape { Sphere, Sweep, Ellipsoid, CutTube };
+enum class Shape { Sphere, Sweep, Ellipsoid, CutTube, Triangle };
 struct Primitive {
     Shape shape = Shape::Sphere;
     Vec a{}, b{}, radii{1, 1, 1};
+    Vec v2{}, na{0,0,1}, nb{0,0,1}, nc{0,0,1};
     std::array<double, 9> basis{1, 0, 0, 0, 1, 0, 0, 0, 1};
     double ra = 1, rb = 1, bulge = 0;
     double depth_ratio = 1, profile = 2;
@@ -67,6 +68,17 @@ class Raster {
                 return "invalid center or ownership";
             double r = p.ra;
             int stamps = 1;
+            if (p.shape == Shape::Triangle) {
+                if (!point(p.b) || !point(p.v2)) return "invalid triangle positions";
+                for (const auto &n : {p.na,p.nb,p.nc})
+                    if (!point(n) || std::abs(dot(n,n)-1)>1e-5) return "invalid triangle normal";
+                const double w = std::max({p.a[0],p.b[0],p.v2[0]})-std::min({p.a[0],p.b[0],p.v2[0]});
+                const double h = std::max({p.a[1],p.b[1],p.v2[1]})-std::min({p.a[1],p.b[1],p.v2[1]});
+                cost += (std::min(double(c.width),std::ceil(w*c.density)+3)) *
+                        (std::min(double(c.height),std::ceil(h*c.density)+3));
+                if (cost>16000000) return "triangle work budget exceeded";
+                continue;
+            }
             if (p.shape == Shape::Ellipsoid) {
                 for (auto axis : p.radii)
                     if (!radius(axis))
@@ -193,6 +205,26 @@ class Raster {
             const double norm = std::sqrt(dot(n,n));
             plot(i,p.a[2]+r*p.depth_ratio*t,norm?dot(n,c.light)/norm:0,p);
         });
+    }
+    // Optional 2.5D triangle surface. Integer sample centers, inclusive shared
+    // edges, deterministic existing depth rule; degenerate projections emit nothing.
+    void triangle(const Config &c, const Primitive &p) {
+        const double ux=p.b[0]-p.a[0], uy=p.b[1]-p.a[1];
+        const double vx=p.v2[0]-p.a[0], vy=p.v2[1]-p.a[1], det=ux*vy-uy*vx;
+        if (std::abs(det)<1e-10) return;
+        const int left=std::max(0,int(std::floor(c.ox+c.density*std::min({p.a[0],p.b[0],p.v2[0]}))));
+        const int right=std::min(c.width-1,int(std::ceil(c.ox+c.density*std::max({p.a[0],p.b[0],p.v2[0]}))));
+        const int top=std::max(0,int(std::floor(c.oy+c.density*std::min({p.a[1],p.b[1],p.v2[1]}))));
+        const int bottom=std::min(c.height-1,int(std::ceil(c.oy+c.density*std::max({p.a[1],p.b[1],p.v2[1]}))));
+        for (int y=bottom;y>=top;--y) for(int x=left;x<=right;++x) {
+            ++samples;
+            const double px=(x-c.ox)/c.density-p.a[0], py=(y-c.oy)/c.density-p.a[1];
+            const double b=(px*vy-py*vx)/det, d=(ux*py-uy*px)/det, a=1-b-d;
+            if (a < -1e-9 || b < -1e-9 || d < -1e-9) continue;
+            const Vec n{a*p.na[0]+b*p.nb[0]+d*p.nc[0],a*p.na[1]+b*p.nb[1]+d*p.nc[1],a*p.na[2]+b*p.nb[2]+d*p.nc[2]};
+            const double norm=std::sqrt(dot(n,n));
+            plot(y*c.width+x,a*p.a[2]+b*p.b[2]+d*p.v2[2],norm>1e-10?dot(n,c.light)/norm:0,p);
+        }
     }
     // At constant center Z, a sampled sweep has exact squared front height
     // max(r*r - dx*dx - dy*dy). Negative values extend the field outside it.
@@ -334,6 +366,8 @@ class Raster {
                 sphere(c, p, p.a, p.ra);
             else if (p.shape == Shape::CutTube)
                 cut_tube(c,p);
+            else if (p.shape == Shape::Triangle)
+                triangle(c,p);
             else
                 each_ball(p, steps(p), [&](const Vec &center, double r) { sphere(c, p, center, r); });
         }
