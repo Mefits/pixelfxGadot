@@ -2,7 +2,7 @@ extends SceneTree
 const Rig=preload("res://lab/anatomy_rd/rig_049.gd")
 const Ink=preload("res://lab/ink_051.gd")
 const Clips=preload("res://addons/creature/clips.gd")
-const Skin=preload("res://lab/body_skin_054.gd")
+const BodyGeometry=preload("res://lab/body_skin_054.gd")
 var engines:Array=[]
 var sprites:Array=[]
 func _initialize()->void:
@@ -45,7 +45,7 @@ func run()->void:
         var row:Array=[]
         for i in 3:
             var density:int=1 if i<2 else 3
-            var data:Dictionary=Skin.make(q,p.angles,i)
+            var data:Dictionary=BodyGeometry.make(q,p.angles,i)
             var result:Dictionary=engines[i].render(data.config,data.parts)
             if not result.ok:push_error(str(result.error));quit(1);return
             if result.body_pixels<50:push_error("Empty body");quit(1);return
