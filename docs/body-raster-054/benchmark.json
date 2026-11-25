@@ -1,0 +1,2066 @@
+[
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			22.33,
+			48.945,
+			174.408,
+			255.624
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			86.7,
+			170.686,
+			289.055,
+			342.235
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			11530,
+			11530,
+			11530,
+			11530
+		],
+		"texture_submit_us": [
+			2,
+			14,
+			16,
+			19
+		],
+		"total_us": [
+			112.0,
+			238.0,
+			356.0,
+			384.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			28.217,
+			55.146,
+			190.46,
+			265.377
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			124.217,
+			197.187,
+			228.153,
+			232.54
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			11528,
+			11577,
+			11636,
+			11636
+		],
+		"texture_submit_us": [
+			2,
+			13,
+			63,
+			99
+		],
+		"total_us": [
+			158.0,
+			253.0,
+			397.0,
+			436.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			95.873,
+			281.387,
+			372.331,
+			403.533
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			345.319,
+			668.166,
+			812.613,
+			3237.631
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			46120,
+			46120,
+			46120,
+			46120
+		],
+		"texture_submit_us": [
+			10,
+			61,
+			155,
+			194
+		],
+		"total_us": [
+			462.0,
+			830.0,
+			1120.0,
+			3522.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			92.151,
+			137.543,
+			208.393,
+			278.172
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			421.975,
+			539.921,
+			595.344,
+			639.282
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			46018,
+			46208,
+			46208,
+			46208
+		],
+		"texture_submit_us": [
+			9,
+			24,
+			38,
+			81
+		],
+		"total_us": [
+			526.0,
+			705.0,
+			774.0,
+			792.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			184.487,
+			303.183,
+			399.06,
+			421.217
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			682.888,
+			880.805,
+			1096.277,
+			1209.291
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			92240,
+			92240,
+			92240,
+			92240
+		],
+		"texture_submit_us": [
+			22,
+			47,
+			71,
+			86
+		],
+		"total_us": [
+			912.0,
+			1197.0,
+			1394.0,
+			1618.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			193.218,
+			265.349,
+			494.836,
+			515.325
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			958.933,
+			1200.164,
+			1363.271,
+			1514.219
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			92006,
+			92358,
+			92358,
+			92358
+		],
+		"texture_submit_us": [
+			23,
+			50,
+			208,
+			234
+		],
+		"total_us": [
+			1188.0,
+			1540.0,
+			1771.0,
+			1819.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			374.984,
+			577.111,
+			2749.719,
+			5571.735
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			1384.715,
+			1674.128,
+			1808.572,
+			1815.081
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			184480,
+			184480,
+			184480,
+			184480
+		],
+		"texture_submit_us": [
+			45,
+			98,
+			175,
+			284
+		],
+		"total_us": [
+			1831.0,
+			2284.0,
+			4340.0,
+			7178.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			397.04,
+			626.711,
+			701.31,
+			749.696
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			1974.531,
+			2359.871,
+			2981.304,
+			3404.544
+		],
+		"density": 1,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			183922,
+			184080,
+			184112,
+			184112
+		],
+		"texture_submit_us": [
+			51,
+			115,
+			142,
+			144
+		],
+		"total_us": [
+			2465.0,
+			2925.0,
+			3847.0,
+			3907.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			26.587,
+			47.315,
+			65.975,
+			381.931
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			279.641,
+			480.112,
+			610.529,
+			660.864
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			32794,
+			32794,
+			32794,
+			32794
+		],
+		"texture_submit_us": [
+			5,
+			14,
+			17,
+			139
+		],
+		"total_us": [
+			315.0,
+			539.0,
+			679.0,
+			725.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			35.788,
+			73.49,
+			208.482,
+			249.808
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			375.385,
+			579.141,
+			737.85,
+			2400.872
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			32778,
+			33011,
+			33011,
+			33011
+		],
+		"texture_submit_us": [
+			8,
+			17,
+			91,
+			94
+		],
+		"total_us": [
+			436.0,
+			646.0,
+			815.0,
+			2464.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			113.787,
+			187.213,
+			272.439,
+			588.331
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			1121.367,
+			1326.396,
+			1403.952,
+			1463.561
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			131176,
+			131176,
+			131176,
+			131176
+		],
+		"texture_submit_us": [
+			23,
+			47,
+			70,
+			97
+		],
+		"total_us": [
+			1280.0,
+			1547.0,
+			1703.0,
+			1926.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			127.263,
+			209.71,
+			364.033,
+			381.809
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			1440.756,
+			1683.562,
+			1769.021,
+			1900.128
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			130966,
+			131282,
+			131282,
+			131282
+		],
+		"texture_submit_us": [
+			24,
+			45,
+			61,
+			173
+		],
+		"total_us": [
+			1599.0,
+			1926.0,
+			2089.0,
+			2135.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			246.901,
+			588.037,
+			1726.421,
+			3468.241
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			2393.239,
+			3919.727,
+			5716.911,
+			6998.189
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			262352,
+			262352,
+			262352,
+			262352
+		],
+		"texture_submit_us": [
+			55,
+			276,
+			639,
+			1343
+		],
+		"total_us": [
+			2689.0,
+			4666.0,
+			7375.0,
+			8419.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			247.671,
+			399.002,
+			557.072,
+			687.752
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			2937.318,
+			3432.184,
+			4041.248,
+			4376.534
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			261946,
+			262437,
+			262437,
+			262437
+		],
+		"texture_submit_us": [
+			48,
+			80,
+			129,
+			174
+		],
+		"total_us": [
+			3246.0,
+			3939.0,
+			4793.0,
+			4809.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			458.424,
+			604.528,
+			655.714,
+			731.079
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			4484.097,
+			5439.075,
+			5785.415,
+			6542.048
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			524704,
+			524704,
+			524704,
+			524704
+		],
+		"texture_submit_us": [
+			107,
+			181,
+			316,
+			381
+		],
+		"total_us": [
+			5067.0,
+			6246.0,
+			6406.0,
+			7155.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			606.479,
+			1028.715,
+			1322.101,
+			15478.845
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			6232.689,
+			7940.65,
+			8487.365,
+			18642.155
+		],
+		"density": 2,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			523825,
+			523978,
+			524163,
+			524163
+		],
+		"texture_submit_us": [
+			138,
+			280,
+			772,
+			4179
+		],
+		"total_us": [
+			6985.0,
+			9047.0,
+			10299.0,
+			38300.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			35.252,
+			53.6420000000001,
+			78.9059999999999,
+			481.221
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			652.853,
+			797.72,
+			1022.739,
+			1165.033
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			65403,
+			65403,
+			65403,
+			65403
+		],
+		"texture_submit_us": [
+			10,
+			18,
+			36,
+			53
+		],
+		"total_us": [
+			702.0,
+			860.0,
+			1223.0,
+			1224.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			38.822,
+			79.981,
+			146.752,
+			198.241
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			724.03,
+			848.677,
+			939.073,
+			942.248
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			65096,
+			65403,
+			65403,
+			65403
+		],
+		"texture_submit_us": [
+			7,
+			18,
+			36,
+			38
+		],
+		"total_us": [
+			769.0,
+			911.0,
+			994.0,
+			1104.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			144.753,
+			397.272,
+			917.499,
+			2410.036
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			2545.73,
+			4184.377,
+			5239.345,
+			5920.317
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			261612,
+			261612,
+			261612,
+			261612
+		],
+		"texture_submit_us": [
+			46,
+			124,
+			170,
+			268
+		],
+		"total_us": [
+			2754.0,
+			4730.0,
+			6289.0,
+			6429.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			188.07,
+			325.544,
+			557.77,
+			1474.103
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			3085.584,
+			4002.643,
+			5402.9,
+			6705.625
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			260179,
+			260955,
+			260955,
+			260955
+		],
+		"texture_submit_us": [
+			58,
+			93,
+			147,
+			442
+		],
+		"total_us": [
+			3360.0,
+			4379.0,
+			6199.0,
+			7045.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			311.152,
+			742.452,
+			2306.157,
+			2389.67
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			5196.189,
+			6929.548,
+			8346.259,
+			9289.843
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			523224,
+			523224,
+			523224,
+			523224
+		],
+		"texture_submit_us": [
+			114,
+			219,
+			304,
+			959
+		],
+		"total_us": [
+			5637.0,
+			7711.0,
+			9425.0,
+			12555.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			344.655,
+			497.779,
+			810.66,
+			863.219
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			6007.781,
+			7343.521,
+			8703.649,
+			10700.194
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			519787,
+			521174,
+			521174,
+			521174
+		],
+		"texture_submit_us": [
+			111,
+			157,
+			242,
+			2302
+		],
+		"total_us": [
+			6479.0,
+			7970.0,
+			9747.0,
+			11228.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			613.989,
+			963.271,
+			3038.795,
+			3134.346
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			10442.721,
+			13383.847,
+			16421.654,
+			31322.846
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			1046448,
+			1046448,
+			1046448,
+			1046448
+		],
+		"texture_submit_us": [
+			261,
+			387,
+			541,
+			2161
+		],
+		"total_us": [
+			11369.0,
+			14823.0,
+			21717.0,
+			32312.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			762.15,
+			1080.558,
+			2423.013,
+			5193.518
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			12059.803,
+			14870.203,
+			19266.987,
+			19820.482
+		],
+		"density": 3,
+		"field_tests": [
+			0,
+			0,
+			0,
+			0
+		],
+		"mode": "reference",
+		"sample_tests": [
+			1039886,
+			1040409,
+			1040944,
+			1040944
+		],
+		"texture_submit_us": [
+			264,
+			366,
+			556,
+			2210
+		],
+		"total_us": [
+			13083.0,
+			16117.0,
+			22154.0,
+			27224.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			22.165,
+			53.662,
+			72.185,
+			129.622
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			105.889,
+			167.702,
+			266.281,
+			2537.378
+		],
+		"density": 1,
+		"field_tests": [
+			15029,
+			15029,
+			15029,
+			15029
+		],
+		"mode": "organic",
+		"sample_tests": [
+			12025,
+			12025,
+			12025,
+			12025
+		],
+		"texture_submit_us": [
+			2,
+			14,
+			16,
+			16
+		],
+		"total_us": [
+			133.0,
+			225.0,
+			310.0,
+			2683.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			28.386,
+			54.677,
+			64.697,
+			143.566
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			152.439,
+			215.995,
+			251.799,
+			275.334
+		],
+		"density": 1,
+		"field_tests": [
+			15029,
+			15313,
+			15313,
+			15313
+		],
+		"mode": "organic",
+		"sample_tests": [
+			12025,
+			12083,
+			12131,
+			12131
+		],
+		"texture_submit_us": [
+			3,
+			13,
+			19,
+			90
+		],
+		"total_us": [
+			187.0,
+			272.0,
+			309.0,
+			314.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			89.39,
+			394.527,
+			2326.961,
+			4771.336
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			429.456,
+			816.039,
+			3218.233,
+			3893.928
+		],
+		"density": 1,
+		"field_tests": [
+			60116,
+			60116,
+			60116,
+			60116
+		],
+		"mode": "organic",
+		"sample_tests": [
+			48100,
+			48100,
+			48100,
+			48100
+		],
+		"texture_submit_us": [
+			9,
+			28,
+			48,
+			137
+		],
+		"total_us": [
+			532.0,
+			2404.0,
+			5229.0,
+			5400.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			107.017,
+			338.752,
+			497.079,
+			564.094
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			563.99,
+			1281.248,
+			1484.132,
+			1521.42
+		],
+		"density": 1,
+		"field_tests": [
+			60064,
+			60696,
+			60696,
+			60696
+		],
+		"mode": "organic",
+		"sample_tests": [
+			48004,
+			48188,
+			48188,
+			48188
+		],
+		"texture_submit_us": [
+			12,
+			75,
+			140,
+			212
+		],
+		"total_us": [
+			693.0,
+			1771.0,
+			1959.0,
+			1976.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			179.639,
+			265.687,
+			432.575,
+			472.077
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			852.784,
+			1207.848,
+			1539.737,
+			1744.954
+		],
+		"density": 1,
+		"field_tests": [
+			120232,
+			120232,
+			120232,
+			120232
+		],
+		"mode": "organic",
+		"sample_tests": [
+			96200,
+			96200,
+			96200,
+			96200
+		],
+		"texture_submit_us": [
+			20,
+			50,
+			76,
+			288
+		],
+		"total_us": [
+			1057.0,
+			1486.0,
+			1872.0,
+			1963.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			220.392,
+			367.273,
+			593.163,
+			690.127
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			1231.302,
+			1562.823,
+			2408.945,
+			3179.074
+		],
+		"density": 1,
+		"field_tests": [
+			120238,
+			120696,
+			120696,
+			120696
+		],
+		"mode": "organic",
+		"sample_tests": [
+			95944,
+			96285,
+			96285,
+			96285
+		],
+		"texture_submit_us": [
+			26,
+			76,
+			150,
+			182
+		],
+		"total_us": [
+			1507.0,
+			1982.0,
+			2846.0,
+			3703.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			410.811,
+			1211.808,
+			1433.874,
+			1947.759
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			1832.184,
+			3693.558,
+			5164.241,
+			5569.849
+		],
+		"density": 1,
+		"field_tests": [
+			240464,
+			240464,
+			240464,
+			240464
+		],
+		"mode": "organic",
+		"sample_tests": [
+			192400,
+			192400,
+			192400,
+			192400
+		],
+		"texture_submit_us": [
+			57,
+			318,
+			443,
+			458
+		],
+		"total_us": [
+			2326.0,
+			4645.0,
+			7371.0,
+			7535.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			403.611,
+			548.522,
+			635.781,
+			721.72
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			2496.295,
+			2868.787,
+			2933.966,
+			3065.083
+		],
+		"density": 1,
+		"field_tests": [
+			240702,
+			240821,
+			240928,
+			240928
+		],
+		"mode": "organic",
+		"sample_tests": [
+			191857,
+			192024,
+			192024,
+			192024
+		],
+		"texture_submit_us": [
+			52,
+			96,
+			121,
+			129
+		],
+		"total_us": [
+			2945.0,
+			3464.0,
+			3588.0,
+			3603.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			26.605,
+			45.833,
+			88.361,
+			95.961
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			362.395,
+			461.014,
+			543.899,
+			566.402
+		],
+		"density": 2,
+		"field_tests": [
+			60180,
+			60180,
+			60180,
+			60180
+		],
+		"mode": "organic",
+		"sample_tests": [
+			34455,
+			34455,
+			34455,
+			34455
+		],
+		"texture_submit_us": [
+			4,
+			14,
+			18,
+			92
+		],
+		"total_us": [
+			394.0,
+			511.0,
+			589.0,
+			610.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			36.122,
+			85.135,
+			771.015,
+			861.355
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			464.468,
+			607.865,
+			1177.422,
+			3266.645
+		],
+		"density": 2,
+		"field_tests": [
+			60113,
+			60516,
+			60571,
+			60571
+		],
+		"mode": "organic",
+		"sample_tests": [
+			34455,
+			34651,
+			34651,
+			34651
+		],
+		"texture_submit_us": [
+			5,
+			16,
+			38,
+			95
+		],
+		"total_us": [
+			515.0,
+			713.0,
+			1901.0,
+			4166.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			118.273,
+			198.456,
+			397.824,
+			426.745
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			1487.778,
+			1912.637,
+			3082.638,
+			3769.621
+		],
+		"density": 2,
+		"field_tests": [
+			240720,
+			240720,
+			240720,
+			240720
+		],
+		"mode": "organic",
+		"sample_tests": [
+			137820,
+			137820,
+			137820,
+			137820
+		],
+		"texture_submit_us": [
+			26,
+			59,
+			82,
+			281
+		],
+		"total_us": [
+			1648.0,
+			2261.0,
+			3242.0,
+			4199.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			144.755,
+			266.243,
+			327.292,
+			419.189
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			1937.365,
+			2521.454,
+			2907.404,
+			3195.128
+		],
+		"density": 2,
+		"field_tests": [
+			240479,
+			240913,
+			240919,
+			240919
+		],
+		"mode": "organic",
+		"sample_tests": [
+			137608,
+			137838,
+			137838,
+			137838
+		],
+		"texture_submit_us": [
+			29,
+			71,
+			130,
+			149
+		],
+		"total_us": [
+			2110.0,
+			2814.0,
+			3117.0,
+			3545.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			234.019,
+			459.442,
+			488.719,
+			896.967
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			2850.767,
+			4867.223,
+			8156.822,
+			13205.817
+		],
+		"density": 2,
+		"field_tests": [
+			481440,
+			481440,
+			481440,
+			481440
+		],
+		"mode": "organic",
+		"sample_tests": [
+			275640,
+			275640,
+			275640,
+			275640
+		],
+		"texture_submit_us": [
+			53,
+			117,
+			455,
+			517
+		],
+		"total_us": [
+			3157.0,
+			5637.0,
+			8731.0,
+			13669.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			271.973,
+			455.256,
+			651.729,
+			668.456
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			3690.634,
+			5104.652,
+			6248.544,
+			6877.399
+		],
+		"density": 2,
+		"field_tests": [
+			480885,
+			481548,
+			481603,
+			481603
+		],
+		"mode": "organic",
+		"sample_tests": [
+			275195,
+			275641,
+			275641,
+			275641
+		],
+		"texture_submit_us": [
+			55,
+			102,
+			231,
+			263
+		],
+		"total_us": [
+			4032.0,
+			5628.0,
+			7075.0,
+			7251.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			469.526,
+			673.142,
+			899.787,
+			9356.833
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			6227.852,
+			7672.517,
+			9761.9,
+			10357.167
+		],
+		"density": 2,
+		"field_tests": [
+			962880,
+			962880,
+			962880,
+			962880
+		],
+		"mode": "organic",
+		"sample_tests": [
+			551280,
+			551280,
+			551280,
+			551280
+		],
+		"texture_submit_us": [
+			111,
+			230,
+			498,
+			3106
+		],
+		"total_us": [
+			6795.0,
+			8617.0,
+			10622.0,
+			22820.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			545.331,
+			701.943,
+			938.182,
+			1468.947
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			7522.761,
+			8486.981,
+			8613.264,
+			8714.024
+		],
+		"density": 2,
+		"field_tests": [
+			961929,
+			962549,
+			962549,
+			962549
+		],
+		"mode": "organic",
+		"sample_tests": [
+			550392,
+			550527,
+			550692,
+			550692
+		],
+		"texture_submit_us": [
+			123,
+			181,
+			296,
+			312
+		],
+		"total_us": [
+			8189.0,
+			9282.0,
+			9597.0,
+			10288.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			33.8339999999999,
+			47.649,
+			54.256,
+			84.27
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			858.502,
+			1059.104,
+			1135.729,
+			1207.673
+		],
+		"density": 3,
+		"field_tests": [
+			134922,
+			134922,
+			134922,
+			134922
+		],
+		"mode": "organic",
+		"sample_tests": [
+			68913,
+			68913,
+			68913,
+			68913
+		],
+		"texture_submit_us": [
+			9,
+			19,
+			45,
+			142
+		],
+		"total_us": [
+			912.0,
+			1156.0,
+			1191.0,
+			1278.0
+		]
+	},
+	{
+		"bodies": 1,
+		"bridge_and_image_us": [
+			41.0700000000001,
+			91.385,
+			121.288,
+			333.053
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			933.195,
+			1099.155,
+			1205.104,
+			1235.349
+		],
+		"density": 3,
+		"field_tests": [
+			135093,
+			135426,
+			135658,
+			135658
+		],
+		"mode": "organic",
+		"sample_tests": [
+			68593,
+			68913,
+			68913,
+			68913
+		],
+		"texture_submit_us": [
+			8,
+			19,
+			20,
+			28
+		],
+		"total_us": [
+			986.0,
+			1205.0,
+			1300.0,
+			1370.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			150.052,
+			304.288,
+			696.166,
+			7192.775
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			3488.16,
+			4017.396,
+			5452.834,
+			13129.225
+		],
+		"density": 3,
+		"field_tests": [
+			539688,
+			539688,
+			539688,
+			539688
+		],
+		"mode": "organic",
+		"sample_tests": [
+			275652,
+			275652,
+			275652,
+			275652
+		],
+		"texture_submit_us": [
+			48,
+			112,
+			166,
+			3072
+		],
+		"total_us": [
+			3708.0,
+			4261.0,
+			6248.0,
+			23394.0
+		]
+	},
+	{
+		"bodies": 4,
+		"bridge_and_image_us": [
+			183.366,
+			328.424,
+			371.53,
+			428.62
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			3868.51,
+			4678.93,
+			4761.905,
+			8548.074
+		],
+		"density": 3,
+		"field_tests": [
+			540494,
+			540922,
+			540998,
+			540998
+		],
+		"mode": "organic",
+		"sample_tests": [
+			274103,
+			274849,
+			274849,
+			274849
+		],
+		"texture_submit_us": [
+			55,
+			109,
+			181,
+			764
+		],
+		"total_us": [
+			4132.0,
+			5094.0,
+			5227.0,
+			8933.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			289.094,
+			424.274,
+			692.963,
+			752.922
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			7015.858,
+			8185.475,
+			9482.037,
+			9512.726
+		],
+		"density": 3,
+		"field_tests": [
+			1079376,
+			1079376,
+			1079376,
+			1079376
+		],
+		"mode": "organic",
+		"sample_tests": [
+			551304,
+			551304,
+			551304,
+			551304
+		],
+		"texture_submit_us": [
+			114,
+			189,
+			267,
+			273
+		],
+		"total_us": [
+			7428.0,
+			8698.0,
+			10069.0,
+			10374.0
+		]
+	},
+	{
+		"bodies": 8,
+		"bridge_and_image_us": [
+			408.129,
+			732.277,
+			823.848,
+			882.264
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			7833.365,
+			9670.048,
+			11529.039,
+			13889.189
+		],
+		"density": 3,
+		"field_tests": [
+			1081135,
+			1081627,
+			1081920,
+			1081920
+		],
+		"mode": "organic",
+		"sample_tests": [
+			547826,
+			549022,
+			549022,
+			549022
+		],
+		"texture_submit_us": [
+			131,
+			230,
+			332,
+			425
+		],
+		"total_us": [
+			8428.0,
+			10571.0,
+			12252.0,
+			14589.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			909.32,
+			1910.657,
+			2788.558,
+			19428.521
+		],
+		"buffer_growths": 0,
+		"changing": false,
+		"cpu_us": [
+			15020.44,
+			17347.242,
+			20752.061,
+			33993.479
+		],
+		"density": 3,
+		"field_tests": [
+			2158752,
+			2158752,
+			2158752,
+			2158752
+		],
+		"mode": "organic",
+		"sample_tests": [
+			1102608,
+			1102608,
+			1102608,
+			1102608
+		],
+		"texture_submit_us": [
+			385,
+			1019,
+			1533,
+			7627
+		],
+		"total_us": [
+			16224.0,
+			19933.0,
+			22834.0,
+			61049.0
+		]
+	},
+	{
+		"bodies": 16,
+		"bridge_and_image_us": [
+			762.444,
+			991.525,
+			1880.152,
+			4578.053
+		],
+		"buffer_growths": 0,
+		"changing": true,
+		"cpu_us": [
+			15500.795,
+			17072.466,
+			20241.848,
+			25265.947
+		],
+		"density": 3,
+		"field_tests": [
+			2162310,
+			2162533,
+			2162533,
+			2162533
+		],
+		"mode": "organic",
+		"sample_tests": [
+			1095848,
+			1096252,
+			1096848,
+			1096848
+		],
+		"texture_submit_us": [
+			270,
+			358,
+			939,
+			4283
+		],
+		"total_us": [
+			16576.0,
+			18067.0,
+			23061.0,
+			34127.0
+		]
+	}
+]

@@ -1,4 +1,5 @@
 // Godot adapter for the independent C++ kernel.
+#include "body_extension.hpp"
 #include "kernel.hpp"
 #ifdef PFX_ORIGINAL
 #include "original.hpp"
@@ -76,6 +77,7 @@ public:
 void init(ModuleInitializationLevel level){
     if(level!=MODULE_INITIALIZATION_LEVEL_SCENE)return;
     GDREGISTER_CLASS(PixelFXRaster);
+    GDREGISTER_CLASS(PixelFXBodyRaster);
 #ifdef PFX_ORIGINAL
     GDREGISTER_CLASS(PixelFXOriginal);
 #endif

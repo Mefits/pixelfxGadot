@@ -59,3 +59,7 @@ This is an isolated animation research track, not a new VFX runtime release. Own
 - Owner addition: Lab 0.46 explicitly includes key reduction vs limited cadence comparison (24/15/8 poses per second plus authored holds); planned, not implemented. See handoff.
 
 - Astra archival import: [d279ad1](https://github.com/Mefits/pixelfxGadot/commit/d279ad1081fdd7147dddaf19ba6f677a9e052e11), 8 original source files verified by Git blob hashes; 19 remain archive-only. Active code unchanged.
+
+## Lab 0.54b · isolated native body raster
+
+The independent C++ body kernel, Godot bridge, upstream primitive oracle, frozen-pose captures and benchmark are on the Astra experiment branch. See the [integration handoff and measured coverage](BODY_RASTER_HANDOFF_RU.md).

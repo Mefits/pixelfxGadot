@@ -1,5 +1,5 @@
-# Body raster interface — proposed v1, Lab 0.54b
-This is the technical boundary for Astra, not implemented yet. Do not change the animation graph or use endpoint IK. The caller owns evaluated positions, part construction and art parameters. Kernel only renders explicit geometry.
+# Body raster interface — v1, Lab 0.54b
+Implementation, supported joins, test results and Sol integration: [handoff](BODY_RASTER_HANDOFF_RU.md). Do not change the animation graph or use endpoint IK. The caller owns evaluated positions, part construction and art parameters. Kernel only renders explicit geometry.
 
 ## Input
 A thin Godot GDExtension class (suggest PixelFXBodyRaster) with a callable render(config: Dictionary, primitives: Array) -> Dictionary; internally use typed C++ structures and contiguous buffers. Astra may choose a faster packed ABI if a simple GDScript wrapper maintains this contract. No dependence on creature joint names or QuickJS in the native kernel.
