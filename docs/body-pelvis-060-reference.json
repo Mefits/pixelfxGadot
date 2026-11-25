@@ -1,0 +1,38 @@
+{
+  "method": "Manual silhouette trace of supplied front image, resampled 1024x1494; estimated uncertainty ±5px each endpoint. Not a 3D reconstruction.",
+  "front_sha256": "843b9ee1f32dc3bf57630c1af3a0aa7e1588d8dcccd31bf2c4fbf0c70f952a1f",
+  "three_quarter_sha256": "f4b0904ff5811ea135fed047059ee47343a87a91642ed71de082b51058af899c",
+  "reference_width": 279,
+  "landmarks": [
+    [
+      "chest",
+      480,
+      378,
+      657,
+      1
+    ],
+    [
+      "waist",
+      600,
+      413,
+      623,
+      0.753
+    ],
+    [
+      "upper pelvis",
+      700,
+      402,
+      634,
+      0.832
+    ],
+    [
+      "thigh insertion",
+      760,
+      386,
+      648,
+      0.939
+    ]
+  ],
+  "crotch_tip_y_approx": 816,
+  "three_quarter_note": "Qualitative only: continuous abdomen/pelvis, thigh root embedded; uncalibrated view cannot determine depth."
+}
