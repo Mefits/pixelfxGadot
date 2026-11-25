@@ -3,6 +3,7 @@ const RIG=preload("res://addons/creature/rig.gd")
 const CLIPS=preload("res://addons/creature/clips.gd")
 const VALID=preload("res://addons/creature/sdk_validate.gd")
 const INK=preload("res://lab/anatomy_rd/ink_readable.gd")
+const INK46=preload("res://lab/anatomy_rd/ink_046.gd")
 const CHAINS={"hand_near":["shoulder_near","elbow_near"],"hand_far":["shoulder_far","elbow_far"],"foot_near":["thigh_near","knee_near"],"foot_far":["thigh_far","knee_far"]}
 static func solve(rig,pose:Dictionary,targets:Dictionary)->Dictionary:
     rig.evaluate(pose)
@@ -30,13 +31,15 @@ static func solve(rig,pose:Dictionary,targets:Dictionary)->Dictionary:
     return pose
 class Board extends Node2D:
     var pts:Array=[]
+    var skins:Array=[]
     func _draw()->void:
         for i in pts.size():
             var x:=float(i*240)
             draw_rect(Rect2(x,0,240,230),Color("#273b4b"))
             draw_line(Vector2(x+4,210),Vector2(x+236,210),Color("#738a8f"))
             draw_set_transform(Vector2(x+103,210),0,Vector2.ONE*3.4)
-            INK.actor(self,pts[i],0,"hand_near")
+            if skins[i]:INK46.actor(self,pts[i],0,"hand_near")
+            else:INK.actor(self,pts[i],0,"hand_near")
             draw_set_transform(Vector2.ZERO)
 func _initialize()->void:call_deferred("run")
 func run()->void:
@@ -47,8 +50,10 @@ func run()->void:
     var rig=RIG.humanoid()
     var board:=Board.new()
     root.add_child(board)
-    root.content_scale_size=Vector2i(960,230)
-    root.size=Vector2i(960,230)
+    var capture_size:=Vector2i(cfg.size()*240,230)
+    root.content_scale_size=capture_size
+    root.size=capture_size
+    for v in cfg:board.skins.append(v.get("skin46",false))
     var all_points:Array=[]
     var report:Array=[]
     var count:=0
@@ -58,11 +63,16 @@ func run()->void:
         var keys:Array=[]
         var max_pen:=0.0
         var max_root_adjust:=0.0
+        var max_support_error:=0.0
+        var max_joint_step:=0.0
+        var previous:Dictionary={}
+        var max_bone_error:=0.0
         var locks:Dictionary={}
         for t in v.frames.size():
             var f:Dictionary=v.frames[t]
             var tilt:float=clampf(f.tilt,-65,65)
-            var p:=CLIPS.pose({"hips":tilt*.25,"chest":tilt*.75,"head":-tilt*.45},f.root[0],f.root[1])
+            var hip_extra:float=f.get("hip_extra",0.0)
+            var p:=CLIPS.pose({"hips":tilt*.25+hip_extra,"chest":tilt*.75-hip_extra,"head":-tilt*.45},f.root[0],f.root[1])
             p=solve(rig,p,f.targets)
             # Foot correction uses actual source ankle height and a fixed planted point.
             var goals:Dictionary={}
@@ -98,16 +108,30 @@ func run()->void:
             max_pen=maxf(max_pen,penetration)
             p.root[1]-=penetration
             rig.evaluate(p)
-            poses.append(rig.points.duplicate())
+            for tip in locks:max_support_error=maxf(max_support_error,rig.point(tip).distance_to(locks[tip]))
+            for joint in rig.joints:
+                if not joint.parent.is_empty():
+                    max_bone_error=maxf(max_bone_error,absf(rig.point(joint.id).distance_to(rig.point(joint.parent))-joint.offset.length()))
+                if previous.has(joint.id):max_joint_step=maxf(max_joint_step,rig.point(joint.id).distance_to(previous[joint.id]))
+            previous=rig.points.duplicate()
+            poses.append(previous)
             keys.append({"t":t/60.0,"pose":p})
-        all_points.append(poses)
+        
         count=maxi(count,poses.size())
         var clip:={"duration":float(keys.size()-1)/60.0,"loop":false,"easing":"linear","keys":keys,"events":[{"t":float(v.contact)/60.0,"kind":"strike","anchor":"hand_near"}]}
+        var sampled:Array=[]
+        var max_sampler_error:=0.0
+        for t in keys.size():
+            rig.evaluate(CLIPS.sample(clip,t/60.0,false))
+            for id in rig.points:max_sampler_error=maxf(max_sampler_error,rig.point(id).distance_to(poses[t][id]))
+            sampled.append(rig.points.duplicate())
+        if max_sampler_error>.001:push_error("Sampler mismatch");quit(1);return
+        all_points.append(sampled)
         var entry:={"schema":1,"id":"mocap_style_"+str(i),"name":v.label,"kind":"animation","source":"authored","payload":{"slot":"strike","clip":clip}}
         if not VALID.new().validate(entry).ok:push_error("Invalid SDK "+str(i));quit(1);return
         var file:=FileAccess.open(out.path_join("clip_"+str(i)+".json"),FileAccess.WRITE)
         file.store_string(JSON.stringify(entry));file.close()
-        report.append({"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust})
+        report.append({"variant":v.label,"duration":clip.duration,"contact_s":float(v.contact)/60.0,"frames":keys.size(),"floor_pen_before_final_clamp":max_pen,"root_adjustment_px":max_root_adjust,"support_error_px":max_support_error,"bone_error_px":max_bone_error,"max_joint_step_px":max_joint_step,"sampler_error_px":max_sampler_error,"contact_hand_px":[poses[v.contact]["hand_near"].x,poses[v.contact]["hand_near"].y]})
     for t in count:
         board.pts=[]
         for v in all_points:board.pts.append(v[mini(t,v.size()-1)])
@@ -115,7 +139,7 @@ func run()->void:
         await process_frame
         await RenderingServer.frame_post_draw
         var img:=root.get_texture().get_image()
-        if img.get_size()!=Vector2i(960,230) or img.save_png(out.path_join("%03d.png"%t))!=OK:quit(1);return
+        if img.get_size()!=capture_size or img.save_png(out.path_join("%03d.png"%t))!=OK:quit(1);return
     var f:=FileAccess.open(out.path_join("render-report.json"),FileAccess.WRITE)
     f.store_string(JSON.stringify(report,"  "));f.close()
     print("MOCAP_STYLE_OK")

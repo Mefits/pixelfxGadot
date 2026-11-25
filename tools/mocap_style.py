@@ -120,13 +120,49 @@ def variants(frames,meta):
             seq.append(f)
         out.append(dict(label=label,frames=seq,contact=contact,style=style,retime=retime))
     return out
+def variants046(frames,meta):
+    # Preserve the actual 0.45 D controls, not a reconstruction of them.
+    d=variants(frames,meta)[3]
+    control=copy.deepcopy(d)
+    control["label"]="D 0.45 / old skin"
+    revised=copy.deepcopy(d)
+    revised.update(label="D / new skin",skin46=True)
+    out=[control,revised]
+    for label,strength in [("E / moderate",0.55),("F / strong",1.0),("G / extreme",1.65)]:
+        v=copy.deepcopy(revised)
+        v["label"]=label
+        v["strength"]=strength
+        for i,f in enumerate(v["frames"]):
+            t=i/60
+            # Phase-local edits; all variants retain D's contact and total clock.
+            load=math.exp(-((t-.23)/.065)**2)
+            strike=math.exp(-((t-.35)/.060)**2)
+            release=math.exp(-((t-.43)/.065)**2)
+            f["tilt"]+=strength*(5*strike-4*load-2*release)
+            f["root"][0]+=strength*(1.2*strike-.8*load)
+            f["root"][1]+=strength*(.7*load-.25*strike)
+            # Counter-rotation between hips and chest, net torso tilt unchanged.
+            f["hip_extra"]=strength*(-4*load+5*strike)
+            near=f["targets"]["hand_near"]
+            near[0]+=strength*(.045*strike-.055*load)
+            near[1]-=strength*.025*strike
+            # Keep the passive arm in a compact, readable guard, preserving its bend sign.
+            far=f["targets"]["hand_far"]
+            blend=min(.62,strength*(.23*load+.34*strike+.12*release))
+            far[0]=(1-blend)*far[0]+blend*.30
+            far[1]=(1-blend)*far[1]+blend*(-.25)
+        out.append(v)
+    assert out[0]["frames"]==d["frames"] and out[1]["frames"]==d["frames"]
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46"],default="46");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
-    config=variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    if a.stage=="46" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
+    config=variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -139,7 +175,7 @@ def main():
     assert imgs
     seq=[imgs[0]]*12+imgs+[imgs[-1]]*12
     gif(seq,out/"comparison.gif",60);gif(seq,out/"comparison-half.gif",30)
-    sheet=Image.new("RGB",(960,imgs[0].height*3),"#142332")
-    for row,i in enumerate([0,round(meta["contact"]*60),len(imgs)-1]):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
+    sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*3),"#142332")
+    for row,i in enumerate([0,config[0]["contact"],len(imgs)-1]):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
 if __name__=="__main__":main()
