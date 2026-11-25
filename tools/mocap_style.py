@@ -445,14 +445,81 @@ def refine051c(frames,meta):
         out.append(v)
     return out
 
+def push052a(frames,meta):
+    # Use accepted F jab and turning-shoulder cross; replace the uppercut
+    # with a new authored push kick. Two versions differ only in the
+    # transition into the kick and extension/recovery timing of the pose.
+    base=shoulder049(frames,meta)[2]
+    seq=copy.deepcopy(base["frames"][:35])
+    for f in seq:
+        f.update(pelvis_turn=0.,foot_pitch_near=0.,foot_pitch_far=0.)
+    start=seq[-1]
+    def pose(x,y,torso,upper,st,pt,near,far,leg,support,pitch,heel,weight=0,dx=1.5,height=21.7):
+        p=copy.deepcopy(start)
+        for key in ("aim_tip","aim_point","aim_weight"):p.pop(key,None)
+        p.update(root=[x,y],tilt=upper,hip_extra=torso-.25*upper,shoulder_turn=st,pelvis_turn=pt,
+                 foot_pitch_far=pitch,foot_pitch_near=heel,reference_support_weight=weight,
+                 reference_support_dx=dx,reference_support_height=height)
+        p["targets"]["hand_near"]=[*near,1]
+        p["targets"]["hand_far"]=[*far,1]
+        p["targets"]["foot_far"]=[*leg,-1]
+        p["feet"]=[[start["feet"][0][0],0],[start["feet"][1][0],0 if support else -10]]
+        return p
+    out=[]
+    for label,linked in [("A / basic push",False),("B / linked drive",True)]:
+        s=copy.deepcopy(seq)
+        # At contact keep the leg almost straight but not locked; sole faces
+        # forward and hip drives. No use of high-kick 40deg / 34deg recipe.
+        # A uses a neutral transition, B starts gathering the knee earlier.
+        knots=[
+          (34,start),
+          (38,pose(4,-2,-3,0,50,20,(.40,-.04),(.45,.04),(.05,.96),True,0,0)),
+          (42,pose(4,-2,-9,-4,30,45,(.35,-.16),(.43,.10),(.26,.48),False,-8,6,.55)),
+          (46,pose(5,-2,-18,-8,20,75,(.40,-.18),(.28,.20),(.37,.12),False,-32,12,.85)),
+          (50,pose(7,-3,-19,-5,15,90,(.38,-.12),(.23,.32),(.989,-.055),False,-80,17,1,2.8,21.5)),
+          (52,pose(7,-3,-19,-5,15,90,(.38,-.12),(.23,.32),(.989,-.055),False,-80,17,1,2.8,21.5)),
+          (58,pose(4,-2,-13,-6,25,50,(.35,-.12),(.38,.12),(.35,.22),False,-30,8,.65)),
+          (64,pose(4,-2,-5,-3,18,8,(.40,-.12),(.40,.05),(.08,.96),True,0,0)),
+          (76,pose(4,-2,-3,-2,0,0,(.40,-.12),(.46,.05),(.08,.96),True,0,0))]
+        if linked:
+            knots[1]=(38,pose(6,-2,4,8,65,42,(.37,-.12),(.40,.08),(.10,.88),True,0,3))
+            knots[2]=(42,pose(5,-2,-6,2,42,65,(.31,-.10),(.35,.16),(.36,.22),False,-18,8,.7,1.6,21.2))
+            knots[3]=(46,pose(6,-2,-12,-4,22,85,(.37,-.15),(.24,.28),(.53,.08),False,-44,12,.92,2.0,21.4))
+            knots[4]=(50,pose(8,-3,-13,-3,15,90,(.38,-.12),(.23,.36),(.995,-.10),False,-80,17,1,3.5,21.5))
+            knots[5]=(52,pose(8,-3,-13,-3,15,90,(.38,-.12),(.23,.36),(.995,-.10),False,-80,17,1,3.5,21.5))
+        for (a,lo),(b,hi) in zip(knots,knots[1:]):
+            for k in range(a+1,b+1):
+                u=(k-a)/(b-a)
+                if b!=50:u=u*u*(3-2*u)
+                mix=lambda x,y:(1-u)*x+u*y
+                p=copy.deepcopy(lo)
+                for key in ("aim_tip","aim_point","aim_weight"):p.pop(key,None)
+                for key in ("tilt","hip_extra","shoulder_turn","pelvis_turn","foot_pitch_near","foot_pitch_far","reference_support_weight","reference_support_dx","reference_support_height"):
+                    p[key]=mix(lo.get(key,0),hi.get(key,0))
+                p["root"]=[mix(lo["root"][j],hi["root"][j]) for j in range(2)]
+                p["feet"]=[[start["feet"][0][0],0],[start["feet"][1][0],-10 if 40<=k<64 else 0]]
+                for tip in p["targets"]:
+                    p["targets"][tip]=[mix(lo["targets"][tip][j],hi["targets"][tip][j]) for j in range(2)]+[hi["targets"][tip][2]]
+                s.append(p)
+        assert len(s)==77
+        v=copy.deepcopy(base)
+        v.update(label=label,frames=s,skin51=2,foot51=2,cadence=0,
+                 events=[{"tick":20,"anchor":"hand_near"},{"tick":32,"anchor":"hand_far"},{"tick":50,"anchor":"foot_far"}])
+        out.append(v)
+    # Third lane tests artistic exposure separately, with B's same pose path.
+    c=copy.deepcopy(out[1]);c.update(label="C / linked holds",cadence=-1,
+        holds=[0,4,8,12,16,18,20,22,25,28,30,32,34,37,40,42,46,48,50,52,55,58,62,64,69,76])
+    out.append(c)
+    return out
+
 def gif(frames,path,fps):
     delay=[10*(round((i+1)*100/fps)-round(i*100/fps)) for i in range(len(frames))]
     frames[0].save(path,save_all=True,append_images=frames[1:],duration=delay,loop=0,disposal=2)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b","51c","51c2"],default="51c2");a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument("--godot",required=True);ap.add_argument("--out",type=Path,required=True);ap.add_argument("--bvh",type=Path);ap.add_argument("--xvfb",action="store_true");ap.add_argument("--stage",choices=["45","46","46b","47","48","49","50","51a","51b","51c","51c2","52a"],default="52a");a=ap.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=False);raw,name=source(out,a.bvh);frames,meta=build(raw,name)
     if a.stage!="45" and meta["sha256"]!="8a56bfb4422138f061a0e36148354a43dd62a5b9645cbdf6cee8122e5c40fde8":raise ValueError("0.46 requires the exact 0.45 source")
-    config=refine051c(frames,meta) if a.stage=="51c2" else reference051c(frames,meta) if a.stage=="51c" else foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
+    config=push052a(frames,meta) if a.stage=="52a" else refine051c(frames,meta) if a.stage=="51c2" else reference051c(frames,meta) if a.stage=="51c" else foot051b(frames,meta) if a.stage=="51b" else shell051a(frames,meta) if a.stage=="51a" else pelvis050(frames,meta) if a.stage=="50" else shoulder049(frames,meta) if a.stage=="49" else bag048(frames,meta) if a.stage=="48" else combo047(frames,meta) if a.stage=="47" else cadence046(frames,meta) if a.stage=="46b" else variants046(frames,meta) if a.stage=="46" else variants(frames,meta);(out/"source-report.json").write_text(json.dumps(meta,indent=2));(out/"config.json").write_text(json.dumps(config))
     print(meta,flush=True)
     cmd=(["xvfb-run","-a","-s","-screen 0 1280x768x24"] if a.xvfb else [])+[a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--script","res://tests/mocap_style.gd","--",str(out)]
     p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=100);log=p.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
@@ -470,7 +537,7 @@ def main():
         select=sorted(set(range(0,len(imgs),2))|{config[0]["contact"],len(imgs)-1}|{e["tick"] for e in config[0].get("events",[])})
         fast=[imgs[0]]*6+[imgs[i] for i in select]+[imgs[-1]]*6
         gif(fast,out/"comparison-1p2.gif",36)
-    if a.stage in ("48","49","50","51a","51b","51c","51c2"):
+    if a.stage in ("48","49","50","51a","51b","51c","51c2","52a"):
         # Keep all strike frames, 20+ ms delays, exact rounded 1.1x cycle.
         select=sorted(set(range(0,len(imgs),2))|{len(imgs)-1}|{e["tick"] for e in config[0]["events"]})
         spans=[(imgs[0],12)]+[(imgs[k],(select[j+1]-k if j+1<len(select) else 1)) for j,k in enumerate(select)]+[(imgs[-1],12)]
@@ -483,12 +550,12 @@ def main():
             delays.append(10*(round((elapsed+n)*100/66)-round(elapsed*100/66)));elapsed+=n
         assert min(delays)>=20
         merged[0][0].save(out/"comparison-1p1.gif",save_all=True,append_images=[im for im,_ in merged[1:]],duration=delays,loop=0,disposal=2)
-    review_ticks=[0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b","51c","51c2") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
+    review_ticks=[0,20,32,42,46,50,58,76] if a.stage=="52a" else [0,20,32,38,46,52,60,76] if a.stage in ("50","51a","51b","51c","51c2") else [0,20,28,32,40,46,64] if a.stage in ("47","48","49") else [0,config[0]["contact"],len(imgs)-1]
     sheet=Image.new("RGB",(imgs[0].width,imgs[0].height*len(review_ticks)),"#142332")
     for row,i in enumerate(review_ticks):sheet.paste(imgs[min(i,len(imgs)-1)],(0,row*imgs[0].height))
     sheet.save(out/"review.png")
-    if a.stage in ("51c","51c2"):
-        imgs[38].save(out/"contact-review.png")
+    if a.stage in ("51c","51c2","52a"):
+        imgs[50 if a.stage=="52a" else 38].save(out/"contact-review.png")
     if a.stage=="51a":
         clips=[json.loads((out/f"clip_{i}.json").read_text())["payload"] for i in range(3)]
         assert clips[0]==clips[1]==clips[2], "Skin variants must not alter animation data"
