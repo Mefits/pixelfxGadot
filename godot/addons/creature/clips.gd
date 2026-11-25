@@ -45,7 +45,7 @@ static func sample(clip: Dictionary,time: float,wrap_loop: bool=true) -> Diction
             match keys[i].get("easing",clip.get("easing","smooth")):
                 "smooth":u=u*u*(3-2*u)
                 "accelerate":u=pow(u,2.15)
-                "hold", "snap":u=0.0
+                "hold", "snap":return a.duplicate(true)
             var angles: Dictionary={}
             var ids: Array=a.angles.keys()
             for id in b.angles:
