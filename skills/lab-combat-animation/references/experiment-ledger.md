@@ -65,3 +65,6 @@ Use same organic primitives at densities 1/2/3/4; match nominal outline in rig s
 
 ## 0.55a — procedural character geometry
 Owner chose density ×3, black outline 3 raster px, adjustable later. A fitted, B shinobi vest, C loose costume use same FK and material/volume recipes in body_style_055.gd. Native Godot capture passed, actual review inspected. More clothing volume changes silhouette without reauthoring the animation; small details are obscured by pose, and rigid scarf is not cloth physics. Test neutral and combat poses before art acceptance. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45695496484). Await owner review.
+
+## 0.55b — character-specific geometry test
+Classic Sasuke Part I as fan-art reference. Native procedural recipe adds material/volume details to unchanged FK. Recognizable overall silhouette and palette in actual Godot capture; hair, high collar, angular clothing cut and face still need art refinement. Fixed camera crops high-kick extremity; avoid interpreting as geometry failure. Density 3, outline 3 retained. [Run](https://github.com/Mefits/pixelfxGadot/actions/runs/45696364357). Owner review pending.
