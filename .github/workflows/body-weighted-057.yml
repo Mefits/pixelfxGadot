@@ -1,0 +1,60 @@
+name: Lab weighted surface 057
+on:
+  push:
+    branches: [experiment/body-skin-054c]
+    paths:
+      - 'godot/lab/body_weighted_057.gd'
+      - 'godot/lab/weighted_surface_057.gd'
+      - 'godot/tests/body_weighted_compare.gd'
+      - 'tools/body_weighted_compare.py'
+      - '.github/workflows/body-weighted-057.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lab-godot
+          key: lab-godot-linux-4.4.1
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: pip install scons numpy pillow
+      - name: Native oracle regression
+        run: |
+          g++ -std=c++17 -O2 -ffp-contract=off -fno-fast-math native_cpp/body_tests/test.cpp -o /tmp/body-test
+          /tmp/body-test native_cpp/body_tests/oracle.txt
+      - name: Build native body extension
+        run: python native_cpp/build.py
+      - name: Godot
+        run: |
+          mkdir -p ~/.cache/lab-godot
+          if [ ! -x ~/.cache/lab-godot/godot ]; then
+            curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+            unzip -qo /tmp/godot.zip -d ~/.cache/lab-godot
+            mv ~/.cache/lab-godot/Godot_v4.4.1-stable_linux.x86_64 ~/.cache/lab-godot/godot
+          fi
+          echo "$HOME/.cache/lab-godot" >> "$GITHUB_PATH"
+      - name: Verify frozen poses
+        run: ~/.cache/lab-godot/godot --headless --path godot --script res://tests/body_fixture_verify.gd
+      - name: Native capture
+        run: |
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+          python tools/body_weighted_compare.py --godot godot --out body-skin-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: body-weighted-057
+          path: |
+            body-skin-results/*.gif
+            body-skin-results/*.json
+            body-skin-results/review.png
+            body-skin-results/stand-review.png
+            body-skin-results/engine.log
