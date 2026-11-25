@@ -181,6 +181,27 @@ func run()->void:
         var release_origin:=Vector2.ZERO
         for t in v.frames.size():
             var f:Dictionary=v.frames[t]
+            if v.get("run_cycle",false):
+                var run_pose:=CLIPS.pose(f.run_angles,0,0)
+                rig.evaluate(run_pose)
+                var bottom:float=-1000.0
+                for tip in ["foot_near","foot_far"]:
+                    for vertex in INK51.shoe_points(rig.point(tip),float(run_pose.angles["foot_pitch_"+tip.trim_prefix("foot_")])):
+                        bottom=maxf(bottom,vertex.y)
+                # In-place cycle: ground the lowest sole or add authored flight.
+                # Not a world-space locomotion or no-slip simulation.
+                run_pose.root[1]=-bottom-float(f.run_flight)
+                rig.evaluate(run_pose)
+                for joint in rig.joints:
+                    if not joint.parent.is_empty():
+                        max_bone_error=maxf(max_bone_error,absf(rig.point(joint.id).distance_to(rig.point(joint.parent))-joint.offset.length()))
+                    if previous.has(joint.id):max_joint_step=maxf(max_joint_step,rig.point(joint.id).distance_to(previous[joint.id]))
+                previous=rig.points.duplicate()
+                poses.append(previous)
+                support_frames.append({})
+                toe_frames.append({})
+                keys.append({"t":t/60.0,"pose":run_pose})
+                continue
             var tilt:float=clampf(f.tilt,-65,65)
             var hip_extra:float=f.get("hip_extra",0.0)
             var p:=CLIPS.pose({"hips":tilt*.25+hip_extra,"chest":tilt*.75-hip_extra,"head":-tilt*.45},f.root[0],f.root[1])
@@ -281,7 +302,7 @@ func run()->void:
         var events:Array=[]
         for e in v.get("events",[{"tick":v.contact,"anchor":"hand_near"}]):
             events.append({"t":float(e.tick)/60.0,"kind":"strike","anchor":e.anchor})
-        var clip:={"duration":float(keys.size()-1)/60.0,"loop":false,"easing":"linear","keys":keys,"events":events}
+        var clip:={"duration":float(keys.size()-1)/60.0,"loop":bool(v.get("run_cycle",false)),"easing":"linear","keys":keys,"events":events}
         var original:=clip.duplicate(true)
         var exposure_indices:Array=choose_exposures(int(v.get("cadence",0)),keys.size()-1,int(v.contact),support_frames,v.get("events",[]),v.get("holds",[]))
         if int(v.get("cadence",0))!=0:clip=hold_clip(original,exposure_indices)
@@ -316,7 +337,7 @@ func run()->void:
         if max_sampler_error>.001:push_error("Sampler mismatch");quit(1);return
         all_points.append(sampled)
         all_foot_angles.append(foot_samples)
-        var entry:={"schema":1,"id":"mocap_style_"+str(i),"name":v.label,"kind":"animation","source":"authored","payload":{"slot":"strike","clip":clip}}
+        var entry:={"schema":1,"id":"mocap_style_"+str(i),"name":v.label,"kind":"animation","source":"authored","payload":{"slot":"walk" if v.get("run_cycle",false) else "strike","clip":clip}}
         if not VALID.new().validate(entry).ok:push_error("Invalid SDK "+str(i));quit(1);return
         var file:=FileAccess.open(out.path_join("clip_"+str(i)+".json"),FileAccess.WRITE)
         file.store_string(JSON.stringify(entry));file.close()
