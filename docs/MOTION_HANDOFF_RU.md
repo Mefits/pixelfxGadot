@@ -364,3 +364,16 @@ See [CLOTH_MATERIAL_074.md](CLOTH_MATERIAL_074.md). Base 0.72/0.73 CI passed on 
 
 ## 0.75 — hybrid motion continuity
 Owner direction: full 60 FPS combat, not universal 15/25 cadence; phase-specific attack dynamics, procedural adaptation, natural transitions, authored acrobatic choreography. See [MOTION_CONTINUITY_075.md](MOTION_CONTINUITY_075.md). New isolated branch experiment/motion-continuity-075; 0.74 CI passed, variant B recommended but art decision pending. No merge or N changes.
+
+
+## 0.75 verified / 0.76 timing experiment
+
+
+## 0.75 verified — art decision pending
+[CI 45836808996](https://github.com/Mefits/pixelfxGadot/actions/runs/45836808996) passed exact SHA 4eea3d62ae9bab7cb8a23021008028421b0292fa; [artifact 15127540417](https://github.com/Mefits/pixelfxGadot/actions/runs/45836808996/artifacts/15127540417). Native 140 poses, contact ticks 20/32/50 preserved. GIF 70 frames/2330ms and 140 frames/4670ms; real frame sheet inspected. Switch joint displacement A 33.057/25.169, B 10.798/12.257, C 0.00000191/0 rig units for run-to-combo and combo-to-run. Max in first 10 ticks A/B/C 33.057/13.886/11.003; p95 25.564/13.529/9.372. C is technical candidate, no owner art selection yet; exact first pose continuity duplicates last source pose for one tick and tangent caps mean no proof of velocity continuity. C still changes from run to guard before attacking; world travel, planted feet and phase-aware transitions remain unresolved. All lanes retain same attack timing. No changes to N or runtime.
+
+
+## Owner review — 2026-11-26
+Owner found both B (spatial wind) and C (softer material) interesting and has not chosen between them. **Preserve both as equally valid candidates for the next cloth experiment; neither is accepted or rejected.** A remains exact control. Keep frozen code at bf2b54084be741dfe633cfb99369b94d897952a6, [successful CI](https://github.com/Mefits/pixelfxGadot/actions/runs/45833397319), [actual GIF artifact](https://github.com/Mefits/pixelfxGadot/actions/runs/45833397319/artifacts/15124220945). B and C must be compared again on moving anchors with the same body and motion; do not silently choose B. Cloth work is temporarily paused while 60Hz motion transitions and authored attack dynamics are developed. Measured A/B/C peak structural strain 6.04/5.02/9.30%, median centerline turn 1.47/2.02/2.42 rad; replay error zero. Numerical metrics are not art selection.
+
+Next: [ATTACK_TIMING_076.md](ATTACK_TIMING_076.md), isolated timing at 60Hz, no art decision yet.
