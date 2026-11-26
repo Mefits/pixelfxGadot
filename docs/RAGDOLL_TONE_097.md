@@ -4,3 +4,7 @@ Measured gates: unchanged A, snapshots/replay, anatomy, floor proxy, anchor resi
 
 
 First CI 45903718577 failed replay at [0,29,29]: fresh solver construction omitted profile/iteration arguments and used the old guided flag, unlike restore. Both paths now use the same parameters, iteration count is snapshotted; corrected hip rest-offset sign consistently in the physical limit, soft band and metric. No acceptance gates relaxed. Re-run required.
+
+
+## Verified 097
+Run 45904584499 success at 8d72cd51248234543f7b853228d6522c364ae670. A/B/C post-contact COM slide 4.18/4.09/10.02, max hip flex 150.74/105.18/105.11 degrees. C sweep 12/18/28 passes p95 1.824/2.626/3.965 ms, max anchor residual .307/.134/.038. Visual issue: one leg remains raised near vertical at rest. Owner asks for stronger impulse comparison before further tone changes.
