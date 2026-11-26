@@ -58,3 +58,7 @@ For subsequent Lab animation comparisons, export normal playback at exactly ×1.
 
 ## Owner direction 2026-11-26 — 60 FPS hybrid motion
 Combat should use full 60 Hz pose evaluation by default. Limited 15/25 Hz exposure is an optional stylistic experiment, not a global requirement. Keep authored attack/contact choreography; use procedural transition, support/IK and secondary physics for adaptation. Separate transition smoothness from strike dynamics; do not smooth away contact or delay gameplay inputs merely for aesthetics. See docs/MOTION_CONTINUITY_075.md for the isolated experiment, not a production runtime change.
+
+
+## Owner requirement — stable guard recovery (2026-11-26)
+Do not use arbitrary clip terminal pose as idle. Maintain a separate stance preference and support state; recover a usable base using deliberate steps and weight transfer, not sliding both feet to an absolute template. Keep authored attacks/60Hz timing, permit procedural adaptation. See docs/STANCE_RECOVERY_078.md; this first grounded test is not a dynamic balance solver.
