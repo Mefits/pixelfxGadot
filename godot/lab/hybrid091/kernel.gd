@@ -1,4 +1,5 @@
 extends RefCounted
+const Grid=preload("precision.gd")
 const Gait=preload("gait.gd")
 const Support=preload("support.gd")
 const Leg=preload("res://lab/leg_constraints_082.gd")
@@ -39,16 +40,23 @@ func _init(r,run_clip:Dictionary,motions:Dictionary,guard_angles:Dictionary,rate
     var base:Dictionary=gait.intent()
     pose=base.pose
     paths=base.paths
+    prepare_geometry(pose,paths)
     support.resolve(pose,paths)
     previous=pose
     final_pose=pose
     hands=world_hands()
 
+func prepare_geometry(p:Dictionary,goals:Array)->void:
+    Grid.pose(p)
+    for path in goals:
+        path.toe=Grid.point(path.toe)
+        path.pitch=Grid.scalar(path.pitch)
+
 func world_hands()->Dictionary:
     var result:Dictionary={}
     for side in Leg.SIDES:
         var id:String="hand_"+side
-        result[id]=rig.point(id)+Vector2.RIGHT*gait.travel
+        result[id]=Grid.point(rig.point(id)+Vector2.RIGHT*gait.travel)
     return result
 
 # One command per tick: target speed, optional action edge, signed chest
@@ -72,6 +80,7 @@ func step(cmd:Dictionary)->void:
         dest.angles[id]=lerpf(dest.angles[id],guard[id],settle)
     for path in paths:path.pitch=lerpf(path.pitch,0.,settle)
     dest.root[1]=lerpf(dest.root[1],2.5,settle)
+    prepare_geometry(dest,paths)
     var next:String=cmd.get("action","")
     var change:bool=bank.has(next) or (action!="" and age>=bank[action].frames.size())
     if change:
@@ -99,6 +108,7 @@ func step(cmd:Dictionary)->void:
         var u:=float(age)/duration
         for id in offsets:
             dest.angles[id]+=offsets[id]*(1.-smoothstep(0.,1.,u))+clampf(slopes[id]*duration,-45.,45.)*u*(1.-u)*(1.-u)
+    Grid.pose(dest)
     previous=pose
     pose=dest
     recoil_velocity+=float(cmd.get("impulse",0.))
@@ -120,8 +130,9 @@ func step(cmd:Dictionary)->void:
                 var delta:Vector2=current[id]-start
                 var u:=clampf((cmd.hurt_center-start).dot(delta)/maxf(delta.length_squared(),1e-12),0.,1.)
                 hit=(start+u*delta).distance_to(cmd.hurt_center)<=cmd.radius
+            if marker.kind!="strike":hit=false
             if hit:health-=5
-            events.append([tick,serial,ordinal,id,hit])
+            events.append([tick,serial,ordinal,id,hit,marker.kind])
             ordinal+=1
     hands=current
     age+=1

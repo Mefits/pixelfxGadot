@@ -1,4 +1,5 @@
 extends RefCounted
+const Grid=preload("precision.gd")
 const IK=preload("res://lab/support_adaptation_077.gd")
 const Leg=preload("res://lab/leg_constraints_082.gd")
 var chains:Array=[]
@@ -40,4 +41,5 @@ func resolve(p:Dictionary,paths:Array)->void:
         p.angles["knee_"+side]=rad_to_deg(wrapf(bend+chain[2]-chain[3],-PI,PI))
         if not Leg.valid(p,side):
             Leg.put(p,side,Leg.bend(p,side),Leg.ankle(p,side))
+    Grid.pose(p)
     rig.evaluate(p)

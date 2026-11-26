@@ -47,6 +47,10 @@ jobs:
           for rate in [60, 120]:
               traces = [pathlib.Path("trace-"+os, f"{rate}-0.txt").read_text().splitlines() for os in ("ubuntu-latest", "windows-latest")]
               for tick, (left,right) in enumerate(zip(*traces,strict=True)):
-                  assert left==right, (rate,tick,left,right)
+                  if left!=right:
+                      states = [json.loads(pathlib.Path("trace-"+os, f"{rate}-0.txt.jsonl").read_text().splitlines()[tick]) for os in ("ubuntu-latest","windows-latest")]
+                      for field, (a,b) in enumerate(zip(*states)):
+                          if a!=b: print("state field",field,a,b)
+                      raise ValueError((rate,tick,left,right))
               hashes = [json.loads(pathlib.Path("trace-"+os, f"{rate}.json").read_text())[0]["sha256"] for os in ("ubuntu-latest","windows-latest")]
               assert hashes[0]==hashes[1], hashes
