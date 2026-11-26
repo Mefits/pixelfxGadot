@@ -70,3 +70,7 @@ A new allowed movement must transition from the actual displayed pose and its mo
 
 ## Adaptive transitions (owner direction 2026-11-26)
 Use movement-dependent correction duration; do not use universal 100ms. Bound by incoming contact/event deadline, keep source and event timeline independent. Measure real transition path and support feasibility; do not reward suppressing deliberate attack dynamics. Lab 080 compares fixed, heuristic and predictive methods; no production default selected.
+
+
+## Leg regression — owner screenshot 2026-11-26
+Validate geometric knee bend (include rig rest offsets) and shin-relative ankle orientation, not raw Euler signs. Avoid forcing unreachable or anatomically invalid IK branch. Preserve source attack/contact poses, 60Hz timing and sparse planning budget. See docs/LEG_CONSTRAINTS_082.md.
