@@ -88,6 +88,7 @@ func _ready():
     side.add_child(row)
     button(row,"Копия цели",copy_goal)
     button(row,"Вставить",paste_goal)
+    button(row,"L ↔ R",mirror_goal)
     button(row,"Удалить",erase_goal)
     row=HBoxContainer.new()
     side.add_child(row)
@@ -151,6 +152,7 @@ func open_motion(id:String):
     var path:=Asset.FOLDER+id+".json"
     var d:=Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
     var error:=Asset.problem(d)
+    if error=="" and d.id!=id:error="Имя файла расходится с id"
     if error!="":
         info.text="Загрузка: "+error
         return
@@ -407,6 +409,18 @@ func paste_goal():
     var g:=clip_board.duplicate(true)
     if document.kind=="action":g.clock="action"
     elif g.clock=="action":g.clock="cycle"
+    document.goals.append(g)
+    selected=document.goals.size()-1
+    refresh(frame)
+
+func mirror_goal():
+    if selected<0 or document.goals.size()>=64:return
+    var g:Dictionary=document.goals[selected].duplicate(true)
+    var near:bool=g.joint.ends_with("_near")
+    g.joint=g.joint.get_slice("_",0)+("_far" if near else "_near")
+    if g.clock=="cycle":g.center=fposmod(g.center+.5,1.)
+    if g.clock.begins_with("swing_"):g.clock="swing_"+g.joint.get_slice("_",1)
+    history.append(document.duplicate(true))
     document.goals.append(g)
     selected=document.goals.size()-1
     refresh(frame)

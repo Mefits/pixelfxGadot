@@ -15,9 +15,9 @@ static func phase(k,clock:String)->float:
     return (gait.travel-start)/(leg.end-start)
 
 # At most one winning target per arm/leg; ties follow document order.
-static func resolve(k,p:Dictionary,paths:Array,legs:bool)->void:
+static func resolve(k,p:Dictionary,paths:Array,legs:bool,goals:Array)->void:
     var owned:Dictionary={}
-    for g in k.art.goals:
+    for g in goals:
         var foot:bool=g.joint.begins_with("foot")
         if foot!=legs:continue
         var t:=phase(k,g.clock)
@@ -35,7 +35,11 @@ static func resolve(k,p:Dictionary,paths:Array,legs:bool)->void:
         var reason:="мягкая цель" if w<.999 else "цель"
         if foot:
             if paths[index].stance:reason="стопа в опоре"
-            else:paths[index].toe=Grid.point(Vector2(paths[index].toe).lerp(goal,w))
+            else:
+                var swing:=phase(k,"swing_"+side)
+                if k.released.has(side):w*=k.released[side][0]
+                else:w*=smoothstep(0.,.08,swing)*(1.-smoothstep(.92,1.,swing))
+                paths[index].toe=Grid.point(Vector2(paths[index].toe).lerp(goal,w))
         else:
             k.rig.evaluate(p)
             var start:Vector2=k.rig.point(g.joint)
@@ -44,6 +48,14 @@ static func resolve(k,p:Dictionary,paths:Array,legs:bool)->void:
                 var result:Dictionary=k.rig.aim_arm(p,g.joint,target)
                 for joint in ["shoulder_"+side,"elbow_"+side]:p.angles[joint]=Grid.scalar(result.pose.angles[joint])
                 if result.clamp_distance>.01:reason="предел длины руки"
+                var elbow:String="elbow_"+side
+                var rest_upper:Vector2=k.rig.joints[k.rig.ids[elbow]].offset
+                var rest_lower:Vector2=k.rig.joints[k.rig.ids[g.joint]].offset
+                var rest:=rad_to_deg(rest_upper.angle_to(rest_lower))
+                var bend:=wrapf(p.angles[elbow]+rest,-180.,180.)
+                if absf(bend)>170.:
+                    p.angles[elbow]=Grid.scalar(clampf(bend,-170.,170.)-rest)
+                    reason="предел сгиба локтя"
             else:
                 var pivot:Vector2=k.rig.point("shoulder_"+side)
                 p.angles["shoulder_"+side]=Grid.scalar(p.angles["shoulder_"+side]+rad_to_deg((start-pivot).angle_to(target-pivot)))

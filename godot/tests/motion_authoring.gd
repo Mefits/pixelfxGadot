@@ -92,5 +92,40 @@ func run():
         costs.sort()
         old_cost.sort()
         print(id," @",hz," p95 base/goals us ",old_cost[int(.95*old_cost.size())],"/",costs[int(.95*costs.size())]," tick ",target_tick)
+    # Interrupt a driven attack with a different data-only program before its marker.
+    var g:=Asset.read(Asset.DIR+"sprint.json")
+    var j:=Asset.read(Asset.DIR+"jab.json")
+    var f:=Asset.read(Asset.DIR+"feint.json")
+    var ensemble=Asset.ensemble(g,[j,f],hz)
+    for t in range(100*scale):
+        var c={"speed":1.85}
+        if t==60*scale:c.action="jab"
+        if t==68*scale:c.action="feint"
+        ensemble.step(c)
+        check(ensemble.events.is_empty(),"cancel future marker")
+        if t==68*scale:check(ensemble.action=="feint","interrupt")
+    # A release track is compiled through the existing 091 author-foot solver.
+    var source:Dictionary=Asset.read(Asset.FIX+"highkick051c2_C.json").payload.clip
+    var kick={"version":1,"id":"released_kick","name":"kick","kind":"action","duration":.5,"goals":[],"keys":[],"events":[{"t":.25,"kind":"strike","anchor":"foot_far"}],"release":{"far":[0.,.25,.65,1.]}}
+    for i in range(31):
+        kick.keys.append({"t":i/60.,"angles":source.keys[23+i].pose.angles})
+    check(Asset.problem(kick)=="","leg document")
+    var kicker=Asset.player(kick,hz)
+    var foot_marker:=false
+    for t in range(55*scale):
+        kicker.step({"speed":0.,"action":"released_kick" if t==20*scale else ""})
+        if t==35*scale:
+            foot_marker=kicker.events.size()==1 and kicker.events[0][3]=="foot_far"
+            check(kicker.released.has("far") and not kicker.paths[1].stance,"authored swing")
+    check(foot_marker,"foot event")
+    # An impossible planted toe cannot move the support; a hand outside
+    # the reach disk must report the clamp while preserving bone lengths.
+    g.goals=[{"joint":"foot_near","xy":[100,-90],"clock":"cycle","center":0.,"width":1.,"priority":9,"weight":1.},
+        {"joint":"hand_near","xy":[120,-110],"clock":"cycle","center":0.,"width":1.,"priority":9,"weight":1.}]
+    var blocked=Asset.player(g,hz)
+    blocked.step({"speed":1.})
+    check(blocked.goal_report.foot_near.reason=="стопа в опоре","support priority")
+    check(blocked.goal_report.hand_near.reason=="предел длины руки","reach diagnostic")
+    check(blocked.rig.point("elbow_near").distance_to(blocked.rig.point("hand_near"))<10.,"arm length bound")
     print("TRACE ",digest.finish().hex_encode())
     quit(1 if failed else 0)

@@ -104,7 +104,8 @@ func step(cmd:Dictionary)->void:
     if action!="":
         dest.angles.merge(bank[action].frames[age],true)
     goal_report.clear()
-    if not art.is_empty() and not art.goals.is_empty():Goals.resolve(self,dest,paths,false)
+    var active_goals:Array=[] if art.is_empty() else art.programs.get(action,[])
+    if not active_goals.is_empty():Goals.resolve(self,dest,paths,false,active_goals)
     # Signed, damped reaction. Strip the already-applied reaction from
     # transition history via the unlayered pose kept below.
     if change:
@@ -154,7 +155,7 @@ func step(cmd:Dictionary)->void:
     # Pose history stores the authored layer; final rig contains reaction.
     var resolved:Dictionary=pose.duplicate(true)
     resolved.angles.chest+=recoil
-    if not art.is_empty() and not art.goals.is_empty():Goals.resolve(self,resolved,paths,true)
+    if not active_goals.is_empty():Goals.resolve(self,resolved,paths,true,active_goals)
     support.resolve(resolved,paths)
     final_pose=resolved
     var current:=world_anchors()

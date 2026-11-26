@@ -188,7 +188,7 @@ func reset()->void:
         if current_asset.is_empty():
             player=Kernel.new(rig,run_clip,bank,bank.jab.frames[0],60)
         else:
-            player=Asset.player(current_asset,60)
+            player=Asset.ensemble(current_asset if current_asset.kind=="gait" else {},[current_asset] if current_asset.kind=="action" else [],60,bank)
             rig=player.rig
         last_pose=player.final_pose
         reaction=null
@@ -211,7 +211,7 @@ func reset()->void:
 
 func queue_action(action:String)->void:
     if mode==0:pending_action=action
-    elif mode>1 and current_asset.kind=="action":pending_action=current_asset.id
+    elif mode>1:pending_action=current_asset.id if action=="jab" and current_asset.kind=="action" else action
 
 func queue_hit(zone:String,power:float,finisher:bool)->void:
     if mode!=1:

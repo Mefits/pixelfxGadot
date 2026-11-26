@@ -8,6 +8,7 @@ const FOLDER="user://motion_authoring/"
 const IDS=["sprint","jab","feint"]
 const JOINTS=["hand_near","hand_far","elbow_near","elbow_far","foot_near","foot_far"]
 const CHANNELS=["chest","head","shoulder_turn","shoulder_near","elbow_near","shoulder_far","elbow_far"]
+const LEG_CHANNELS=["hips","pelvis_turn","thigh_near","knee_near","foot_pitch_near","thigh_far","knee_far","foot_pitch_far"]
 const FIX="res://tests/fixtures/body_raster/full_058/"
 static var run_clip:Dictionary
 static var guard:Dictionary
@@ -38,9 +39,18 @@ static func problem(d:Dictionary)->String:
         if mask.is_empty():mask=k.angles.keys()
         if mask.size()!=k.angles.size():return "Каналы поз"
         for id in mask:
-            if not id in CHANNELS or not number(k.angles.get(id),-360,360):return "Канал позы"
+            if (not id in CHANNELS and not id in LEG_CHANNELS) or not number(k.angles.get(id),-360,360):return "Канал позы"
         last=k.t
     if d.keys[0].t!=0 or not is_equal_approx(last,d.duration):return "Границы движения"
+    var release=d.get("release",{})
+    if not release is Dictionary:return "Фазы опоры"
+    for side in release:
+        var knots=release[side]
+        if not side in ["near","far"] or not knots is Array or knots.size()!=4:return "Фаза освобождения ноги"
+        for i in 4:
+            if not number(knots[i],0,1) or (i>0 and knots[i]<=knots[i-1]):return "Порядок фаз ноги"
+        for part in ["thigh_","knee_","foot_pitch_"]:
+            if not mask.has(part+side):return "Пропущен канал ноги"
     if not d.get("events") is Array or d.events.size()>32:return "Список маркеров"
     for e in d.events:
         if not e is Dictionary or not number(e.get("t"),0,d.duration) or e.get("kind")!="strike" or not e.get("anchor") in ["hand_near","hand_far","foot_near","foot_far"]:return "Маркер"
@@ -77,19 +87,40 @@ static func build(d:Dictionary,hz:int)->Dictionary:
         var keys:Array=[]
         for k in d.keys:keys.append({"t":k.t,"pose":{"angles":k.angles,"root":[0,0]}})
         var clip={"keys":keys,"easing":"linear","events":d.events,"duration":d.duration,"loop":false}
-        out.bank[d.id]=Motion.compile(clip,0,ceili(d.duration*60.-.000001),d.keys[0].angles.keys(),hz)
+        var release:Dictionary={}
+        for side in d.get("release",{}):
+            release[side]=[]
+            for knot in d.release[side]:release[side].append(knot*d.duration*60.)
+        var channels:Array=d.keys[0].angles.keys().filter(func(id):return id in CHANNELS or id in ["hips","pelvis_turn"])
+        out.bank[d.id]=Motion.compile(clip,0,ceili(d.duration*60.-.000001),channels,hz,Body.make_rig() if not release.is_empty() else null,release)
     return out
 
 static func player(d:Dictionary,hz:int):
+    return ensemble(d if d.kind=="gait" else {},[d] if d.kind=="action" else [],hz)
+
+# Use one rig and one action calendar. Immutable programs are selected by
+# the kernel's current action, including when a new command interrupts it.
+static func ensemble(gait_doc:Dictionary,actions:Array,hz:int,base_bank:Dictionary={}):
     if run_clip.is_empty():
         run_clip=read(FIX+"run053a_C.json").payload.clip
         guard=read(FIX+"combo052a2_B.json").payload.clip.keys[0].pose.angles.duplicate()
         for id in guard.keys():
             if not id in CHANNELS:guard.erase(id)
         for id in guard:guard[id]=Grid.scalar(guard[id])
-    var asset:=build(d,hz)
-    var k=Kernel.new(Body.make_rig(),run_clip,asset.bank,guard,hz)
-    k.gait.arm_sweep=d.get("arm_sweep",94.)
-    k.gait.flight_width=d.get("flight_width",5.)
-    k.art=asset
+    var bank:=base_bank.duplicate()
+    var programs:Dictionary={}
+    var signatures:Array=[]
+    if not gait_doc.is_empty():
+        var gait_asset:=build(gait_doc,hz)
+        programs[""]=gait_asset.goals
+        signatures.append(gait_asset.signature)
+    for d in actions:
+        var asset:=build(d,hz)
+        bank.merge(asset.bank,true)
+        programs[d.id]=asset.goals
+        signatures.append(asset.signature)
+    var k=Kernel.new(Body.make_rig(),run_clip,bank,guard,hz)
+    k.gait.arm_sweep=gait_doc.get("arm_sweep",94.)
+    k.gait.flight_width=gait_doc.get("flight_width",5.)
+    k.art={"programs":programs,"signature":JSON.stringify(signatures).sha256_text()}
     return k

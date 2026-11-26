@@ -2,7 +2,7 @@ name: Motion authoring replay
 on:
   push:
     branches: [experiment/lab-motion-authoring]
-    paths: ['godot/lab/hybrid091/**', 'godot/lab/authoring/**', 'godot/tests/motion_authoring.gd', '.github/workflows/motion-authoring.yml']
+    paths: ['godot/lab/hybrid091/**', 'godot/lab/authoring/**', 'godot/tests/motion_authoring.gd', 'godot/tests/workshop_ui.gd', '.github/workflows/motion-authoring.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -55,3 +55,30 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
       - run: diff -r trace-ubuntu-latest trace-windows-latest
+
+  editor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: pip install scons
+      - run: python native_cpp/build.py
+      - shell: bash
+        run: |
+          curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -qo /tmp/godot.zip -d /tmp/engine
+          engine=/tmp/engine/Godot_v4.4.1-stable_linux.x86_64
+          mkdir -p godot/.godot results
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+          "$engine" --headless --path godot --script res://tests/lab_integration_100.gd
+          xvfb-run -a "$engine" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/workshop_ui.gd -- "$PWD/results" 2>&1 | tee results/workshop.log
+          test -s results/workshop.png
+          ! grep -E 'SCRIPT ERROR|ERROR:' results/workshop.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: workshop-ui
+          path: results/
