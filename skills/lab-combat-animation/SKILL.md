@@ -62,3 +62,7 @@ Combat should use full 60 Hz pose evaluation by default. Limited 15/25 Hz exposu
 
 ## Owner requirement — stable guard recovery (2026-11-26)
 Do not use arbitrary clip terminal pose as idle. Maintain a separate stance preference and support state; recover a usable base using deliberate steps and weight transfer, not sliding both feet to an absolute template. Keep authored attacks/60Hz timing, permit procedural adaptation. See docs/STANCE_RECOVERY_078.md; this first grounded test is not a dynamic balance solver.
+
+
+## Owner requirement — interruptible actions (2026-11-26)
+A new allowed movement must transition from the actual displayed pose and its motion/support history, including mid-transition interruption; no mandatory neutral/guard pose in between. Guard recovery only when no command continues motion. Keep authored technique/event timing separate from transition; cancelled future markers cannot fire and completed markers cannot repeat. See docs/ACTION_INTERRUPT_079.md. Actual cancel policy for gameplay is not yet approved.
