@@ -11,3 +11,7 @@ A exact 094 pose sequence. B same two 8-unit step trajectories plus common 2.4-u
 
 ## First native run correction
 Run 45895178746 captured all 156 frames and passed GDScript replay/anatomy. Python final pose gate failed: rotated lateral hip offsets placed the far ankle 6.72 units below hips, lifting trunk. Actual capture also showed near forearm held diagonally upward in DOWN. Correct final global thigh targets for rotated hip offsets and lower both arms; preserve original acceptance gate, flight, slip and timing. Re-run native CI before acceptance.
+
+
+## Corrected CI
+45895467671 success, exact 61e2dec551871f0ac961a462d6ddbdaeaf110fb5. Owner requests physical fall instead of compulsory final pose; see [096](ACTIVE_RAGDOLL_096.md). 095 preserved as control.
