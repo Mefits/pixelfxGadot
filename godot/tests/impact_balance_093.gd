@@ -1,0 +1,188 @@
+extends SceneTree
+const Body=preload("res://lab/body_ankle_069.gd")
+const Reaction=preload("res://lab/impact_balance_093.gd")
+const Leg=preload("res://lab/leg_constraints_082.gd")
+const FIX="res://tests/fixtures/body_raster/full_058/combo052a2_B.json"
+const LABELS=["A / 092 SCRIPTED STEP","B / PREDICTIVE STEP","C / B + RECOIL LEAN"]
+const EVENTS={24:["HEAD",.85],88:["BODY",.85],144:["HEAD",.70],154:["BODY",.80],164:["HEAD",1.45]}
+const FRAMES:int=270
+var cfg={"width":288,"height":240,"origin":[136,195],"density":3,"ink":0xff000000,"outline":3,"light":[-.48,-.64,.6],"seams":false,"materials":[[0xffe6ded7,0xffbdb3a8,0xff9e9081,0xff746759],[0xffa09d74,0xff827d50,0xff656139,0xff4a4628],[0xff655a4c,0xff50473b,0xff3c342c,0xff29231e]]}
+func _initialize():call_deferred("run")
+func fail(reason:String)->void:
+    push_error(reason)
+    quit(1)
+func input_at(player,t:int)->void:
+    if EVENTS.has(t):
+        var e:Array=EVENTS[t]
+        if player.hit(t,e[0],-1.,e[1]) and t==164 and player.variant==0:
+            player.permit_recovery_step(-1.)
+func run():
+    var args=OS.get_cmdline_user_args()
+    if args.size()!=1 or not ClassDB.class_exists("PixelFXBodyRaster"):
+        quit(2)
+        return
+    var fixture=JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/body_raster/poses.json"))
+    var verified:bool=false
+    for f in fixture.clips:
+        if f.clip=="combo052a2_B":verified=FileAccess.get_sha256(FIX)==f.sha256
+    if not verified:
+        fail("frozen guard SHA mismatch")
+        return
+    var source:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(FIX)).payload.clip.keys[0].pose
+    # Replay includes overlapping impulses and duplicate event rejection.
+    for mode in 3:
+        var a=Reaction.new(Body.make_rig(),source,mode)
+        var b=Reaction.new(Body.make_rig(),source,mode)
+        for t in 149:
+            input_at(a,t)
+            a.step()
+        var saved:Dictionary=a.snapshot()
+        b.restore(saved)
+        if b.hit(144,"HEAD",-1.,.7):
+            fail("duplicate hit accepted")
+            return
+        for t in range(149,FRAMES):
+            input_at(a,t)
+            input_at(b,t)
+            if a.step()!=b.step() or a.snapshot()!=b.snapshot():
+                fail("replay mismatch "+str([mode,t]))
+                return
+        var c=Reaction.new(Body.make_rig(),source,mode)
+        for t in 173:
+            input_at(c,t)
+            c.step()
+        var middle:Dictionary=c.snapshot()
+        var d=Reaction.new(Body.make_rig(),source,mode)
+        d.restore(middle)
+        for t in range(173,FRAMES):
+            input_at(c,t)
+            input_at(d,t)
+            if c.step()!=d.step() or c.snapshot()!=d.snapshot():
+                fail("mid-step replay mismatch "+str([mode,t]))
+                return
+        if saved.seen.size()!=3:
+            fail("snapshot alias")
+            return
+    for variant in [1,2]:
+        for dir in [-1.,1.]:
+            for power in [.85,1.45]:
+                var probe=Reaction.new(Body.make_rig(),source,variant)
+                probe.hit(1,"HEAD",dir,power)
+                for frame in 60:probe.step()
+                if (probe.recoveries>0)!=(power>1.):
+                    fail("independent balance trigger "+str([variant,dir,power,probe.recoveries]))
+                    return
+    root.size=Vector2i(864,272)
+    root.content_scale_size=root.size
+    var bg=ColorRect.new()
+    bg.color=Color("#34424d")
+    bg.size=root.size
+    bg.z_index=-2
+    root.add_child(bg)
+    var players:Array=[]
+    var bodies:Array=[]
+    var engines:Array=[]
+    var sprites:Array=[]
+    var arrows:Array=[]
+    var old:Array=[{}, {}, {}]
+    var rows:Array=[]
+    for lane in 3:
+        players.append(Reaction.new(Body.make_rig(),source,lane))
+        bodies.append(Body.new(2))
+        engines.append(ClassDB.instantiate("PixelFXBodyRaster"))
+        var sp=Sprite2D.new()
+        sp.centered=false
+        sp.position=Vector2(lane*288,24)
+        sp.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+        root.add_child(sp)
+        sprites.append(sp)
+        var label=Label.new()
+        label.text=LABELS[lane]
+        label.position=Vector2(lane*288+8,1)
+        label.add_theme_font_size_override("font_size",14)
+        root.add_child(label)
+        var floor_line=Line2D.new()
+        floor_line.width=1.
+        floor_line.default_color=Color("#8ca1aa")
+        floor_line.points=PackedVector2Array([Vector2(lane*288+8,222.),Vector2(lane*288+280,222.)])
+        floor_line.z_index=-1
+        root.add_child(floor_line)
+        var arrow=Line2D.new()
+        arrow.width=2.
+        arrow.default_color=Color("#ffb66d")
+        arrow.z_index=2
+        root.add_child(arrow)
+        arrows.append(arrow)
+    var caption=Label.new()
+    caption.position=Vector2(8,248)
+    caption.add_theme_font_size_override("font_size",14)
+    root.add_child(caption)
+    var last:int=-100
+    var zone:String=""
+    for t in FRAMES:
+        if EVENTS.has(t):
+            last=t
+            zone=EVENTS[t][0]
+        caption.text="60 Hz / %03d / %s"%[t,zone+" HIT" if t-last<6 else ("RECOVERY" if t-last<40 else "GUARD")]
+        var record:Dictionary={"tick":t,"lanes":[]}
+        for lane in 3:
+            var player=players[lane]
+            input_at(player,t)
+            var start:int=Time.get_ticks_usec()
+            var sample:Dictionary=player.step()
+            var pose_us:int=Time.get_ticks_usec()-start
+            var p:Dictionary=sample.pose
+            var rig=player.rig
+            if sample.error>.01:
+                fail("ankle drift "+str([lane,t,sample.error]))
+                return
+            for side in Leg.SIDES:
+                if not Leg.valid(p,side):
+                    fail("leg limit "+str([lane,t,side,Leg.bend(p,side),Leg.ankle(p,side)]))
+                    return
+            var q:Dictionary=rig.points.duplicate(true)
+            var points:Dictionary={}
+            var jump:float=0.
+            for joint in rig.joints:
+                var id:String=joint.id
+                var point:Vector2=q[id]
+                if not point.is_finite():
+                    fail("nonfinite")
+                    return
+                if not String(joint.parent).is_empty():
+                    if absf(point.distance_to(q[joint.parent])-Vector2(joint.offset).length())>.0002:
+                        fail("bone length "+id)
+                        return
+                if old[lane].has(id):jump=maxf(jump,point.distance_to(old[lane][id]))
+                points[id]=[point.x,point.y]
+            old[lane]=q
+            var parts:Array=bodies[lane].make(q,p.angles,rig.rotations.head)
+            for i in [0,2,3,8,9]:parts[i].material_id=1
+            for i in [5,6,7,11,12,13,15,17]:parts[i].material_id=2
+            var result:Dictionary=engines[lane].render(cfg,parts)
+            if not result.get("ok",false):
+                fail(str(result))
+                return
+            var im=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
+            var bounds=im.get_used_rect()
+            if bounds.size.x==0 or bounds.position.x<=0 or bounds.position.y<=0 or bounds.end.x>=288 or bounds.end.y>=240:
+                fail("empty or clipped")
+                return
+            if sprites[lane].texture==null:sprites[lane].texture=ImageTexture.create_from_image(im)
+            else:sprites[lane].texture.update(im)
+            arrows[lane].visible=t-last<5
+            if arrows[lane].visible:
+                var target:Vector2=q.head if zone=="HEAD" else Vector2(q.chest).lerp(q.hips,.55)
+                var end:Vector2=Vector2(lane*288+136,219)+target*3.+Vector2(10,0)
+                arrows[lane].points=PackedVector2Array([end+Vector2(26,0),end,end+Vector2(7,-5),end,end+Vector2(7,5)])
+            record.lanes.append({"phase":sample.phase,"moving":sample.moving,"swing":sample.swing,"anchors":{"near":[sample.anchors.near.x,sample.anchors.near.y],"far":[sample.anchors.far.x,sample.anchors.far.y]},"points":points,"offset":sample.offset,"velocity":sample.energy_proxy,"error":sample.error,"accepted":sample.accepted,"pose_us":pose_us,"joint_jump":jump,"prediction":sample.prediction,"margin":sample.margin,"recoveries":sample.recoveries,"last_start":sample.last_start})
+        rows.append(record)
+        await process_frame
+        await RenderingServer.frame_post_draw
+        if root.get_texture().get_image().save_png(args[0].path_join("frame-%03d.png"%t))!=OK:
+            fail("capture failed")
+            return
+    var file=FileAccess.open(args[0].path_join("records.json"),FileAccess.WRITE)
+    file.store_string(JSON.stringify(rows))
+    print("IMPACT_093_CAPTURE_OK frames=",FRAMES)
+    quit()
