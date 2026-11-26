@@ -1,0 +1,77 @@
+name: Lab physics backend comparison 099
+on:
+  push:
+    branches: [experiment/physics-backends-099]
+    paths:
+      - 'godot/lab/ragdoll_*_099.gd'
+      - 'godot/tests/physics_backends_*_099.gd'
+      - 'tools/*_099.*'
+      - '.github/workflows/physics-backends-099.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lab-godot
+          key: lab-godot-linux-4.4.1
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: pip install scons numpy scipy pillow
+      - name: Native oracle regression
+        run: |
+          g++ -std=c++17 -O2 -ffp-contract=off -fno-fast-math native_cpp/body_tests/test.cpp -o /tmp/body-test
+          /tmp/body-test native_cpp/body_tests/oracle.txt
+          g++ -std=c++17 -O2 -ffp-contract=off native_cpp/body_tests/loft.cpp -o /tmp/loft-test
+          /tmp/loft-test
+      - name: Build native body extension
+        run: python native_cpp/build.py
+      - name: Godot
+        run: |
+          mkdir -p ~/.cache/lab-godot
+          if [ ! -x ~/.cache/lab-godot/godot ]; then
+            curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+            unzip -qo /tmp/godot.zip -d ~/.cache/lab-godot
+            mv ~/.cache/lab-godot/Godot_v4.4.1-stable_linux.x86_64 ~/.cache/lab-godot/godot
+          fi
+          echo "$HOME/.cache/lab-godot" >> "$GITHUB_PATH"
+      - name: Verify frozen poses
+        run: ~/.cache/lab-godot/godot --headless --path godot --script res://tests/body_fixture_verify.gd
+      - name: Build pinned Box2D 3.1.1
+        run: |
+          git clone --depth 1 --branch v3.1.1 https://github.com/erincatto/box2d.git /tmp/box2d
+          git -C /tmp/box2d rev-parse HEAD
+          cmake -S /tmp/box2d -B /tmp/box2d/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBOX2D_SAMPLES=OFF -DBOX2D_UNIT_TESTS=OFF -DBOX2D_BENCHMARKS=OFF
+          cmake --build /tmp/box2d/build -j 2
+          LIB=$(find /tmp/box2d/build -name libbox2d.a -print -quit)
+          test -n "$LIB"
+          g++ -std=c++17 -O2 -ffp-contract=off -fno-fast-math -I/tmp/box2d/include tools/box2d_backend_099.cpp "$LIB" -lpthread -lm -o /tmp/box2d-099
+      - name: Capture three real engines
+        run: |
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+          mkdir -p physics-backends-099-results
+          for script in lab/ragdoll_reference_099.gd lab/ragdoll_common_099.gd tests/physics_backends_sim_099.gd tests/physics_backends_render_099.gd; do
+            godot --headless --path godot --check-only --script "res://$script" 2>&1 | tee -a physics-backends-099-results/syntax.log
+          done
+          ! grep -E 'SCRIPT ERROR|Failed to load script' physics-backends-099-results/syntax.log
+          python tools/physics_backends_099.py --godot godot --box2d /tmp/box2d-099 --out physics-backends-099-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: physics-backends-099
+          path: |
+            physics-backends-099-results/*.gif
+            physics-backends-099-results/*.json
+            physics-backends-099-results/*.log
+            physics-backends-099-results/model.txt
+            physics-backends-099-results/review.png
+            physics-backends-099-results/repeat/*.json
+            physics-backends-099-results/repeat/*.log
