@@ -30,6 +30,7 @@ def main():
     (out/"metrics.json").write_text(json.dumps(metrics,indent=2));print(json.dumps(metrics))
     assert d["max_strain"]<.25 and d["replay_error"]<1e-6
     assert metrics["tip_steady"][0]>metrics["tip_no_wind"][0]+3
+    assert metrics["tip_after"][1]>metrics["tip_steady"][1]+3
     assert metrics["cloth_pixels"]["min"]>15
     print("WIND_072_REVIEW_OK")
 if __name__=="__main__":main()

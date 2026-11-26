@@ -20,6 +20,7 @@ func run():
     var duplicate=Cloth.new()
     duplicate.collisions=room.cloth.collisions.duplicate(true)
     duplicate.reset(room.anchor)
+    for j in 480:duplicate.step(0.,false)
     var baseline:Dictionary=room.rig.points.duplicate(true)
     var geometry:Array=room.base.duplicate(true)
     var records:Array=[]
@@ -27,7 +28,7 @@ func run():
     var max_replay:float=0.
     for frame in 240:
         var sec:float=frame/30.
-        room.wind=0. if sec<2. or sec>=6. else 125.
+        room.wind=0. if sec<2. or sec>=6. else 160.
         room.gust=sec>=4. and sec<6.
         var start:int=Time.get_ticks_usec()
         for j in 4:room.cloth.step(room.wind,room.gust)
@@ -58,6 +59,19 @@ func run():
         if root.get_texture().get_image().save_png(out.path_join("frame-%03d.png"%frame))!=OK:
             quit(1)
             return
+    # Show controls and diagnostic mesh in a separate capture.
+    room.make_controls()
+    room.wind_slider.value=90.
+    room.gust_toggle.button_pressed=true
+    room.mesh_toggle.button_pressed=true
+    if room.wind!=90. or not room.gust or not room.show_mesh:
+        push_error("control signal regression")
+        quit(1)
+        return
+    room.render_frame()
+    await process_frame
+    await RenderingServer.frame_post_draw
+    root.get_texture().get_image().save_png(out.path_join("controls-review.png"))
     var file=FileAccess.open(out.path_join("records.json"),FileAccess.WRITE)
     file.store_string(JSON.stringify({"rows":records,"max_strain":max_error,"replay_error":max_replay,"nodes":room.cloth.nodes.size(),"triangles":2*(Cloth.ROWS-1)}))
     print("WIND_072_CAPTURE_OK frames=",records.size()," strain=",max_error," replay=",max_replay)

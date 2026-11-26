@@ -10,8 +10,8 @@ var prev:PackedVector3Array
 var edges:Array=[]
 var pins:PackedVector3Array
 var time:float=0.
-var damping:float=.985
-var bend:float=.18
+var damping:float=.99
+var bend:float=.01
 var mass:float=1.
 var collisions:Array=[]
 func _init():
@@ -22,16 +22,21 @@ func _init():
         edges.append([2*i,2*i+1,WIDTH,1.])
         if i+1<ROWS:
             for j in 2:edges.append([2*i+j,2*(i+1)+j,DS,1.])
-            edges.append([2*i,2*i+3,sqrt(DS*DS+WIDTH*WIDTH),.72])
-            edges.append([2*i+1,2*i+2,sqrt(DS*DS+WIDTH*WIDTH),.72])
+            edges.append([2*i,2*i+3,sqrt(DS*DS+WIDTH*WIDTH),.25])
+            edges.append([2*i+1,2*i+2,sqrt(DS*DS+WIDTH*WIDTH),.25])
         if i+2<ROWS:
             for j in 2:edges.append([2*i+j,2*(i+2)+j,2.*DS,-1.])
 func reset(anchor:Vector3)->void:
     time=0.
     set_anchor(anchor)
+    # Start with a hanging quarter arc rather than a horizontal rod.
     for i in ROWS:
-        for j in 2:
-            nodes[2*i+j]=pins[j]+Vector3(DS*i,0.,0.)
+        var s:float=i*DS
+        var theta:float=minf(s/5.,PI*.5)
+        var c:Vector3=anchor+Vector3(5.*sin(theta),5.*(1.-cos(theta))+maxf(0.,s-5.*PI*.5),0.)
+        var across:=Vector3(-sin(theta),cos(theta),0.)*WIDTH*.5
+        nodes[2*i]=c-across
+        nodes[2*i+1]=c+across
     prev=nodes.duplicate()
 func set_anchor(anchor:Vector3)->void:
     pins[0]=anchor+Vector3(0.,-WIDTH*.5,0.)
@@ -58,7 +63,7 @@ func step(wind:float,gust:bool)->void:
         var u:float=float(i/2)/float(ROWS-1)
         var wave:float=sin(time*9.-u*6.0)
         var w:float=wind*(1.+(.37*sin(time*4.1)+.18*sin(time*10.2) if gust else 0.))
-        var force:=Vector3(w/mass,48.+absf(w)*.13*wave/mass,absf(w)*.24*sin(time*7.-u*5.+float(i%2)*.7)/mass)
+        var force:=Vector3(w/mass,65.+absf(w)*(.30 if gust else .15)*wave/mass,absf(w)*(.36 if gust else .198)*sin(time*7.-u*5.+float(i%2)*.7)/mass)
         nodes[i]=p+velocity+force*DT*DT
         prev[i]=p
     for iteration in 10:

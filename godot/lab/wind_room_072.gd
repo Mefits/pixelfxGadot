@@ -7,6 +7,7 @@ var base:Array=[]
 var fixed_body:Array=[]
 var raster
 var sprite:Sprite2D
+var overlay:Node2D
 var status:Label
 var speed_label:Label
 var wind_slider:HSlider
@@ -63,11 +64,14 @@ func _ready()->void:
     cloth.collisions=[
         [Vector3(chest.x,chest.y+4.,0.),Vector3(4.8,7.8,3.35)],
         [Vector3(head.x,head.y,0.),Vector3(3.9,4.4,3.25)]]
-    cloth.reset(anchor)
+    reset_cloth()
     sprite=Sprite2D.new()
     sprite.centered=false
     sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
     add_child(sprite)
+    overlay=Node2D.new()
+    add_child(overlay)
+    overlay.draw.connect(draw_mesh)
     status=Label.new()
     status.position=Vector2(12,6)
     status.add_theme_font_size_override("font_size",13)
@@ -80,7 +84,9 @@ func _ready()->void:
     render_frame()
 func make_controls()->void:
     var panel=VBoxContainer.new()
-    panel.position=Vector2(8,213)
+    panel.position=Vector2(8,211)
+    panel.theme=Theme.new()
+    panel.theme.default_font_size=11
     panel.size=Vector2(464,55)
     add_child(panel)
     var line=HBoxContainer.new()
@@ -123,16 +129,19 @@ func make_controls()->void:
     bl.text="Bend"
     second.add_child(bl)
     bend_slider=HSlider.new()
-    bend_slider.max_value=.5
-    bend_slider.step=.01
-    bend_slider.value=.18
+    bend_slider.max_value=.05
+    bend_slider.step=.001
+    bend_slider.value=.01
     bend_slider.custom_minimum_size=Vector2(95,18)
     second.add_child(bend_slider)
     bend_slider.value_changed.connect(func(v):cloth.bend=v)
     var reset=Button.new()
     reset.text="Reset"
     second.add_child(reset)
-    reset.pressed.connect(func():cloth.reset(anchor))
+    reset.pressed.connect(reset_cloth)
+func reset_cloth()->void:
+    cloth.reset(anchor)
+    for j in 480:cloth.step(0.,false)
 func _process(delta:float)->void:
     if manual or raster==null:return
     accum+=minf(delta,.10)
@@ -163,8 +172,9 @@ func render_frame()->bool:
     if sprite.texture==null:sprite.texture=ImageTexture.create_from_image(im)
     else:sprite.texture.update(im)
     status.text="LAB 0.72   /   SCARF WIND TEST"
-    speed_label.text="WIND %+04.0f   |   %s   |   mass %.2f   bend %.2f"%[wind,"GUSTS" if gust else "STEADY",cloth.mass,cloth.bend]
+    speed_label.text="WIND %+04.0f   |   %s   |   mass %.2f   bend %.3f"%[wind,"GUSTS" if gust else "STEADY",cloth.mass,cloth.bend]
     queue_redraw()
+    overlay.queue_redraw()
     return true
 func _draw()->void:
     draw_rect(Rect2(0,0,480,270),Color("#263540"))
@@ -188,9 +198,10 @@ func _draw()->void:
             for i in 5:
                 var x:float=f.x+s*(36.+fmod(i*25.+cloth.time*absf(wind)*.75,125.))
                 draw_line(Vector2(x,y),Vector2(x+s*12.,y),Color("#578c9f"),1.)
+func draw_mesh()->void:
     if show_mesh:
         for edge in cloth.edges:
             if float(edge[3])<0.:continue
             var a:Vector3=cloth.nodes[edge[0]]
             var b:Vector3=cloth.nodes[edge[1]]
-            draw_line(ORIGIN+Vector2(a.x,a.y)*DENSITY,ORIGIN+Vector2(b.x,b.y)*DENSITY,Color("#e2c87a"),1.)
+            overlay.draw_line(ORIGIN+Vector2(a.x,a.y)*DENSITY,ORIGIN+Vector2(b.x,b.y)*DENSITY,Color("#e2c87a"),1.)
