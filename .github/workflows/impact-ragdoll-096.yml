@@ -1,7 +1,7 @@
 name: Lab active ragdoll 096
 on:
   push:
-    branches: [experiment/impact-ragdoll-096]
+    branches: [experiment/active-ragdoll-096]
     paths:
       - 'godot/lab/impact_ragdoll_096.gd'
       - 'godot/lab/ragdoll_solver_096.gd'
