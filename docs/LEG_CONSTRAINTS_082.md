@@ -4,3 +4,7 @@ Owner reports leg turns backwards after attack. Diagnose geometric bend from act
 
 ## 082a compile correction
 Original CI [45843573436](https://github.com/Mefits/pixelfxGadot/actions/runs/45843573436) failed: local wrap() conflicts with Godot builtin. Renamed helper to signed_degrees in 68e6f9ff838da7111c24aa3c09f6fd7a9f5e9585, repeat CI pending. Do not claim owner screenshot fixed before native review.
+
+
+## 082a / 083 verified
+082a CI [45845045140](https://github.com/Mefits/pixelfxGadot/actions/runs/45845045140) success at 68e6f9ff838da7111c24aa3c09f6fd7a9f5e9585, artifact 15131026560. A/B/C negative knee and out-of-bound ankle samples 14/0/0 each; max ankle step 88.10/56.38/56.38 deg. Not visually accepted. 083 CI [45845285874](https://github.com/Mefits/pixelfxGadot/actions/runs/45845285874) success at a35cffda8b5024510c3c8f24512ea53745f7c948, artifact [15132016154](https://github.com/Mefits/pixelfxGadot/actions/runs/45845285874/artifacts/15132016154). Held frame pairs 24/0/0, max joint step 11.143/4.569/2.596, acceleration p95 10.341/2.700/.930, reference stance drift p95 12.484/6.351/.00000267, pose p95 .037/.096/.247ms. GIF 36/72 frames 1200/2400ms. Preserve B/C, no owner choice. User observes strange, jerky kick entry and legs appearing low cadence; source combo tick39->40 knee_near changes 60.1deg in one tick; far chamber several 40–58deg changes, hit held ticks 50–52. Exact screenshot frame not identified. Shift focus from transition complexity to authored choreography; retain 60Hz and existing controller experiments.
