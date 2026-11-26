@@ -163,16 +163,17 @@ func run():
     var baseline:Dictionary=base_event
     var staged_chest:Dictionary=impact_for("chest",Vector2(2.,-2.))
     var staged_hips:Dictionary=impact_for("hips",Vector2(0.,-1.5))
-    var profiles:Array=[]
-    profiles.append(simulate("profileA",16,0,baseline,0,true))
-    profiles.append(simulate("profileB",16,0,staged_chest,1,true))
-    profiles.append(simulate("profileC",16,1,staged_hips,1,true))
     var sweep:Dictionary={}
     var selected:int=0
     for passes in [8,12,16]:
         var probe:Dictionary=simulate("sweep",passes,1,staged_hips,1,false)
         sweep[str(passes)]=probe.metrics
         if selected==0 and bool(probe.metrics.quality):selected=passes
+    var render_passes:int=selected if selected>0 else 16
+    var profiles:Array=[]
+    profiles.append(simulate("profileA",render_passes,0,baseline,0,true))
+    profiles.append(simulate("profileB",render_passes,0,staged_chest,1,true))
+    profiles.append(simulate("profileC",render_passes,1,staged_hips,1,true))
     # Rollback at five cuts, including a corrected input branch.
     setup_model()
     var w=world(maxi(8,selected),1,1)

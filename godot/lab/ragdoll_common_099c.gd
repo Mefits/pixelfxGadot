@@ -6,8 +6,6 @@ const Leg=preload("res://lab/leg_constraints_082.gd")
 const FIX="res://tests/fixtures/body_raster/full_058/combo052a2_B.json"
 const N:int=300
 const H:float=1./120.
-const MU:float=.10
-const DAMP:float=.35
 const G:float=180.
 # All three get an identical horizontal impulse, at the actual chest point.
 # No assigned Y velocity or whole-body spin. Art units, not measured newtons.
