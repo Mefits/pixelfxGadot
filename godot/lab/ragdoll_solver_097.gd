@@ -185,8 +185,8 @@ func residual_tone(a:Dictionary,b:Dictionary)->void:
     var max_torque:float=35.
     if id.begins_with("thigh_"):
         var rest:float=Leg.rest(id.trim_prefix("thigh_"))
-        lo=deg_to_rad(-60.-rest)
-        hi=deg_to_rad(32.-rest)
+        lo=deg_to_rad(-60.+rest)
+        hi=deg_to_rad(32.+rest)
         stiffness=180.
         resistance=9.
         max_torque=220.
@@ -230,7 +230,7 @@ func solve_angle(a:Dictionary,b:Dictionary)->void:
     if profile>0 and String(b.id).begins_with("thigh_"):
         var rest:float=Leg.rest(String(b.id).trim_prefix("thigh_"))
         var release:float=1.-motor
-        lower=maxf(lower,deg_to_rad(lerpf(-130.,-105.,release)-rest))
+        lower=maxf(lower,deg_to_rad(lerpf(-130.,-105.,release)+rest))
     var c:float=relative-clampf(relative,lower,float(b.hi))
     if absf(c)<.000001:return
     var impulse:float=-c/(float(a.ii)+float(b.ii))

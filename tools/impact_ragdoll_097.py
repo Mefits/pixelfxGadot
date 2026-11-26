@@ -54,7 +54,7 @@ def main():
             leg=(np.array(q["knee_near"])-q["thigh_near"]+np.array(q["knee_far"])-q["thigh_far"])*.5
             fold.append(float(np.degrees(np.arccos(np.clip(np.dot(trunk,leg)/(np.linalg.norm(trunk)*np.linalg.norm(leg)),-1,1)))))
             for side,rest in (("near",10.304846468766),("far",-10.304846468766)):
-                hipflex.append((i,-data[i]["angles"]["thigh_"+side]-rest))
+                hipflex.append((i,-data[i]["angles"]["thigh_"+side]+rest))
             foot_head.append(min(np.linalg.norm(np.array(q["foot_"+side])-q["head"]) for side in ("near","far")))
         com=np.array([v["com"] for v in data])
         postslide=float(com[contact,0]-np.min(com[contact:,0]))

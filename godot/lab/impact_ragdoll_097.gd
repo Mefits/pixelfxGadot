@@ -13,11 +13,12 @@ func _init(r,p:Dictionary,m:int):
 
 func snapshot()->Dictionary:
     var s:Dictionary=super.snapshot()
-    s.merge({"prior_pose":prior_pose.duplicate(true),"before_launch":before_launch.duplicate(true),"physical":physics_body.snapshot() if physics_body!=null else {}})
+    s.merge({"passes":passes,"prior_pose":prior_pose.duplicate(true),"before_launch":before_launch.duplicate(true),"physical":physics_body.snapshot() if physics_body!=null else {}})
     return s
 
 func restore(s:Dictionary)->void:
     super.restore(s)
+    passes=int(s.passes)
     prior_pose=s.prior_pose.duplicate(true)
     before_launch=s.before_launch.duplicate(true)
     physics_body=null
@@ -38,7 +39,7 @@ func step()->Dictionary:
         prior_pose=result.pose.duplicate(true)
     else:
         if physics_body==null:
-            physics_body=Solver.new(rig,flight_entry,before_launch,floor_y,variant==2,Vector2(-70.,-58.),-2.4)
+            physics_body=Solver.new(rig,flight_entry,before_launch,floor_y,true,Vector2(-70.,-58.),-2.4,variant,passes)
         flight_pose=physics_body.tick()
         flight_position=IK.root_of(flight_pose)
         support_count=0
