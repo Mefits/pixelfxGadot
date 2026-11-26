@@ -17,6 +17,8 @@ func _initialize():
     var legacy_marks:Array=[]
     var peak_old:=0.
     var peak_new:=0.
+    var locks:Array=[{},{}]
+    var drift:Array=[0.,0.]
     var old_points:Dictionary={}
     var new_points:Dictionary={}
     for t in 245:
@@ -40,6 +42,17 @@ func _initialize():
             p=sample.pose
             for marker in sample.events:legacy_marks.append([t,marker.anchor])
         ref.evaluate(p)
+        if t<112:
+            for i in 2:
+                var side:String=Leg.SIDES[i]
+                var old_toe:Vector2=ref.point("foot_"+side)+IK.toe_vector(p,side)+Vector2.RIGHT*gait.travel
+                var new_toe:Vector2=player.rig.point("foot_"+side)+IK.toe_vector(player.final_pose,side)+Vector2.RIGHT*player.gait.travel
+                var toes:=[old_toe,new_toe]
+                for lane in 2:
+                    if player.paths[i].stance:
+                        if not locks[lane].has(side):locks[lane][side]=toes[lane]
+                        drift[lane]=maxf(drift[lane],toes[lane].distance_to(locks[lane][side]))
+                    else:locks[lane].erase(side)
         if t>=112:
             for id in ref.points:
                 peak_old=maxf(peak_old,ref.point(id).distance_to(old_points[id]))
@@ -52,5 +65,6 @@ func _initialize():
         require(b.save_png(out.path_join("%03d.png"%t))==OK,"new capture")
         rows.append([gait.travel,player.gait.travel,player.events,player.stopped])
     FileAccess.open(out.path_join("capture.json"),FileAccess.WRITE).store_string(JSON.stringify(rows))
+    print("Same gait drift old/new ",drift)
     print("COMPARE ",legacy_marks," post-command peak joint step old/new ",peak_old," / ",peak_new)
     quit(1 if failed else 0)
