@@ -39,3 +39,7 @@ Read README.md, docs/ROADMAP.md and original/pixelfx/skills/pixelfx/SKILL.md fir
 
 ## Isolated Astra body raster assignment
 On experiment/astra-body-raster-054 ONLY, docs/ASTRA_BODY_RASTER_TASK_RU.md and docs/BODY_RASTER_CONTRACT.md define authorized work. This exception is limited to rendering kernel and technical tests; existing animation R&D rules continue on experiment/motion-temporal-rd. No merge, no Project N changes. Do not redo animations or original runtime port. Read task first.
+
+
+## Актуальное направление Lab — решение владельца 2026-11-26
+Для новых исследований гибридного движения исходная ветка `experiment/hybrid-motion-091` (принятый checkpoint `bd0a30bafddbc93a0427788ee7bb1dffed9a7ac3`, код CI `b2fe9d522c10a434b272abcc12abe88f4541586e`). Это уточняет старые ссылки на активную R&D ветку выше. Принято новое ядро как основа Lab, не готовый релиз. См. [решение в handoff](docs/MOTION_HANDOFF_RU.md) и [архитектуру](docs/HYBRID_MOTION_091_RU.md). Сохранять изолированные контрольные эксперименты, не сливать автоматически. Интеграция в интерфейс Lab, редактор авторских целей, реакции/падения и торможение ещё не завершены. Project N не изменять без отдельного согласования. GIF ×1 и ×0.5.

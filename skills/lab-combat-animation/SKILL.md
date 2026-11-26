@@ -78,3 +78,7 @@ Validate geometric knee bend (include rig rest offsets) and shin-relative ankle 
 
 ## Owner locomotion direction (2026-11-26)
 Minimum game movement set: fast walk and fast run. Do not optimize for photorealistic human movement; dynamic stylized silhouette and long expressive sprint steps take priority. Maintain 60Hz, valid anatomy, support and explicit rollback-compatible state. Do not sacrifice style for purely numerical smoothness. Preserve prior profiles; see docs/DISTANCE_GAIT_087.md.
+
+
+## Принятое гибридное ядро (2026-11-26)
+Владелец одобрил правую дорожку Astra Hybrid 0.91. Новое движение разрабатывать на основе `experiment/hybrid-motion-091` и его контракта, а не создавать конкурирующее ядро; старые эксперименты сохранять. Это актуализирует прежнюю инструкцию о ветке. См. docs/HYBRID_MOTION_091_RU.md и docs/MOTION_HANDOFF_RU.md. Интеграция в интерфейс Lab ещё не выполнена. Точные исходники и проверенные ограничения — ledger. Не изменять N и не сливать автоматически.
