@@ -1,0 +1,52 @@
+name: Hybrid motion replay 091
+on:
+  push:
+    branches: [experiment/hybrid-motion-091]
+    paths: ['godot/lab/hybrid091/**', 'godot/tests/hybrid_091.gd', 'tools/hybrid_replay_091.py', '.github/workflows/hybrid-091.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install matching official Godot binaries
+        shell: python
+        run: |
+          import os, pathlib, urllib.request, zipfile
+          windows = os.name == "nt"
+          platform = "win64.exe" if windows else "linux.x86_64"
+          name = "Godot_v4.4.1-stable_" + platform
+          urllib.request.urlretrieve("https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/" + name + ".zip", "engine.zip")
+          with zipfile.ZipFile("engine.zip") as z:
+              z.extractall("engine")
+          exe = next(p for p in pathlib.Path("engine").rglob("*") if p.name == name)
+          exe.chmod(0o755)
+          if windows:
+              exe = exe.with_name(exe.stem + "_console.exe")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              print("GODOT=" + str(exe.resolve()), file=f)
+      - shell: bash
+        run: python tools/hybrid_replay_091.py --godot "$GODOT" --out results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trace-${{ matrix.os }}
+          path: results/
+  compare:
+    runs-on: ubuntu-latest
+    needs: replay
+    steps:
+      - uses: actions/download-artifact@v4
+      - shell: python
+        run: |
+          import json, pathlib
+          for rate in [60, 120]:
+              traces = [pathlib.Path("trace-"+os, f"{rate}-0.txt").read_text().splitlines() for os in ("ubuntu-latest", "windows-latest")]
+              for tick, (left,right) in enumerate(zip(*traces,strict=True)):
+                  assert left==right, (rate,tick,left,right)
+              hashes = [json.loads(pathlib.Path("trace-"+os, f"{rate}.json").read_text())[0]["sha256"] for os in ("ubuntu-latest","windows-latest")]
+              assert hashes[0]==hashes[1], hashes

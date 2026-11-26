@@ -1,0 +1,160 @@
+extends RefCounted
+const Gait=preload("gait.gd")
+const Support=preload("support.gd")
+const Leg=preload("res://lab/leg_constraints_082.gd")
+var rig
+var gait
+var support
+var hz:int
+var bank:Dictionary
+var guard:Dictionary
+var pose:Dictionary
+var previous:Dictionary
+var paths:Array
+var tick:=0
+var speed:=1.
+var stopped:=false
+var settle:=0.
+var action:=""
+var age:=0
+var serial:=0
+var duration:=0
+var offsets:Dictionary={}
+var slopes:Dictionary={}
+var recoil:=0.
+var recoil_velocity:=0.
+var health:=100
+var events:Array=[]
+var hands:Dictionary={}
+var style:=0.
+
+func _init(r,run_clip:Dictionary,motions:Dictionary,guard_angles:Dictionary,rate:int):
+    assert(rate in [60,120])
+    hz=rate
+    rig=r
+    bank=motions
+    guard=guard_angles
+    gait=Gait.new(r,run_clip)
+    support=Support.new(r)
+    var base:Dictionary=gait.intent()
+    pose=base.pose
+    paths=base.paths
+    support.resolve(pose,paths)
+    previous=pose
+    final_pose=pose
+    hands=world_hands()
+
+func world_hands()->Dictionary:
+    var result:Dictionary={}
+    for side in Leg.SIDES:
+        var id:String="hand_"+side
+        result[id]=rig.point(id)+Vector2.RIGHT*gait.travel
+    return result
+
+# One command per tick: target speed, optional action edge, signed chest
+# impulse, static opponent hurt-circle. Combat rules own impulse and damage.
+func step(cmd:Dictionary)->void:
+    events=[]
+    var scale:=60./hz
+    var target:float=clampf(cmd.speed,0.,Gait.RUN_SPEED)
+    speed=move_toward(speed,maxf(1.,target),.035*scale)
+    if target>0.:stopped=false
+    if not stopped:
+        gait.move_distance(speed,speed*scale)
+    var base:Dictionary=gait.intent()
+    paths=base.paths
+    if target==0. and speed<=1. and paths[0].stance and paths[1].stance:
+        stopped=true
+    settle=move_toward(settle,1. if stopped else 0.,scale/12.)
+    style=base.gait
+    var dest:Dictionary=base.pose
+    for id in guard:
+        dest.angles[id]=lerpf(dest.angles[id],guard[id],settle)
+    for path in paths:path.pitch=lerpf(path.pitch,0.,settle)
+    dest.root[1]=lerpf(dest.root[1],2.5,settle)
+    var next:String=cmd.get("action","")
+    var change:bool=bank.has(next) or (action!="" and age>=bank[action].frames.size())
+    if change:
+        action=next if bank.has(next) else ""
+        serial+=1
+        age=0
+    if action!="":
+        dest.angles.merge(bank[action].frames[age],true)
+    # Signed, damped reaction. Strip the already-applied reaction from
+    # transition history via the unlayered pose kept below.
+    if change:
+        offsets.clear()
+        slopes.clear()
+        var magnitude:=0.
+        for id in guard:
+            offsets[id]=wrapf(pose.angles[id]-dest.angles[id],-180.,180.)
+            slopes[id]=wrapf(pose.angles[id]-previous.angles[id],-180.,180.)
+            if action!="" and bank[action].frames.size()>1 and bank[action].frames[0].has(id):
+                slopes[id]-=wrapf(bank[action].frames[1][id]-bank[action].frames[0][id],-180.,180.)
+            magnitude=maxf(magnitude,absf(offsets[id]))
+        duration=roundi(clampf(4.+magnitude/18.,4.,14.)/scale)
+        if action!="":
+            for marker_tick in bank[action].markers:duration=mini(duration,marker_tick)
+    if age<duration:
+        var u:=float(age)/duration
+        for id in offsets:
+            dest.angles[id]+=offsets[id]*(1.-smoothstep(0.,1.,u))+clampf(slopes[id]*duration,-45.,45.)*u*(1.-u)*(1.-u)
+    previous=pose
+    pose=dest
+    recoil_velocity+=float(cmd.get("impulse",0.))
+    recoil_velocity+=(-240.*recoil-30.*recoil_velocity)/hz
+    recoil+=recoil_velocity/hz
+    # Pose history stores the authored layer; final rig contains reaction.
+    var resolved:Dictionary=pose.duplicate(true)
+    resolved.angles.chest+=recoil
+    support.resolve(resolved,paths)
+    final_pose=resolved
+    var current:=world_hands()
+    if action!="" and bank[action].markers.has(age):
+        var ordinal:=0
+        for marker in bank[action].markers[age]:
+            var id:String=marker.anchor
+            var hit:=false
+            if hands.has(id) and cmd.has("hurt_center"):
+                var start:Vector2=hands[id]
+                var delta:Vector2=current[id]-start
+                var u:=clampf((cmd.hurt_center-start).dot(delta)/maxf(delta.length_squared(),1e-12),0.,1.)
+                hit=(start+u*delta).distance_to(cmd.hurt_center)<=cmd.radius
+            if hit:health-=5
+            events.append([tick,serial,ordinal,id,hit])
+            ordinal+=1
+    hands=current
+    age+=1
+    tick+=1
+
+var final_pose:Dictionary
+# S[t] is immediately before command t. Fixed field order, lossless local
+# Variant encoding. Immutable assets and derived render geometry stay outside.
+func save()->PackedByteArray:
+    return var_to_bytes([1,hz,tick,gait.snapshot(),speed,stopped,settle,action,age,serial,duration,offsets,slopes,recoil,recoil_velocity,health,hands,pose,previous,final_pose,paths,style])
+
+func restore(bytes:PackedByteArray)->void:
+    var s:Array=bytes_to_var(bytes)
+    assert(s[0]==1 and s[1]==hz)
+    tick=s[2]
+    gait.restore(s[3])
+    speed=s[4]
+    stopped=s[5]
+    settle=s[6]
+    action=s[7]
+    age=s[8]
+    serial=s[9]
+    duration=s[10]
+    offsets=s[11]
+    slopes=s[12]
+    recoil=s[13]
+    recoil_velocity=s[14]
+    health=s[15]
+    hands=s[16]
+    pose=s[17]
+    previous=s[18]
+    final_pose=s[19]
+    paths=s[20]
+    style=s[21]
+    events=[]
+    rig.evaluate(final_pose)
