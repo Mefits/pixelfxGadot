@@ -21,13 +21,20 @@ def review(out,clips):
     yy,xx=np.mgrid[0:H,0:W];x=(xx-128)/3;y=(yy-225)/3
     summary=[]
     for i in range(3):
-        gaps=[];maskdiff=0;overlap=[];vol=[];feet=[];stand_size=None
+        gaps=[];gaps8=[];islands=[];maskdiff=0;overlap=[];vol=[];feet=[];stand_size=None
         for r,s in zip(rows,solids):
             clip,tick=r["clip"],r["tick"]
             assert (clip,tick)==(s["clip"],s["tick"])
             rgb=np.asarray(Image.open(out/f"{clip}-{tick:03}.png").convert("RGB"))[:,W*i:W*(i+1)]
             mask=np.any(rgb!=rgb[0,0],axis=-1)&np.any(rgb!=0,axis=-1)
-            if label(mask)[1]!=1:gaps.append([clip,tick])
+            labs,count=label(mask)
+            if count!=1:
+                gaps.append([clip,tick])
+                sizes=np.bincount(labs.ravel())[1:]
+                for idx in np.argsort(sizes)[:-1]:
+                    yy0,xx0=np.where(labs==idx+1)
+                    islands.append({"clip":clip,"tick":tick,"pixels":int(sizes[idx]),"xy":[int(xx0.min()),int(yy0.min()),int(xx0.max()),int(yy0.max())]})
+            if label(mask,structure=np.ones((3,3)))[1]!=1:gaps8.append([clip,tick])
             parts=s["lanes"][i]
             if clip=="stand":
                 ys,xs=np.where(mask)
@@ -43,10 +50,11 @@ def review(out,clips):
             overlap.append([float(np.maximum(0,np.minimum(hi[a],hi[b])-np.maximum(lo[a],lo[b])).sum()/9) for a,b in links])
             vol.append(float(union_volume(lo,hi,3)))
         ov=np.array(overlap)
-        summary.append({"lane":LABELS[i],"disconnected_frames":len(gaps),"disconnected_examples":gaps[:8],"oracle_mask_diff_max":maskdiff,"sampled_poses":len(vol),"clothing_pixels":stats([r["lanes"][i]["clothing_pixels"] for r in rows]),"hair_pixels":stats([r["lanes"][i]["hair_pixels"] for r in rows]),"min_attachment_overlap":float(ov.min()),"weakest_pair":list(links[int(np.unravel_index(ov.argmin(),ov.shape)[1])]),"stand":stand_size,"volume_ratio_min":min(vol)/vol[0],"volume_ratio_max":max(vol)/vol[0],"ankle_path_difference":stats(feet),"timings_us":{k:stats([r["lanes"][i][k] for r in rows[8:]]) for k in ("prepare_us","raster_us","bridge_us")}})
-    assert all(s["disconnected_frames"]==0 for s in summary)
-    assert all(s["oracle_mask_diff_max"]<=5 for s in summary)
+        summary.append({"lane":LABELS[i],"disconnected_frames":len(gaps),"disconnected_examples":gaps[:8],"disconnected_8_frames":len(gaps8),"disconnected_8_examples":gaps8[:8],"islands":islands,"oracle_mask_diff_max":maskdiff,"sampled_poses":len(vol),"clothing_pixels":stats([r["lanes"][i]["clothing_pixels"] for r in rows]),"hair_pixels":stats([r["lanes"][i]["hair_pixels"] for r in rows]),"min_attachment_overlap":float(ov.min()),"weakest_pair":list(links[int(np.unravel_index(ov.argmin(),ov.shape)[1])]),"stand":stand_size,"volume_ratio_min":min(vol)/vol[0],"volume_ratio_max":max(vol)/vol[0],"ankle_path_difference":stats(feet),"timings_us":{k:stats([r["lanes"][i][k] for r in rows[8:]]) for k in ("prepare_us","raster_us","bridge_us")}})
     (out/"metrics.json").write_text(json.dumps({"poses":len(rows),"fk_max_error":data["max_xy"],"lanes":summary},indent=2))
+    bad=next((s["disconnected_examples"][0] for s in summary if s["disconnected_examples"]),None)
+    if bad:
+        labelled(out/f"{bad[0]}-{bad[1]:03}.png").save(out/"island-review.png")
     stand=Image.open(out/"stand-000.png").convert("RGB")
     preview=Image.new("RGB",(660,540),"#192632");d=ImageDraw.Draw(preview)
     for i,n in enumerate(LABELS):
@@ -79,7 +87,10 @@ def review(out,clips):
             delays=[]
             for i in range(im.n_frames):im.seek(i);delays.append(im.info["duration"])
             assert sum(delays)==ends[-1]
-    print("BODY_SASUKE_071_REVIEW_OK",json.dumps(summary))
+    print("BODY_SASUKE_071_REVIEW_DIAGNOSTIC",json.dumps([{k:v for k,v in s.items() if k!="islands"} for s in summary]))
+    assert all(s["oracle_mask_diff_max"]<=5 for s in summary)
+    assert all(s["disconnected_frames"]==0 for s in summary)
+    print("BODY_SASUKE_071_REVIEW_OK")
 if __name__=="__main__":
     p=argparse.ArgumentParser();p.add_argument("--godot",required=True);p.add_argument("--out",type=Path,required=True);a=p.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=True)
