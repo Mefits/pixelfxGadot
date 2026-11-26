@@ -1,0 +1,69 @@
+name: Lab energy ribbon 073
+on:
+  push:
+    branches: [experiment/body-anatomy-059]
+    paths:
+      - 'godot/lab/energy_ribbon_073.gd'
+      - 'godot/lab/secondary_motion_072.gd'
+      - 'godot/lab/wind_room_072.gd'
+      - 'godot/lab/energy_ribbon_073.tscn'
+      - 'godot/tests/energy_ribbon_073.gd'
+      - 'tools/energy_ribbon_073.py'
+      - '.github/workflows/energy-ribbon-073.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/lab-godot
+          key: lab-godot-linux-4.4.1
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: pip install scons numpy scipy pillow
+      - name: Native oracle regression
+        run: |
+          g++ -std=c++17 -O2 -ffp-contract=off -fno-fast-math native_cpp/body_tests/test.cpp -o /tmp/body-test
+          /tmp/body-test native_cpp/body_tests/oracle.txt
+          g++ -std=c++17 -O2 -ffp-contract=off native_cpp/body_tests/loft.cpp -o /tmp/loft-test
+          /tmp/loft-test
+      - name: Build native body extension
+        run: python native_cpp/build.py
+      - name: Godot
+        run: |
+          mkdir -p ~/.cache/lab-godot
+          if [ ! -x ~/.cache/lab-godot/godot ]; then
+            curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+            unzip -qo /tmp/godot.zip -d ~/.cache/lab-godot
+            mv ~/.cache/lab-godot/Godot_v4.4.1-stable_linux.x86_64 ~/.cache/lab-godot/godot
+          fi
+          echo "$HOME/.cache/lab-godot" >> "$GITHUB_PATH"
+      - name: Verify frozen poses
+        run: ~/.cache/lab-godot/godot --headless --path godot --script res://tests/body_fixture_verify.gd
+      - name: Check script syntax
+        run: |
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+          ~/.cache/lab-godot/godot --headless --path godot --check-only --script res://tests/energy_ribbon_073.gd
+      - name: Lab 073 capture
+        run: |
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+          python tools/energy_ribbon_073.py --godot godot --out energy-ribbon-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: energy-ribbon-073
+          path: |
+            energy-ribbon-results/*.gif
+            energy-ribbon-results/metrics.json
+            energy-ribbon-results/*review.png
+            energy-ribbon-results/engine.log
+            energy-ribbon-results/records.json
