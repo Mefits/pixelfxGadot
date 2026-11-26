@@ -65,10 +65,15 @@ func _ready():
         for file in directory.get_files():
             var id:String=file.get_basename()
             if file.ends_with(".json") and id.is_valid_identifier() and not ids.has(id):ids.append(id)
-    for id in ids:motion.add_item(id)
+    for id in ids:
+        var path:String=Asset.FOLDER+id+".json"
+        var entry:=Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
+        motion.add_item(str(entry.get("name",id)))
     motion.item_selected.connect(func(i):open_motion(ids[i]))
     joints=OptionButton.new()
-    for id in Asset.JOINTS:joints.add_item(id)
+    for id in Asset.JOINTS:
+        var limb:String={"hand":"Кисть","elbow":"Локоть","knee":"Колено","foot":"Носок"}[id.get_slice("_",0)]
+        joints.add_item(limb+(" · ближняя сторона" if id.ends_with("_near") else " · дальняя сторона"))
     side.add_child(joints)
     goal_list=OptionButton.new()
     side.add_child(goal_list)
@@ -88,7 +93,7 @@ func _ready():
     side.add_child(row)
     button(row,"Копия цели",copy_goal)
     button(row,"Вставить",paste_goal)
-    button(row,"L ↔ R",mirror_goal)
+    button(row,"⇄",mirror_goal)
     button(row,"Удалить",erase_goal)
     row=HBoxContainer.new()
     side.add_child(row)
@@ -300,6 +305,10 @@ func _unhandled_input(event):
         if not event.pressed:
             dragging=false
         elif Rect2(0,0,600,414).has_point(event.position):
+            var preferred:String=Asset.JOINTS[joints.selected]
+            if event.position.distance_to(ORIGIN+at_joint(preferred)*ZOOM)<=6.:
+                begin_drag(preferred)
+                return
             var best:=18.
             var id:=""
             for j in Asset.JOINTS:
@@ -389,7 +398,7 @@ func key_pose():
 func toggle_contact():
     if player.action=="":return
     var id:String=Asset.JOINTS[joints.selected]
-    if id.begins_with("elbow"):return
+    if not (id.begins_with("hand") or id.begins_with("foot")):return
     var t:=clampf((frame-START)/60.,0.,document.duration)
     history.append(document.duplicate(true))
     for i in document.events.size():
@@ -450,7 +459,7 @@ func duplicate_motion():
     d.name=d.name+" · "+str(index)
     if Asset.persist(d)!=OK:return
     ids.append(d.id)
-    motion.add_item(d.id)
+    motion.add_item(d.name)
     motion.select(ids.size()-1)
     open_motion(d.id)
 

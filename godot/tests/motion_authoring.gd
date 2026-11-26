@@ -102,6 +102,7 @@ func run():
         if t==60*scale:c.action="jab"
         if t==68*scale:c.action="feint"
         ensemble.step(c)
+        digest.update(ensemble.save())
         check(ensemble.events.is_empty(),"cancel future marker")
         if t==68*scale:check(ensemble.action=="feint","interrupt")
     # A release track is compiled through the existing 091 author-foot solver.
@@ -114,6 +115,7 @@ func run():
     var foot_marker:=false
     for t in range(55*scale):
         kicker.step({"speed":0.,"action":"released_kick" if t==20*scale else ""})
+        digest.update(kicker.save())
         if t==35*scale:
             foot_marker=kicker.events.size()==1 and kicker.events[0][3]=="foot_far"
             check(kicker.released.has("far") and not kicker.paths[1].stance,"authored swing")
@@ -127,5 +129,23 @@ func run():
     check(blocked.goal_report.foot_near.reason=="стопа в опоре","support priority")
     check(blocked.goal_report.hand_near.reason=="предел длины руки","reach diagnostic")
     check(blocked.rig.point("elbow_near").distance_to(blocked.rig.point("hand_near"))<10.,"arm length bound")
+    # A swing-knee edit redirects the free chain without moving its sibling.
+    g.goals=[]
+    var plain_gait=Asset.player(g,hz)
+    var kt:=0
+    while kt<135*scale:
+        plain_gait.step(command(g,kt,scale))
+        var ph:=Goals.phase(plain_gait,"swing_near")
+        if kt>62*scale and ph>.35 and ph<.65:break
+        kt+=1
+    var knee_pos:Vector2=plain_gait.rig.point("knee_near")
+    var desired:=(knee_pos+Vector2(2.,-1.)).snapped(Vector2.ONE/64.)
+    g.goals=[{"joint":"knee_near","xy":[desired.x,desired.y],"clock":"swing_near","center":Goals.phase(plain_gait,"swing_near"),"width":.2,"weight":1.,"priority":2}]
+    var knee_player=Asset.player(g,hz)
+    for t in kt+1:
+        knee_player.step(command(g,t,scale))
+        digest.update(knee_player.save())
+    check(knee_player.rig.point("knee_near").distance_to(desired)<knee_pos.distance_to(desired),"swing knee influence")
+    check(Leg.valid(knee_player.final_pose,"near"),"free knee limits")
     print("TRACE ",digest.finish().hex_encode())
     quit(1 if failed else 0)

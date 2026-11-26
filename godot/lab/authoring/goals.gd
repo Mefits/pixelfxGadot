@@ -18,7 +18,8 @@ static func phase(k,clock:String)->float:
 static func resolve(k,p:Dictionary,paths:Array,legs:bool,goals:Array)->void:
     var owned:Dictionary={}
     for g in goals:
-        var foot:bool=g.joint.begins_with("foot")
+        var knee:bool=g.joint.begins_with("knee")
+        var foot:bool=g.joint.begins_with("foot") or knee
         if foot!=legs:continue
         var t:=phase(k,g.clock)
         if t<0.:continue
@@ -39,7 +40,21 @@ static func resolve(k,p:Dictionary,paths:Array,legs:bool,goals:Array)->void:
                 var swing:=phase(k,"swing_"+side)
                 if k.released.has(side):w*=k.released[side][0]
                 else:w*=smoothstep(0.,.08,swing)*(1.-smoothstep(.92,1.,swing))
-                paths[index].toe=Grid.point(Vector2(paths[index].toe).lerp(goal,w))
+                var target_toe:=goal
+                if knee:
+                    # Estimate the already constrained swing, rotate its two
+                    # fixed-length segments about the hip, then solve the
+                    # common support problem once more with the new toe goal.
+                    var trial:=p.duplicate(true)
+                    k.support.resolve(trial,paths)
+                    var hip:Vector2=k.rig.point("thigh_"+side)
+                    var upper:Vector2=k.rig.point(g.joint)-hip
+                    var ankle:Vector2=k.rig.point("foot_"+side)-hip
+                    var rotation:=upper.angle_to(goal-hip)
+                    target_toe=hip+ankle.rotated(rotation)+k.LegIK.toe_vector(trial,side)
+                    target_toe.y=minf(0.,target_toe.y)
+                    if absf(upper.length()-hip.distance_to(goal))>.05:reason="фиксированная длина бедра"
+                paths[index].toe=Grid.point(Vector2(paths[index].toe).lerp(target_toe,w))
         else:
             k.rig.evaluate(p)
             var start:Vector2=k.rig.point(g.joint)
