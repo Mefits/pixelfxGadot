@@ -360,3 +360,7 @@ Run 45729989117 reported `Could not resolve class res://lab/wind_room_072.gd`; G
 
 ## 0.74 isolated cloth material comparison
 See [CLOTH_MATERIAL_074.md](CLOTH_MATERIAL_074.md). Base 0.72/0.73 CI passed on 810664f. New branch experiment/cloth-material-074; owner art decision pending. Preserve original branches.
+
+
+## 0.75 — hybrid motion continuity
+Owner direction: full 60 FPS combat, not universal 15/25 cadence; phase-specific attack dynamics, procedural adaptation, natural transitions, authored acrobatic choreography. See [MOTION_CONTINUITY_075.md](MOTION_CONTINUITY_075.md). New isolated branch experiment/motion-continuity-075; 0.74 CI passed, variant B recommended but art decision pending. No merge or N changes.

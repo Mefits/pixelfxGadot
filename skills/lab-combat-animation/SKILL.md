@@ -54,3 +54,7 @@ description: Создание, перенос с референсов, пост�
 
 ### Owner presentation preference (2026-11-26)
 For subsequent Lab animation comparisons, export normal playback at exactly ×1.0 (not ×1.1), plus slow playback ×0.5. Use the actual source clip duration; label normal playback ×1, and prefer `comparison-1x.gif` for new experiments. This is a presentation/export change, not a change to animation timing or existing historical captures.
+
+
+## Owner direction 2026-11-26 — 60 FPS hybrid motion
+Combat should use full 60 Hz pose evaluation by default. Limited 15/25 Hz exposure is an optional stylistic experiment, not a global requirement. Keep authored attack/contact choreography; use procedural transition, support/IK and secondary physics for adaptation. Separate transition smoothness from strike dynamics; do not smooth away contact or delay gameplay inputs merely for aesthetics. See docs/MOTION_CONTINUITY_075.md for the isolated experiment, not a production runtime change.
