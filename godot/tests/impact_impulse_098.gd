@@ -28,6 +28,7 @@ func run():
         fail("frozen guard SHA mismatch")
         return
     var source:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(FIX)).payload.clip.keys[0].pose
+    var min_y:float=0.
     for mode in 3:
         for cut in [29,160,260]:
             var a=Reaction.new(Body.make_rig(),source,mode)
@@ -35,6 +36,7 @@ func run():
             for t in cut:
                 input_at(a,t)
                 a.step()
+                for point in a.rig.points.values():min_y=minf(min_y,Vector2(point).y)
             b.restore(a.snapshot())
             if cut>18 and b.strike(18,"BODY",-1.,1.45,2):
                 fail("duplicate accepted")
@@ -45,6 +47,7 @@ func run():
                 if a.step()!=b.step() or a.snapshot()!=b.snapshot():
                     fail("replay mismatch "+str([mode,cut,t]))
                     return
+                for point in a.rig.points.values():min_y=minf(min_y,Vector2(point).y)
     var control=Control097.new(Body.make_rig(),source,2)
     var local=Reaction.new(Body.make_rig(),source,0)
     for frame in FRAMES:
@@ -53,7 +56,14 @@ func run():
         if control.step().pose!=local.step().pose:
             fail("097 C control regression "+str(frame))
             return
-    root.size=Vector2i(1560,572)
+    # The replay above samples every joint in all three actual trajectories.
+    # One shared vertical framing, plus 54 pixels for the full raster skin.
+    # Keep the original density and ground reference; never move the body.
+    var origin_y:int=maxi(485,ceili(-min_y*3.)+54)
+    var view_h:int=origin_y+55
+    cfg.height=view_h
+    print("CAPTURE_BOUNDS min_joint_y=",min_y," origin_y=",origin_y," lane_height=",view_h)
+    root.size=Vector2i(1560,view_h+32)
     root.content_scale_size=root.size
     var bg=ColorRect.new()
     bg.color=Color("#34424d")
@@ -87,7 +97,7 @@ func run():
         var floor_line=Line2D.new()
         floor_line.width=1.
         floor_line.default_color=Color("#8ca1aa")
-        var floor_px:float=509.+players[lane].floor_y*3.
+        var floor_px:float=float(origin_y)+24.+players[lane].floor_y*3.
         floor_line.points=PackedVector2Array([Vector2(lane*520+8,floor_px),Vector2(lane*520+512,floor_px)])
         floor_line.z_index=-1
         root.add_child(floor_line)
@@ -98,7 +108,7 @@ func run():
         root.add_child(grid)
         grids.append(grid)
         var meter=Label.new()
-        meter.position=Vector2(lane*520+8,526)
+        meter.position=Vector2(lane*520+8,view_h-14)
         meter.add_theme_font_size_override("font_size",13)
         root.add_child(meter)
         meters.append(meter)
@@ -109,7 +119,7 @@ func run():
         root.add_child(arrow)
         arrows.append(arrow)
     var caption=Label.new()
-    caption.position=Vector2(8,548)
+    caption.position=Vector2(8,view_h+8)
     caption.add_theme_font_size_override("font_size",14)
     root.add_child(caption)
     var last:int=-100
@@ -157,10 +167,17 @@ func run():
             # Common 3px/unit scale, horizontal camera only. A world-space
             # ruler and numerical displacement keep travel legible.
             var camera:float=minf(0.,sample.com.x+12.)
-            cfg.origin=[380.-camera*3.,485.]
+            var min_x:float=INF
+            var max_x:float=-INF
+            for point in q.values():
+                min_x=minf(min_x,Vector2(point).x)
+                max_x=maxf(max_x,Vector2(point).x)
+            var origin_x:float=clampf(380.-camera*3.,54.-min_x*3.,466.-max_x*3.)
+            camera=(380.-origin_x)/3.
+            cfg.origin=[origin_x,float(origin_y)]
             var marks:=PackedVector2Array()
             # draw floor ticks with separate short strokes linked along floor
-            var floor_screen:float=509.+player.floor_y*3.
+            var floor_screen:float=float(origin_y)+24.+player.floor_y*3.
             for k in range(-60,12):
                 var x:float=380.+(float(k)*10.-camera)*3.
                 if x>=10. and x<=510.:
@@ -176,17 +193,17 @@ func run():
                 return
             var im=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
             var bounds=im.get_used_rect()
-            if bounds.size.x==0 or bounds.position.x<=0 or bounds.position.y<=0 or bounds.end.x>=520 or bounds.end.y>=540:
-                fail("empty or clipped")
+            if bounds.size.x==0 or bounds.position.x<=0 or bounds.position.y<=0 or bounds.end.x>=520 or bounds.end.y>=view_h:
+                fail("empty or clipped "+str([lane,t,bounds,view_h,cfg.origin,sample.com]))
                 return
             if sprites[lane].texture==null:sprites[lane].texture=ImageTexture.create_from_image(im)
             else:sprites[lane].texture.update(im)
             arrows[lane].visible=t-last<5
             if arrows[lane].visible:
                 var target:Vector2=q.head if zone=="HEAD" else Vector2(q.chest).lerp(q.hips,.55)
-                var end:Vector2=Vector2(lane*520+380.-camera*3.,509.)+target*3.+Vector2(10,0)
+                var end:Vector2=Vector2(lane*520+origin_x,float(origin_y)+24.)+target*3.+Vector2(10,0)
                 arrows[lane].points=PackedVector2Array([end+Vector2(26,0),end,end+Vector2(7,-5),end,end+Vector2(7,5)])
-            record.lanes.append({"phase":sample.phase,"moving":sample.moving,"swing":sample.swing,"anchors":{"near":[sample.anchors.near.x,sample.anchors.near.y],"far":[sample.anchors.far.x,sample.anchors.far.y]},"points":points,"offset":sample.offset,"velocity":sample.energy_proxy,"error":sample.error,"accepted":sample.accepted,"pose_us":pose_us,"joint_jump":jump,"support_count":sample.support_count,"clearance":sample.clearance,"steps":sample.steps,"slip":sample.slip,"contact_joint":sample.contact_joint,"slide":sample.slide,"angles":p.angles.duplicate(true),"raster_bottom":bounds.end.y,"floor_y":player.floor_y,"physics_contacts":sample.physics_contacts,"touched":sample.touched,"motor":sample.motor,"physics_anchor_error":sample.physics_anchor_error,"physics_penetration":sample.physics_penetration,"physics_pose_error":sample.physics_pose_error,"physics_peak_speed":sample.physics_peak_speed,"com":[sample.com.x,sample.com.y],"tone_impulse":sample.tone_impulse,"friction_impulse":sample.friction_impulse})
+            record.lanes.append({"phase":sample.phase,"moving":sample.moving,"swing":sample.swing,"anchors":{"near":[sample.anchors.near.x,sample.anchors.near.y],"far":[sample.anchors.far.x,sample.anchors.far.y]},"points":points,"offset":sample.offset,"velocity":sample.energy_proxy,"error":sample.error,"accepted":sample.accepted,"pose_us":pose_us,"joint_jump":jump,"support_count":sample.support_count,"clearance":sample.clearance,"steps":sample.steps,"slip":sample.slip,"contact_joint":sample.contact_joint,"slide":sample.slide,"angles":p.angles.duplicate(true),"raster_bottom":bounds.end.y,"raster_origin_y":origin_y,"floor_y":player.floor_y,"physics_contacts":sample.physics_contacts,"touched":sample.touched,"motor":sample.motor,"physics_anchor_error":sample.physics_anchor_error,"physics_penetration":sample.physics_penetration,"physics_pose_error":sample.physics_pose_error,"physics_peak_speed":sample.physics_peak_speed,"com":[sample.com.x,sample.com.y],"tone_impulse":sample.tone_impulse,"friction_impulse":sample.friction_impulse})
         rows.append(record)
         await process_frame
         await RenderingServer.frame_post_draw

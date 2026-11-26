@@ -58,12 +58,13 @@ def main():
         com=np.array([v["com"] for v in data])
         postslide=float(com[contact,0]-np.min(com[contact:,0]))
         net_slide=float(com[contact,0]-com[-1,0])
-        metrics[name]={"impulse_scale":[1,3,5][lane],"max_com_rise":float(com[20,1]-np.min(com[21:,1])),"com_shift":float(com[-1,0]-com[20,0]),"peak_speed":max(v["physics_peak_speed"] for v in data),"final_trunk_dy":abs(pts[-1]["hips"][1]-pts[-1]["chest"][1]),"shift":pts[-1]["hips"][0]-pts[0]["hips"][0],"air_ticks":len(air),"contact_tick":contact,"min_air_trunk_thigh_angle_deg":min(fold[i] for i in air),"max_post_contact_hip_flex_deg":max(v for i,v in hipflex if i>=contact),"min_post_contact_foot_head_distance":min(foot_head[contact:]),"post_contact_com_slide":postslide,"net_post_contact_com_slide":net_slide,"max_anchor_residual":max(v["physics_anchor_error"] for v in data),"max_floor_penetration":max(v["physics_penetration"] for v in data),"max_fk_proxy_difference":max(v["physics_pose_error"] for v in data),"final_speed_peak":max(v["physics_peak_speed"] for v in data[-20:]),"max_raster_floor_overlap_px":max(v["raster_bottom"]-(485+3*v["floor_y"]) for v in data),"p95_pose_us":float(np.percentile([v["pose_us"] for v in data[21:]],95)),"max_joint_step":max(v["joint_jump"] for v in data)}
+        metrics[name]={"impulse_scale":[1,3,5][lane],"max_com_rise":float(com[20,1]-np.min(com[21:,1])),"com_shift":float(com[-1,0]-com[20,0]),"peak_speed":max(v["physics_peak_speed"] for v in data),"final_trunk_dy":abs(pts[-1]["hips"][1]-pts[-1]["chest"][1]),"shift":pts[-1]["hips"][0]-pts[0]["hips"][0],"air_ticks":len(air),"contact_tick":contact,"min_air_trunk_thigh_angle_deg":min(fold[i] for i in air),"max_post_contact_hip_flex_deg":max(v for i,v in hipflex if i>=contact),"min_post_contact_foot_head_distance":min(foot_head[contact:]),"post_contact_com_slide":postslide,"net_post_contact_com_slide":net_slide,"max_anchor_residual":max(v["physics_anchor_error"] for v in data),"max_floor_penetration":max(v["physics_penetration"] for v in data),"max_fk_proxy_difference":max(v["physics_pose_error"] for v in data),"final_speed_peak":max(v["physics_peak_speed"] for v in data[-20:]),"max_raster_floor_overlap_px":max(v["raster_bottom"]-(v["raster_origin_y"]+3*v["floor_y"]) for v in data),"p95_pose_us":float(np.percentile([v["pose_us"] for v in data[21:]],95)),"max_joint_step":max(v["joint_jump"] for v in data)}
     (out/"metrics.json").write_text(json.dumps(metrics,indent=2))
     print(json.dumps(metrics),flush=True)
     assert all(rows[i]["lanes"][0]["points"]==rows[i]["lanes"][1]["points"]==rows[i]["lanes"][2]["points"] for i in range(21))
-    sheet=Image.new("RGB",(1560,572*12))
-    for j,k in enumerate((0,20,30,45,60,80,105,135,165,200,260,359)):sheet.paste(frames[k],(0,j*572))
+    width,height=frames[0].size
+    sheet=Image.new("RGB",(width,height*12))
+    for j,k in enumerate((0,20,30,45,60,80,105,135,165,200,260,359)):sheet.paste(frames[k],(0,j*height))
     sheet.save(out/"review.png")
     a,b,c=metrics.values()
     assert a["peak_speed"]<b["peak_speed"]<c["peak_speed"],metrics
