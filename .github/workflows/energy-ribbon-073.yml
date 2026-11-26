@@ -5,7 +5,6 @@ on:
     paths:
       - 'godot/lab/energy_ribbon_073.gd'
       - 'godot/lab/secondary_motion_072.gd'
-      - 'godot/lab/wind_room_072.gd'
       - 'godot/lab/energy_ribbon_073.tscn'
       - 'godot/tests/energy_ribbon_073.gd'
       - 'tools/energy_ribbon_073.py'
@@ -51,7 +50,11 @@ jobs:
         run: |
           mkdir -p godot/.godot
           echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
-          ~/.cache/lab-godot/godot --headless --path godot --check-only --script res://tests/energy_ribbon_073.gd
+          mkdir -p energy-ribbon-results
+          for script in lab/secondary_motion_072.gd lab/wind_room_072.gd lab/energy_ribbon_073.gd tests/energy_ribbon_073.gd; do
+            ~/.cache/lab-godot/godot --headless --path godot --check-only --script "res://$script" 2>&1 | tee -a energy-ribbon-results/syntax.log
+          done
+          ! grep -E "SCRIPT ERROR|Failed to load script" energy-ribbon-results/syntax.log
       - name: Lab 073 capture
         run: |
           mkdir -p godot/.godot
@@ -66,4 +69,5 @@ jobs:
             energy-ribbon-results/metrics.json
             energy-ribbon-results/*review.png
             energy-ribbon-results/engine.log
+            energy-ribbon-results/syntax.log
             energy-ribbon-results/records.json

@@ -10,9 +10,10 @@ def main():
     p=argparse.ArgumentParser();p.add_argument("--godot",required=True);p.add_argument("--out",type=Path,required=True);a=p.parse_args()
     out=a.out.resolve();out.mkdir(parents=True,exist_ok=True)
     try:
-        r=subprocess.run(["xvfb-run","-a",a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--rendering-method","gl_compatibility","--script","res://tests/energy_ribbon_073.gd","--",str(out)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=240)
+        r=subprocess.run(["xvfb-run","-a",a.godot,"--path",str(ROOT/"godot"),"--audio-driver","Dummy","--disable-vsync","--rendering-method","gl_compatibility","--script","res://tests/energy_ribbon_073.gd","--",str(out)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=85)
     except subprocess.TimeoutExpired as e:
         (out/"engine.log").write_text((e.stdout or b"").decode("utf8","replace"))
+        print((e.stdout or b"").decode("utf8","replace"),flush=True)
         raise
     log=r.stdout.decode("utf8","replace");(out/"engine.log").write_text(log);print(log)
     if r.returncode or "ENERGY_073_CAPTURE_OK" not in log or "SCRIPT ERROR" in log:raise RuntimeError(log[-4000:])

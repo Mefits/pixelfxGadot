@@ -71,7 +71,7 @@ func _ready()->void:
     add_child(sprite)
     overlay=Node2D.new()
     add_child(overlay)
-    overlay.draw.connect(draw_mesh)
+    overlay.draw.connect(_draw_cloth_debug)
     status=Label.new()
     status.position=Vector2(12,6)
     status.add_theme_font_size_override("font_size",13)
@@ -198,7 +198,7 @@ func _draw()->void:
             for i in 5:
                 var x:float=f.x+s*(36.+fmod(i*25.+cloth.time*absf(wind)*.75,125.))
                 draw_line(Vector2(x,y),Vector2(x+s*12.,y),Color("#578c9f"),1.)
-func draw_mesh()->void:
+func _draw_cloth_debug()->void:
     if show_mesh:
         for edge in cloth.edges:
             if float(edge[3])<0.:continue
