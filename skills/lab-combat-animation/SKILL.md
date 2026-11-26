@@ -66,3 +66,7 @@ Do not use arbitrary clip terminal pose as idle. Maintain a separate stance pref
 
 ## Owner requirement — interruptible actions (2026-11-26)
 A new allowed movement must transition from the actual displayed pose and its motion/support history, including mid-transition interruption; no mandatory neutral/guard pose in between. Guard recovery only when no command continues motion. Keep authored technique/event timing separate from transition; cancelled future markers cannot fire and completed markers cannot repeat. See docs/ACTION_INTERRUPT_079.md. Actual cancel policy for gameplay is not yet approved.
+
+
+## Adaptive transitions (owner direction 2026-11-26)
+Use movement-dependent correction duration; do not use universal 100ms. Bound by incoming contact/event deadline, keep source and event timeline independent. Measure real transition path and support feasibility; do not reward suppressing deliberate attack dynamics. Lab 080 compares fixed, heuristic and predictive methods; no production default selected.
