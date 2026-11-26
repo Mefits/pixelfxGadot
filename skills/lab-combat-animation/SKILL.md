@@ -74,3 +74,7 @@ Use movement-dependent correction duration; do not use universal 100ms. Bound by
 
 ## Leg regression — owner screenshot 2026-11-26
 Validate geometric knee bend (include rig rest offsets) and shin-relative ankle orientation, not raw Euler signs. Avoid forcing unreachable or anatomically invalid IK branch. Preserve source attack/contact poses, 60Hz timing and sparse planning budget. See docs/LEG_CONSTRAINTS_082.md.
+
+
+## Owner locomotion direction (2026-11-26)
+Minimum game movement set: fast walk and fast run. Do not optimize for photorealistic human movement; dynamic stylized silhouette and long expressive sprint steps take priority. Maintain 60Hz, valid anatomy, support and explicit rollback-compatible state. Do not sacrifice style for purely numerical smoothness. Preserve prior profiles; see docs/DISTANCE_GAIT_087.md.
