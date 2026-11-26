@@ -155,5 +155,5 @@ func run():
     var f=FileAccess.open(out.path_join("records.json"),FileAccess.WRITE)
     f.store_string(JSON.stringify(records))
     f.close()
-    print("MOTIONPHYSICS_099B_RENDER_OK frames=",records.size())
+    print("MOTIONPHYSICS_099C_RENDER_OK frames=",records.size())
     quit()

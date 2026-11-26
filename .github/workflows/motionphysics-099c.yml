@@ -7,6 +7,7 @@ on:
       - 'native_cpp/MotionPhysics099C.scons'
       - 'godot/addons/motionphysics/**'
       - 'godot/tests/motionphysics_*_099c.gd'
+      - 'godot/lab/ragdoll_common_099c.gd'
       - 'tools/motionphysics_099c.py'
       - '.github/workflows/motionphysics-099c.yml'
   workflow_dispatch:
