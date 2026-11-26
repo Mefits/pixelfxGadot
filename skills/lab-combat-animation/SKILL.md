@@ -50,3 +50,7 @@ description: Создание, перенос с референсов, пост�
 
 ## Contact-pose-first (уточнение владельца)
 Приоритет поиска — выразительная поза в момент ударного акцента. Полная запись движения полезна, но не обязательна. Сначала архив владельца (особенно Naruto sprite sheets), затем поиск подходящего открытого референса в сети, если в архиве нет подходящей позы. Для каждого удара выбрать конкретный кадр и перенести его на риг, проверить силуэт и FK до сочинения переходов. При наличии нескольких кадров использовать их для chamber/recovery; не требовать полного готового комбо. Не считать хороший контактный кадр доказательством хорошего перехода. Чужие спрайты — визуальный референс, не игровые ассеты для распространения; фиксировать источник и кадр, не коммитить исходные листы без прав.
+
+
+### Owner presentation preference (2026-11-26)
+For subsequent Lab animation comparisons, export normal playback at exactly ×1.0 (not ×1.1), plus slow playback ×0.5. Use the actual source clip duration; label normal playback ×1, and prefer `comparison-1x.gif` for new experiments. This is a presentation/export change, not a change to animation timing or existing historical captures.
