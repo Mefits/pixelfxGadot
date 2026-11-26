@@ -1,5 +1,8 @@
 extends "res://lab/distance_gait_087.gd"
 ## Distance calendar in rig units. Speed uses historical units per 1/60 s.
+var arm_sweep:=94.
+var flight_width:=5.
+
 func move_distance(speed:float, distance:float)->void:
     velocity=speed
     travel+=distance
@@ -16,9 +19,9 @@ func path_for(index:int,w:float)->Dictionary:
     var swing:float=float(leg.end)-float(leg.start)-STANCE_DISTANCE
     var s:=clampf((travel-float(leg.start)-STANCE_DISTANCE)/swing,0.,1.)
     var x:float
-    if s<.25:x=-5.*smoothstep(0.,.25,s)
-    elif s<.75:x=lerpf(-5.,5.,smoothstep(.25,.75,s))
-    else:x=5.*(1.-smoothstep(.75,1.,s))
+    if s<.25:x=-flight_width*smoothstep(0.,.25,s)
+    elif s<.75:x=lerpf(-flight_width,flight_width,smoothstep(.25,.75,s))
+    else:x=flight_width*(1.-smoothstep(.75,1.,s))
     var weight:=smoothstep(.65,1.,w)
     path.toe+=Vector2(x,-3.*maxf(0.,sin(TAU*s))*pow(sin(PI*s),2.))*weight
     return path
@@ -45,7 +48,7 @@ func intent()->Dictionary:
         var high:float=smoothstep(.80,1.,w)
         var upper:float=lerpf(-6.+30.*cos(TAU*u),82.+9.*cos(TAU*u+.4),w)
         var elbow:float=lerpf(-60.+12.*cos(TAU*u+.45),-12.+8.*sin(TAU*u),w)
-        upper=lerpf(upper,94.+5.*cos(TAU*u+.4),high)
+        upper=lerpf(upper,arm_sweep+5.*cos(TAU*u+.4),high)
         elbow=lerpf(elbow,-6.+4.*sin(TAU*u),high)
         var a:Vector2=rig.joints[rig.ids["elbow_"+name]].offset
         var b:Vector2=rig.joints[rig.ids["hand_"+name]].offset

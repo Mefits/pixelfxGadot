@@ -1,0 +1,57 @@
+name: Motion authoring replay
+on:
+  push:
+    branches: [experiment/lab-motion-authoring]
+    paths: ['godot/lab/hybrid091/**', 'godot/lab/authoring/**', 'godot/tests/motion_authoring.gd', '.github/workflows/motion-authoring.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install matching official Godot binaries
+        shell: python
+        run: |
+          import os, pathlib, urllib.request, zipfile
+          windows = os.name == "nt"
+          platform = "win64.exe" if windows else "linux.x86_64"
+          name = "Godot_v4.4.1-stable_" + platform
+          urllib.request.urlretrieve("https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/" + name + ".zip", "engine.zip")
+          with zipfile.ZipFile("engine.zip") as z:
+              z.extractall("engine")
+          exe = next(p for p in pathlib.Path("engine").rglob("*") if p.name == name)
+          exe.chmod(0o755)
+          if windows:
+              exe = exe.with_name(exe.stem + "_console.exe")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              print("GODOT=" + str(exe.resolve()), file=f)
+      - shell: python
+        run: |
+          import os, pathlib, subprocess
+          dest=pathlib.Path("results")
+          dest.mkdir()
+          for rate in ("60","120"):
+              hashes=[]
+              for i in range(2):
+                  p=subprocess.run([os.environ["GODOT"],"--headless","--path","godot","--script","res://tests/motion_authoring.gd","--",rate],capture_output=True,text=True,timeout=40)
+                  print(p.stdout,p.stderr)
+                  p.check_returncode()
+                  assert "SCRIPT ERROR" not in p.stderr
+                  hashes.append(next(line for line in p.stdout.splitlines() if line.startswith("TRACE ")))
+              assert hashes[0]==hashes[1]
+              (dest/rate).write_text(hashes[0])
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trace-${{ matrix.os }}
+          path: results/
+  compare:
+    runs-on: ubuntu-latest
+    needs: replay
+    steps:
+      - uses: actions/download-artifact@v4
+      - run: diff -r trace-ubuntu-latest trace-windows-latest

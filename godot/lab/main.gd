@@ -13,6 +13,7 @@ const SECTIONS=[
         ["L","Молния","Процедурный разряд в реальном времени.","live_lightning"]
     ]},
     {"label":"АНИМАЦИЯ И СУЩЕСТВА","color":"#92c6af","items":[
+        ["M","Мастерская движений","Фазовые цели и исполнение Hybrid.","authoring/editor"],
         ["U","Редактор анимаций","Позы скелета и ключевые кадры.","pose_workshop"],
         ["T","Бой (прежний стенд)","Два бойца и проверка прежних атак.","combat_lab"],
         ["H","Гибридное движение","Ядро Astra, объёмное тело, ткань, реакции.","hybrid_studio"],
@@ -71,7 +72,7 @@ func _ready() -> void:
             root.add_child(button)
             buttons.append(button)
             button.pressed.connect(func():_open(path))
-            y+=44
+            y+=41
     _label(root,"БИБЛИОТЕКА ШАБЛОНОВ",Vector2(274,96),14,Color("#79b9d4"))
     category=OptionButton.new()
     category.position=Vector2(274,122)

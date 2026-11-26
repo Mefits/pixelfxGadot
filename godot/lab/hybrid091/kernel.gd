@@ -1,4 +1,7 @@
 extends RefCounted
+const Goals=preload("res://lab/authoring/goals.gd")
+var art:Dictionary={}
+var goal_report:Dictionary={}
 const Grid=preload("precision.gd")
 const Gait=preload("gait.gd")
 const Support=preload("support.gd")
@@ -100,6 +103,8 @@ func step(cmd:Dictionary)->void:
         age=0
     if action!="":
         dest.angles.merge(bank[action].frames[age],true)
+    goal_report.clear()
+    if not art.is_empty() and not art.goals.is_empty():Goals.resolve(self,dest,paths,false)
     # Signed, damped reaction. Strip the already-applied reaction from
     # transition history via the unlayered pose kept below.
     if change:
@@ -149,6 +154,7 @@ func step(cmd:Dictionary)->void:
     # Pose history stores the authored layer; final rig contains reaction.
     var resolved:Dictionary=pose.duplicate(true)
     resolved.angles.chest+=recoil
+    if not art.is_empty() and not art.goals.is_empty():Goals.resolve(self,resolved,paths,true)
     support.resolve(resolved,paths)
     final_pose=resolved
     var current:=world_anchors()
@@ -174,11 +180,16 @@ var final_pose:Dictionary
 # S[t] is immediately before command t. Fixed field order, lossless local
 # Variant encoding. Immutable assets and derived render geometry stay outside.
 func save()->PackedByteArray:
-    return var_to_bytes([2,hz,tick,gait.snapshot(),speed,stopped,settle,action,age,serial,duration,offsets,slopes,recoil,recoil_velocity,health,anchors,pose,previous,final_pose,paths,style,released,landing])
+    var state:=[2,hz,tick,gait.snapshot(),speed,stopped,settle,action,age,serial,duration,offsets,slopes,recoil,recoil_velocity,health,anchors,pose,previous,final_pose,paths,style,released,landing]
+    if not art.is_empty():state.append(art.signature)
+    return var_to_bytes(state)
 
 func restore(bytes:PackedByteArray)->void:
     var s:Array=bytes_to_var(bytes)
-    assert(s[0]==2 and s[1]==hz)
+    if s[0]!=2 or s[1]!=hz or (s.size()==24)!=art.is_empty() or (not art.is_empty() and s[24]!=art.signature):
+        push_error("Incompatible motion snapshot")
+        return
+    goal_report.clear()
     tick=s[2]
     gait.restore(s[3])
     speed=s[4]

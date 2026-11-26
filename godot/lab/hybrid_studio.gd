@@ -1,6 +1,9 @@
 extends Node2D
 ## Integration workspace. The accepted kernel remains the gameplay pose source.
 ## 092 is a separate experiment in this UI, not a competing integrated runtime.
+const Asset=preload("res://lab/authoring/asset.gd")
+var user_assets:Array=[]
+var current_asset:Dictionary={}
 const Body=preload("res://lab/body_ankle_069.gd")
 const Kernel=preload("res://lab/hybrid091/kernel.gd")
 const Motion=preload("res://lab/hybrid091/motion.gd")
@@ -101,6 +104,14 @@ func build_ui()->void:
     mode_select=OptionButton.new()
     mode_select.add_item("Astra Hybrid 0.91")
     mode_select.add_item("Реакции 0.92 C (отдельно)")
+    var folder:=DirAccess.open(Asset.FOLDER)
+    if folder:
+        for file in folder.get_files():
+            if not file.ends_with(".json"):continue
+            var data:=Asset.read(Asset.FOLDER+file)
+            if Asset.problem(data)!="":continue
+            user_assets.append(data)
+            mode_select.add_item("Мастерская · "+str(data.name))
     panel.add_child(mode_select)
     mode_select.item_selected.connect(set_mode)
     var controls=HBoxContainer.new()
@@ -172,8 +183,13 @@ func toggle_pause()->void:
 func reset()->void:
     if raster==null:return
     rig=Body.make_rig()
-    if mode==0:
-        player=Kernel.new(rig,run_clip,bank,bank.jab.frames[0],60)
+    if mode!=1:
+        current_asset={} if mode==0 else user_assets[mode-2]
+        if current_asset.is_empty():
+            player=Kernel.new(rig,run_clip,bank,bank.jab.frames[0],60)
+        else:
+            player=Asset.player(current_asset,60)
+            rig=player.rig
         last_pose=player.final_pose
         reaction=null
     else:
@@ -195,17 +211,18 @@ func reset()->void:
 
 func queue_action(action:String)->void:
     if mode==0:pending_action=action
+    elif mode>1 and current_asset.kind=="action":pending_action=current_asset.id
 
 func queue_hit(zone:String,power:float,finisher:bool)->void:
-    if mode==0:
+    if mode!=1:
         # Only Astra's accepted simple chest impulse in this mode.
         pending_impulse+=(-140. if zone=="HEAD" else 140.)*power
     else:pending_hits.append([zone,power,finisher])
 
 func advance_tick()->void:
     if raster==null:return
-    if mode==0:
-        var cmd={"speed":target_speed,"impulse":pending_impulse}
+    if mode!=1:
+        var cmd={"speed":(current_asset.get("speed",target_speed) if mode>1 and target_speed>1. else target_speed),"impulse":pending_impulse}
         if not pending_action.is_empty():cmd.action=pending_action
         player.step(cmd)
         last_pose=player.final_pose
@@ -241,7 +258,7 @@ func update_cloth(travel:float,advance:bool)->void:
 
 func render_frame()->void:
     var parts:Array=body.make(rig.points,last_pose.angles,rig.rotations.head)
-    if mode==0:Depth.apply(parts,player.style)
+    if mode!=1:Depth.apply(parts,player.style)
     for i in [0,2,3,8,9]:parts[i].material_id=1
     for i in [5,6,7,11,12,13,15,17]:parts[i].material_id=2
     if cloth!=null:
@@ -259,12 +276,13 @@ func render_frame()->void:
     var im=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
     if canvas.texture==null:canvas.texture=ImageTexture.create_from_image(im)
     else:canvas.texture.update(im)
-    if mode==0:
+    if mode!=1:
         status.text="Тик %d  ·  скорость %.2f  ·  действие %s  ·  путь %.1f"%[frame_tick,player.speed,player.action if player.action!="" else "локомоция",last_travel]
         details.text="Astra 0.91: единое ядро, 60 Гц; камера следует за персонажем.\nТорможение пока экспериментальное. Контакт двух бойцов не реализован."
     else:
         status.text="Тик %d  ·  попаданий %d  ·  шаг %s"%[frame_tick,reaction.seen.size(),"активен" if reaction.step_age>=0 else "нет"]
         details.text="0.92 C: отдельный стенд реакций с заданными импульсами.\nФинишер разрешает компенсирующий шаг, не отбрасывание."
+    if mode>1:details.text="Сохранённое движение: "+str(current_asset.name)+" · 1/2/3 скорость · F исполнить"
     details.text+="\nРастеризация %d мкс · ткань %s (только визуальная)"%[last_render_us,["выкл","B","C"][cloth_mode]]
     queue_redraw()
 

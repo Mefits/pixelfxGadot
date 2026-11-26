@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "id": "jab",
+  "name": "Джеб",
+  "kind": "action",
+  "duration": 0.5166666666666667,
+  "keys": [
+    {
+      "t": 0.0,
+      "angles": {
+        "chest": -2.5548,
+        "head": 1.5329,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -5.9249,
+        "elbow_near": -135.1909,
+        "shoulder_far": -52.1323,
+        "elbow_far": -85.6826
+      }
+    },
+    {
+      "t": 0.11666666666666667,
+      "angles": {
+        "chest": -3.0693,
+        "head": 1.9564,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -3.6961,
+        "elbow_near": -137.6871,
+        "shoulder_far": -51.4493,
+        "elbow_far": -85.4089
+      }
+    },
+    {
+      "t": 0.23333333333333334,
+      "angles": {
+        "chest": -6.1355,
+        "head": 6.0066,
+        "shoulder_turn": 0.0,
+        "shoulder_near": 13.9967,
+        "elbow_near": -157.4788,
+        "shoulder_far": -45.8458,
+        "elbow_far": -95.4599
+      }
+    },
+    {
+      "t": 0.25,
+      "angles": {
+        "chest": -4.5593,
+        "head": 4.7322,
+        "shoulder_turn": 0.0,
+        "shoulder_near": 9.1007,
+        "elbow_near": -152.8059,
+        "shoulder_far": -47.6833,
+        "elbow_far": -96.4407
+      }
+    },
+    {
+      "t": 0.26666666666666666,
+      "angles": {
+        "chest": -1.6942,
+        "head": 2.3266,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -1.4758,
+        "elbow_near": -138.934,
+        "shoulder_far": -51.6825,
+        "elbow_far": -97.2609
+      }
+    },
+    {
+      "t": 0.2833333333333333,
+      "angles": {
+        "chest": 2.0788,
+        "head": -0.896,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -18.8159,
+        "elbow_near": -116.2848,
+        "shoulder_far": -57.6778,
+        "elbow_far": -98.6285
+      }
+    },
+    {
+      "t": 0.3,
+      "angles": {
+        "chest": 6.3038,
+        "head": -4.5278,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -49.4507,
+        "elbow_near": -69.3599,
+        "shoulder_far": -65.137,
+        "elbow_far": -101.3704
+      }
+    },
+    {
+      "t": 0.31666666666666665,
+      "angles": {
+        "chest": 9.6726,
+        "head": -7.6012,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -73.8039,
+        "elbow_near": -35.9755,
+        "shoulder_far": -72.2661,
+        "elbow_far": -104.5718
+      }
+    },
+    {
+      "t": 0.3333333333333333,
+      "angles": {
+        "chest": 11.3794,
+        "head": -9.4132,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -79.0818,
+        "elbow_near": -35.9756,
+        "shoulder_far": -77.3321,
+        "elbow_far": -107.0678
+      }
+    },
+    {
+      "t": 0.35,
+      "angles": {
+        "chest": 11.0743,
+        "head": -9.5652,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -79.5353,
+        "elbow_near": -35.9755,
+        "shoulder_far": -78.8852,
+        "elbow_far": -107.3644
+      }
+    },
+    {
+      "t": 0.36666666666666664,
+      "angles": {
+        "chest": 10.8954,
+        "head": -9.2856,
+        "shoulder_turn": 0.0,
+        "shoulder_near": -88.1792,
+        "elbow_near": -16.4462,
+        "shoulder_far": -77.8208,
+        "elbow_far": -107.26
+      }
+    },
+    {
+      "t": 0.38333333333333336,
+      "angles": {
+        "chest": 9.3102,
+        "head": -7.3425,
+        "shoulder_turn": 7.0,
+        "shoulder_near": -82.3259,
+        "elbow_near": -16.4462,
+        "shoulder_far": -71.2163,
+        "elbow_far": -109.6003
+      }
+    },
+    {
+      "t": 0.4,
+      "angles": {
+        "chest": 5.8227,
+        "head": -3.0678,
+        "shoulder_turn": 14.0,
+        "shoulder_near": -30.0254,
+        "elbow_near": -95.219,
+        "shoulder_far": -56.2985,
+        "elbow_far": -114.5775
+      }
+    },
+    {
+      "t": 0.4166666666666667,
+      "angles": {
+        "chest": 2.3352,
+        "head": 1.2069,
+        "shoulder_turn": 21.0,
+        "shoulder_near": 6.788,
+        "elbow_near": -133.0802,
+        "shoulder_far": -40.6556,
+        "elbow_far": -119.2845
+      }
+    },
+    {
+      "t": 0.43333333333333335,
+      "angles": {
+        "chest": 0.75,
+        "head": 3.15,
+        "shoulder_turn": 28.0,
+        "shoulder_near": 25.0724,
+        "elbow_near": -146.5099,
+        "shoulder_far": -33.2225,
+        "elbow_far": -121.3165
+      }
+    },
+    {
+      "t": 0.4666666666666667,
+      "angles": {
+        "chest": -0.5,
+        "head": 4.5,
+        "shoulder_turn": 48.6667,
+        "shoulder_near": 34.4076,
+        "elbow_near": -168.3987,
+        "shoulder_far": -19.7469,
+        "elbow_far": -124.1124
+      }
+    },
+    {
+      "t": 0.48333333333333334,
+      "angles": {
+        "chest": 3.125,
+        "head": 0.225,
+        "shoulder_turn": 59.0,
+        "shoulder_near": 28.8849,
+        "elbow_near": -165.8504,
+        "shoulder_far": -56.5298,
+        "elbow_far": -79.9004
+      }
+    },
+    {
+      "t": 0.5,
+      "angles": {
+        "chest": 6.75,
+        "head": -4.05,
+        "shoulder_turn": 69.3333,
+        "shoulder_near": 22.5026,
+        "elbow_near": -163.1204,
+        "shoulder_far": -100.4273,
+        "elbow_far": -10.2963
+      }
+    },
+    {
+      "t": 0.5166666666666667,
+      "angles": {
+        "chest": 10.375,
+        "head": -8.325,
+        "shoulder_turn": 79.6667,
+        "shoulder_near": 15.3999,
+        "elbow_near": -160.2411,
+        "shoulder_far": -120.445,
+        "elbow_far": 7.6273
+      }
+    }
+  ],
+  "events": [
+    {
+      "t": 0.3333333333333333,
+      "kind": "strike",
+      "anchor": "hand_near"
+    }
+  ],
+  "goals": []
+}

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "sprint",
+  "name": "Бег C",
+  "kind": "gait",
+  "speed": 1.85,
+  "goals": [],
+  "arm_sweep": 94,
+  "flight_width": 5
+}
