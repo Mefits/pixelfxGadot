@@ -1,3 +1,5 @@
+> **Актуально на 2026-11-26:** [Lab 1.0 RC1 — состав, запуск, ограничения и план](LAB_100_RU.md). Ниже сохранена история соответствующего инструмента, а не описание готового нового ядра.
+
 # Physics Lab — first physical body prototype
 Open I in the main menu. A/D move, W or Space jump, automatic grip when moving toward a reachable top corner, Q toggles procedural legs, V debug, P pause, X quarter-speed, R reset, 1/2 decrease/increase tail segments, 3/4 decrease/increase mass, left-drag nearby physical point to apply a force. Tail/mass changes reset the body for controlled comparison, not live evolution yet.
 Core physical_body.gd: fixed 120 Hz position-based integration, inverse-mass weighted XPBD-style distance constraints with compliance, static AABB circle contacts, velocity/friction, center of mass, debug contacts and constraint error. physical_creature.gd: two main chunks with optional tail, force-driven movement, jump/coyote window, simple top-corner grip. The skin follows simulated coordinates. No animation clips drive the body. This is an independent prototype inspired by the general chunk-based approach, not a port of Rain World code.

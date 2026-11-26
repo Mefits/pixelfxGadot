@@ -1,3 +1,5 @@
+> **Lab 1.0 RC1:** нативное расширение обязательно для стенда H (PixelFXBodyRaster); для прежнего офлайн PixelFX остаётся необязательным. См. [актуальное руководство](../docs/LAB_100_RU.md). Ниже исторические инструкции и архивы.
+
 # Optional compiled lightning raster
 The original GDScript path remains intact. C++ handles complete stroke/crackle (including light) in one call, with two packed buffers returned to Painter. It does not alter procedural geometry or particle physics.
 Build on Linux/Windows x86-64 with Python, SCons, Git and GCC/MSVC: python native_cpp/build.py. This pins godot-cpp to Godot 4.4.1. The .gdextension descriptor is copied only after successful build. No binary required for ordinary use.

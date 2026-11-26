@@ -1,7 +1,7 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
 ## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="0.37"
+const VERSION="1.0 RC1"
 const EXP=preload("res://addons/creature/kit_export.gd")
 const CAT=preload("res://addons/creature/catalog.gd")
 const PREVIEW=preload("res://lab/catalog_preview.gd")
@@ -14,7 +14,8 @@ const SECTIONS=[
     ]},
     {"label":"АНИМАЦИЯ И СУЩЕСТВА","color":"#92c6af","items":[
         ["U","Редактор анимаций","Позы скелета и ключевые кадры.","pose_workshop"],
-        ["T","Боевая лаборатория","Два бойца и проверка атак.","combat_lab"],
+        ["T","Бой (прежний стенд)","Два бойца и проверка прежних атак.","combat_lab"],
+        ["H","Гибридное движение","Ядро Astra, объёмное тело, ткань, реакции.","hybrid_studio"],
         ["I","Физика и эволюция","Физика, атаки, изменение анатомии.","physics_lab"]
     ]}
 ]
@@ -61,7 +62,7 @@ func _ready() -> void:
             routes[spec[0]]=path
             var button:=Button.new()
             button.position=Vector2(28,y)
-            button.size=Vector2(226,43)
+            button.size=Vector2(226,39)
             button.text=spec[0]+"  "+spec[1]
             button.alignment=HORIZONTAL_ALIGNMENT_LEFT
             button.tooltip_text=spec[2]
@@ -70,7 +71,7 @@ func _ready() -> void:
             root.add_child(button)
             buttons.append(button)
             button.pressed.connect(func():_open(path))
-            y+=48
+            y+=44
     _label(root,"БИБЛИОТЕКА ШАБЛОНОВ",Vector2(274,96),14,Color("#79b9d4"))
     category=OptionButton.new()
     category.position=Vector2(274,122)

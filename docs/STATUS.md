@@ -1,3 +1,9 @@
+> **Актуально на 2026-11-26:** [Lab 1.0 RC1 — состав, запуск, ограничения и план](LAB_100_RU.md). Ниже сохранена история соответствующего инструмента, а не описание готового нового ядра.
+
+## Текущий статус интеграции
+
+RC1 в feature/lab-1.0-integration: меню H, native 069 + Astra 091, отдельный режим реакций 092 C, ткань 074 B/C. CI нового стенда пока ожидается. Базовый CI Astra 45879091781 и реакций 45880481002 прошли, не являются тестами новой UI-сборки. Далее исторические измерения PixelFX (не актуальный полный бюджет приложения).
+
 # Status — 2026-11-24, verified implementation 0ba5552
 Latest implementation test: https://github.com/Mefits/pixelfxGadot/actions/runs/45382920708
 Portable package: https://github.com/Mefits/pixelfxGadot/actions/runs/45382920708/artifacts/14913418629

@@ -1,8 +1,8 @@
-# PixelFX Godot Toolkit — v0.2 development
+# Creature & PixelFX Lab — 1.0 RC1 (интеграционный кандидат)
 
-## Активная лаборатория анимаций — Lab 0.45
+**[Актуальная версия, запуск и ограничения](docs/LAB_100_RU.md)** · [Передача проекта](docs/MOTION_HANDOFF_RU.md) · [Ядро Astra](docs/HYBRID_MOTION_091_RU.md) · [Дорожная карта](docs/ROADMAP.md).
 
-**[Актуальная передача проекта следующему агенту](docs/MOTION_HANDOFF_RU.md)**. Ветка `experiment/motion-temporal-rd`: исправленные суставы 0.44, перенос реального мокапа ACCAD, сравнение A/B/C/D. Пользователь выбрал D как базу дальнейшей стилизации. Не путать с замороженным Lab 0.42 и отдельным Project N. [Нативный сравнительный рендер 0.45](https://github.com/Mefits/pixelfxGadot/actions/runs/45656732943/artifacts/15042302641) (артефакт Actions имеет срок хранения).
+Lab — инструмент R&D и авторинга персонажей/движений/VFX для отдельного Project N. Ветка feature/lab-1.0-integration объединяет принятые исходники и новый стенд H, сохраняет прежние инструменты. Нативный PixelFXBodyRaster обязателен для H. Архивы и ссылки ниже исторические, не сборка RC1. Нативная проверка RC1 и художественная приёмка открыты.
 
 Godot 4 toolkit using [original PixelFX](https://github.com/patch-gg/pixelfx), pinned in a Git submodule. No substitute rendering algorithms in the offline path.
 
