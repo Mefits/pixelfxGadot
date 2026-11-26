@@ -356,3 +356,7 @@ Owner interested in hybrid scarf/energy effect, asked about 120Hz cloth with 60/
 
 ### 0.73 first CI failed before capture
 Run 45729989117 reported `Could not resolve class res://lab/wind_room_072.gd`; Godot --check-only returned success despite script compile errors, then capture timed out. Artifact only engine.log. Likely base script method name draw_mesh conflicts with native CanvasItem.draw_mesh; rename to _draw_cloth_debug, explicitly check each dependent script and reject SCRIPT ERROR text. No changes to simulation or appearance, no successful hybrid preview yet.
+
+
+## 0.74 isolated cloth material comparison
+See [CLOTH_MATERIAL_074.md](CLOTH_MATERIAL_074.md). Base 0.72/0.73 CI passed on 810664f. New branch experiment/cloth-material-074; owner art decision pending. Preserve original branches.
