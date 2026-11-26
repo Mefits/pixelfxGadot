@@ -64,9 +64,9 @@ public:
             for(auto& c:b.circles)if(!(in>>c.x>>c.y>>c.r)||!std::isfinite(c.x)||!std::isfinite(c.y)||!std::isfinite(c.r)||c.r<=0||c.r>100)return false;
         }
         substeps=passes;
-        auto wd=b2DefaultWorldDef();wd.gravity={0,180*S};wd.restitutionThreshold=physical_profile==1?.15f:1.f;wd.enableSleep=false;wd.workerCount=1;
+        auto wd=b2DefaultWorldDef();wd.gravity={0,180*S};wd.restitutionThreshold=physical_profile==1?.05f:1.f;wd.restitutionIterations=4;wd.enableSleep=false;wd.workerCount=1;
         world=b2CreateWorld(&wd);
-        auto sd=b2DefaultShapeDef();sd.material.friction=physical_profile==1?.10f:.22f;sd.material.restitution=physical_profile==1?.14f:0.f;sd.material.rollingResistance=physical_profile==1?.02f:0.f;
+        auto sd=b2DefaultShapeDef();sd.material.friction=physical_profile==1?.16f:.22f;sd.material.restitution=physical_profile==1?.18f:0.f;sd.material.rollingResistance=physical_profile==1?.03f:0.f;
         auto groundDef=b2DefaultBodyDef();groundDef.position={0,(floor+50)*S};
         auto ground=b2CreateBody(world,&groundDef);
         sd.filter.categoryBits=1;sd.filter.maskBits=2;
@@ -74,7 +74,7 @@ public:
         for(int c=0;c<copies;c++){
             for(const auto& b:specs){
                 auto bd=b2DefaultBodyDef();bd.type=b2_dynamicBody;bd.position={(b.x+200*c)*S,b.y*S};bd.rotation=b2MakeRot(b.a);
-                bd.linearDamping=physical_profile==1?.35f:.9f;bd.angularDamping=.9f;bd.enableSleep=false;
+                bd.linearDamping=physical_profile==1?.65f:.9f;bd.angularDamping=.9f;bd.enableSleep=false;
                 auto id=b2CreateBody(world,&bd);ids.push_back(id);
                 sd.filter.categoryBits=2;sd.filter.maskBits=1;sd.density=1;
                 for(auto q:b.circles){b2Circle circle={{(q.x-b.cx)*S,(q.y-b.cy)*S},q.r*S};b2CreateCircleShape(id,&sd,&circle);}

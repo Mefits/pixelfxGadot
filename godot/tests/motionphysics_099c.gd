@@ -149,7 +149,7 @@ func simulate(label:String,passes:int,physical_profile:int,impact:Dictionary,con
             if com_vy[t-1]<-.15 and com_vy[t]>=.15:bounce_count+=1
     var pose_hold_error:float=pose_error_sum/maxf(1.,float(pose_error_count))
     var quality:bool=max_angle<8. and max_anchor<1. and max_floor<.6 and max_fk<2. and final_speed<18.
-    if physical_profile==1:quality=quality and slide>=8. and bounce_count<=2
+    if physical_profile==1:quality=quality and slide>=15. and slide<=45. and pose_hold_error<30. and bounce_count<=2
     var metrics:Dictionary={"label":label,"p95_step_us":percentile(times),"max_joint_limit_error_deg":max_angle,"worst_joint":worst_joint,"worst_tick":worst_tick,"max_anchor_error":max_anchor,"max_floor_penetration":max_floor,"max_fk_error":max_fk,"final_speed_peak":final_speed,"impulse_error":impulse_error,"flight_pose_hold_error_deg":pose_hold_error,"contact_tick":contact_tick,"post_contact_slide":slide,"bounce_count":bounce_count,"quality":quality,"final_state_hash":w.state_hash()}
     if write_trace:save_json(label,rows)
     return {"metrics":metrics,"rows":rows}
