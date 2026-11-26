@@ -3,21 +3,21 @@ extends RefCounted
 ## Foot pitch is world-space; convert to shin-relative angle before blending.
 const SIDES=["near","far"]
 const REST:float=10.304846468766
-static func wrap(a:float)->float:
+static func signed_degrees(a:float)->float:
     return wrapf(a,-180.,180.)
 static func rest(side:String)->float:
     return REST if side=="near" else -REST
 static func bend(p:Dictionary,side:String)->float:
-    return wrap(float(p.angles["knee_"+side])+2.*rest(side))
+    return signed_degrees(float(p.angles["knee_"+side])+2.*rest(side))
 static func shin(p:Dictionary,side:String)->float:
     return float(p.angles.hips)+float(p.angles["thigh_"+side])+float(p.angles["knee_"+side])+rest(side)
 static func ankle(p:Dictionary,side:String)->float:
-    return wrap(float(p.angles.get("foot_pitch_"+side,0.))-shin(p,side))
+    return signed_degrees(float(p.angles.get("foot_pitch_"+side,0.))-shin(p,side))
 static func valid(p:Dictionary,side:String)->bool:
     return bend(p,side)>=-.001 and bend(p,side)<=155.001 and ankle(p,side)>=-95.001 and ankle(p,side)<=85.001
 static func put(p:Dictionary,side:String,b:float,a:float)->void:
     p.angles["knee_"+side]=clampf(b,0.,155.)-2.*rest(side)
-    p.angles["foot_pitch_"+side]=wrap(shin(p,side)+clampf(a,-95.,85.))
+    p.angles["foot_pitch_"+side]=signed_degrees(shin(p,side)+clampf(a,-95.,85.))
 static func sanitize(p:Dictionary)->Dictionary:
     var q:Dictionary=p.duplicate(true)
     for side in SIDES:
