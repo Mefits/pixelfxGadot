@@ -213,13 +213,13 @@ func landing()->Dictionary:
         var arm_w:float=smoothstep(0.,13. if near else 17.,t)
         var upper_rest:float=rad_to_deg(Vector2(rig.joints[rig.ids["elbow_"+side]].offset).angle())-90.
         var lower_rest:float=rad_to_deg(Vector2(rig.joints[rig.ids["hand_"+side]].offset).angle())-90.
-        var arm_upper:float=-96. if near else -100.
-        var arm_lower:float=-134. if near else -100.
+        var arm_upper:float=-65. if near else -110.
+        var arm_lower:float=-77. if near else -105.
         p.angles["shoulder_"+side]=mix_angle(landing_entry.angles["shoulder_"+side],arm_upper-chest_global-upper_rest,arm_w)
         p.angles["elbow_"+side]=mix_angle(landing_entry.angles["elbow_"+side],arm_lower-arm_upper+upper_rest-lower_rest,arm_w)
-        var thigh:float=-88. if near else -86.
+        var thigh:float=-77. if near else -105.
         p.angles["thigh_"+side]=mix_angle(landing_entry.angles["thigh_"+side],thigh-p.angles.hips+Leg.rest(side),leg_w)
-        Leg.put(p,side,lerpf(Leg.bend(landing_entry,side),4. if near else 6.,leg_w),lerpf(Leg.ankle(landing_entry,side),12. if near else 16.,leg_w))
+        Leg.put(p,side,lerpf(Leg.bend(landing_entry,side),4. if near else 6.,leg_w),lerpf(Leg.ankle(landing_entry,side),22. if near else 28.,leg_w))
     rig.evaluate(p)
     # Unilateral floor envelope projection: no suspension at first contact.
     flight_position.y+=floor_y-bottom()
