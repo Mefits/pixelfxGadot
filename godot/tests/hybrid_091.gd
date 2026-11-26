@@ -1,4 +1,5 @@
 extends SceneTree
+const History=preload("res://lab/hybrid091/history.gd")
 const Kernel=preload("res://lab/hybrid091/kernel.gd")
 const Motion=preload("res://lab/hybrid091/motion.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
@@ -51,9 +52,6 @@ func pct(values:Array,f:float):
 func _initialize():
     var args:=OS.get_cmdline_user_args()
     rate=int(args[0]) if args.size() else 60
-    var capture:=args.size()>1
-    var raster
-    if capture:raster=ClassDB.instantiate("PixelFXBodyRaster")
     run_clip=JSON.parse_string(FileAccess.get_file_as_string(FIX+"run053a_C.json")).payload.clip
     var clip:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(FIX+"combo052a2_B.json")).payload.clip
     bank={"jab":Motion.compile(clip,0,38,CHANNELS,rate),"cross":Motion.compile(clip,23,45,CHANNELS,rate)}
@@ -98,7 +96,7 @@ func _initialize():
         trace.append(digest.finish().hex_encode())
         for ev in k.events:
             marks.append(ev)
-            print("MARK ",ev," endpoint ",k.hands[ev[3]])
+            print("MARK ",ev," endpoint ",k.anchors[ev[3]])
         var p:Dictionary=k.final_pose
         for id in k.rig.points:
             if prev.has(id):jumps=maxf(jumps,k.rig.point(id).distance_to(prev[id]))
@@ -119,12 +117,6 @@ func _initialize():
             ref_rig.evaluate(ref.pose)
             old_cost.append(Time.get_ticks_usec()-start)
             for id in ref_rig.points:errors=maxf(errors,k.rig.point(id).distance_to(ref_rig.point(id)))
-        if capture:
-            var image:=render(k.rig,p,k.style,raster)
-            require(image.save_png(args[1].path_join("%03d.png"%t))==OK,"PNG write")
-            if rate==60 and t<112:
-                var control:=render(ref_rig,old.sample().pose,k.style,raster)
-                require(control.save_png(args[1].path_join("old%03d.png"%t))==OK,"control PNG write")
     snapshots.append(k.save())
     history.update(snapshots.back())
     require(errors<.005,"baseline joint error "+str(errors))
@@ -142,6 +134,28 @@ func _initialize():
     # Discard predicted damage by restoring the pre-contact state. Reapply
     # with a displaced target, then replay the confirmed hit exactly once.
     var replay=new_player()
+    # Editor fixture: release only the far foot during a kick; ground the
+    # near toe, test a world-space foot marker and cancel during retraction.
+    var kick:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(FIX+"highkick051c2_C.json")).payload.clip
+    bank["kick"]=Motion.compile(kick,23,53,CHANNELS,rate,Body.make_rig(),{"far":[23,33,40,53]})
+    replay.restore(snapshots.back())
+    var near_anchor:Vector2=replay.anchors.foot_near
+    var entry_y:float=replay.anchors.foot_far.y
+    var highest:=entry_y
+    var kick_hit:=false
+    for f in range(22*scale):
+        var c={"speed":0.,"hurt_center":Vector2(replay.gait.travel+15.,-26.),"radius":12.}
+        if f==0:c.action="kick"
+        if f==19*scale:c.action="jab"
+        if f==20*scale:c.impact={"joint":"hand_far","force":Vector2(-4.,0.),"gain":1.5,"cap":80.}
+        replay.step(c)
+        require(near_anchor.distance_to(replay.anchors.foot_near)<.015,"kick support")
+        require(Leg.valid(replay.final_pose,"far"),"kick anatomy")
+        highest=minf(highest,replay.anchors.foot_far.y)
+        if not replay.events.is_empty():
+            kick_hit=replay.events[0][3]=="foot_far" and replay.events[0][4]
+    history.update(replay.save())
+    require(entry_y-highest>12. and kick_hit,"released leg contact "+str([highest,kick_hit]))
     var contact:=132*scale
     replay.restore(snapshots[contact])
     var miss:=command(contact)
@@ -151,6 +165,20 @@ func _initialize():
     replay.restore(snapshots[contact])
     replay.step(command(contact))
     require(replay.health==95 and replay.save()==snapshots[contact+1],"corrected hit")
+    var session:=History.new(replay,8*scale)
+    for n in range(contact+1,contact+9*scale+1):
+        var c:=command(n)
+        if n==137*scale:c.erase("action")
+        require(session.advance(c),"ring advance")
+        session.confirm_through(n-6*scale)
+    require(session.correct(137*scale,command(137*scale)),"late command")
+    require(replay.save()==snapshots[contact+9*scale+1],"ring corrected state")
+    for n in range(replay.tick,147*scale+1):
+        session.confirm_through(n-5*scale)
+        require(session.advance(command(n)),"history capacity")
+    var published:=session.confirm_through(replay.tick-1)
+    require(published.size()==1 and session.confirm_through(replay.tick-1).is_empty(),"publish once")
+    require(not session.correct(contact,miss),"confirmed history immutable")
     # Replace the attack during the first transition.
     replay.restore(snapshots[113*scale])
     var replace:=command(113*scale)

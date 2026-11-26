@@ -2,6 +2,7 @@ extends RefCounted
 const Grid=preload("precision.gd")
 const Gait=preload("gait.gd")
 const Support=preload("support.gd")
+const LegIK=preload("res://lab/support_adaptation_077.gd")
 const Leg=preload("res://lab/leg_constraints_082.gd")
 var rig
 var gait
@@ -26,7 +27,9 @@ var recoil:=0.
 var recoil_velocity:=0.
 var health:=100
 var events:Array=[]
-var hands:Dictionary={}
+var released:Dictionary={}
+var landing:Dictionary={}
+var anchors:Dictionary={}
 var style:=0.
 
 func _init(r,run_clip:Dictionary,motions:Dictionary,guard_angles:Dictionary,rate:int):
@@ -40,23 +43,25 @@ func _init(r,run_clip:Dictionary,motions:Dictionary,guard_angles:Dictionary,rate
     var base:Dictionary=gait.intent()
     pose=base.pose
     paths=base.paths
-    prepare_geometry(pose,paths)
+    Grid.pose(pose)
+    prepare_geometry(paths)
     support.resolve(pose,paths)
     previous=pose
     final_pose=pose
-    hands=world_hands()
+    anchors=world_anchors()
 
-func prepare_geometry(p:Dictionary,goals:Array)->void:
-    Grid.pose(p)
+func prepare_geometry(goals:Array)->void:
     for path in goals:
         path.toe=Grid.point(path.toe)
         path.pitch=Grid.scalar(path.pitch)
 
-func world_hands()->Dictionary:
+func world_anchors()->Dictionary:
     var result:Dictionary={}
     for side in Leg.SIDES:
         var id:String="hand_"+side
         result[id]=Grid.point(rig.point(id)+Vector2.RIGHT*gait.travel)
+        id="foot_"+side
+        result[id]=Grid.point(rig.point(id)+LegIK.toe_vector(final_pose,side)+Vector2.RIGHT*gait.travel)
     return result
 
 # One command per tick: target speed, optional action edge, signed chest
@@ -69,6 +74,7 @@ func step(cmd:Dictionary)->void:
     if target>0.:stopped=false
     if not stopped:
         gait.move_distance(speed,speed*scale)
+    var old_paths:=paths
     var base:Dictionary=gait.intent()
     paths=base.paths
     if target==0. and speed<=1. and paths[0].stance and paths[1].stance:
@@ -80,10 +86,15 @@ func step(cmd:Dictionary)->void:
         dest.angles[id]=lerpf(dest.angles[id],guard[id],settle)
     for path in paths:path.pitch=lerpf(path.pitch,0.,settle)
     dest.root[1]=lerpf(dest.root[1],2.5,settle)
-    prepare_geometry(dest,paths)
+    prepare_geometry(paths)
     var next:String=cmd.get("action","")
     var change:bool=bank.has(next) or (action!="" and age>=bank[action].frames.size())
     if change:
+        landing.clear()
+        for i in 2:
+            var side:String=Leg.SIDES[i]
+            if released.has(side) or old_paths[i].get("landing",false):
+                landing[side]=[anchors["foot_"+side],old_paths[i].pitch]
         action=next if bank.has(next) else ""
         serial+=1
         age=0
@@ -92,6 +103,7 @@ func step(cmd:Dictionary)->void:
     # Signed, damped reaction. Strip the already-applied reaction from
     # transition history via the unlayered pose kept below.
     if change:
+        Grid.pose(dest)
         offsets.clear()
         slopes.clear()
         var magnitude:=0.
@@ -108,10 +120,30 @@ func step(cmd:Dictionary)->void:
         var u:=float(age)/duration
         for id in offsets:
             dest.angles[id]+=offsets[id]*(1.-smoothstep(0.,1.,u))+clampf(slopes[id]*duration,-45.,45.)*u*(1.-u)*(1.-u)
+    released=bank[action].feet[age] if action!="" else {}
+    for i in 2:
+        var side:String=Leg.SIDES[i]
+        var path:Dictionary=paths[i]
+        if released.has(side):
+            var influence:Array=released[side]
+            path.toe=Grid.point(Vector2(path.toe).lerp(influence[1],influence[0]))
+            path.pitch=Grid.scalar(lerpf(path.pitch,influence[2],influence[0]))
+            path.stance=false
+        if landing.has(side) and age<duration:
+            var u:=smoothstep(0.,float(duration),float(age))
+            path.toe=Grid.point((Vector2(landing[side][0])-Vector2.RIGHT*gait.travel).lerp(path.toe,u))
+            path.pitch=Grid.scalar(lerpf(landing[side][1],path.pitch,u))
+            path.stance=false
+            path.landing=true
     Grid.pose(dest)
     previous=pose
     pose=dest
     recoil_velocity+=float(cmd.get("impulse",0.))
+    if cmd.has("impact"):
+        var impact:Dictionary=cmd.impact
+        # Gameplay controls gain and cap. The lever arm sets signed torque.
+        var lever:Vector2=Grid.point(rig.point(impact.joint)-rig.point("chest"))
+        recoil_velocity+=Grid.scalar(clampf(lever.cross(impact.force)*impact.gain,-impact.cap,impact.cap))
     recoil_velocity+=(-240.*recoil-30.*recoil_velocity)/hz
     recoil+=recoil_velocity/hz
     # Pose history stores the authored layer; final rig contains reaction.
@@ -119,14 +151,14 @@ func step(cmd:Dictionary)->void:
     resolved.angles.chest+=recoil
     support.resolve(resolved,paths)
     final_pose=resolved
-    var current:=world_hands()
+    var current:=world_anchors()
     if action!="" and bank[action].markers.has(age):
         var ordinal:=0
         for marker in bank[action].markers[age]:
             var id:String=marker.anchor
             var hit:=false
-            if hands.has(id) and cmd.has("hurt_center"):
-                var start:Vector2=hands[id]
+            if anchors.has(id) and cmd.has("hurt_center"):
+                var start:Vector2=anchors[id]
                 var delta:Vector2=current[id]-start
                 var u:=clampf((cmd.hurt_center-start).dot(delta)/maxf(delta.length_squared(),1e-12),0.,1.)
                 hit=(start+u*delta).distance_to(cmd.hurt_center)<=cmd.radius
@@ -134,7 +166,7 @@ func step(cmd:Dictionary)->void:
             if hit:health-=5
             events.append([tick,serial,ordinal,id,hit,marker.kind])
             ordinal+=1
-    hands=current
+    anchors=current
     age+=1
     tick+=1
 
@@ -142,11 +174,11 @@ var final_pose:Dictionary
 # S[t] is immediately before command t. Fixed field order, lossless local
 # Variant encoding. Immutable assets and derived render geometry stay outside.
 func save()->PackedByteArray:
-    return var_to_bytes([1,hz,tick,gait.snapshot(),speed,stopped,settle,action,age,serial,duration,offsets,slopes,recoil,recoil_velocity,health,hands,pose,previous,final_pose,paths,style])
+    return var_to_bytes([2,hz,tick,gait.snapshot(),speed,stopped,settle,action,age,serial,duration,offsets,slopes,recoil,recoil_velocity,health,anchors,pose,previous,final_pose,paths,style,released,landing])
 
 func restore(bytes:PackedByteArray)->void:
     var s:Array=bytes_to_var(bytes)
-    assert(s[0]==1 and s[1]==hz)
+    assert(s[0]==2 and s[1]==hz)
     tick=s[2]
     gait.restore(s[3])
     speed=s[4]
@@ -161,11 +193,13 @@ func restore(bytes:PackedByteArray)->void:
     recoil=s[13]
     recoil_velocity=s[14]
     health=s[15]
-    hands=s[16]
+    anchors=s[16]
     pose=s[17]
     previous=s[18]
     final_pose=s[19]
     paths=s[20]
     style=s[21]
+    released=s[22]
+    landing=s[23]
     events=[]
     rig.evaluate(final_pose)
