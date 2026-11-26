@@ -1,0 +1,8 @@
+[configuration]
+entry_symbol = "motionphysics_099d_init"
+compatibility_minimum = "4.4"
+reloadable = false
+
+[libraries]
+linux.x86_64 = "res://addons/motionphysics/bin/libmotionphysics_099d.linux.x86_64.so"
+windows.x86_64 = "res://addons/motionphysics/bin/motionphysics_099d.windows.x86_64.dll"
