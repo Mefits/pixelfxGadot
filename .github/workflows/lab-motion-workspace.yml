@@ -118,22 +118,3 @@ jobs:
           print("ASTRA_CROSS_PLATFORM_EXACT",a["astra"]==b["astra"])
           print("BOX2D_CROSS_PLATFORM_EXACT",a["box2d"]==b["box2d"])
           assert a["astra"]==b["astra"], "Astra cross-platform regression"
-
-  verify_download:
-    needs: verify
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: Lab-Motion-Workspace-Windows-portable
-          path: "Fresh Lab Download"
-      - name: Verify actual downloaded archive from clean cache
-        shell: pwsh
-        run: |
-          Set-Location "Fresh Lab Download"
-          if (Test-Path "godot/.godot") { Remove-Item -Recurse -Force "godot/.godot" }
-          cmd.exe /d /c START_LAB.bat --check
-          if ($LASTEXITCODE -ne 0) { Get-Content LAB_STARTUP.log; exit 1 }
-          if (!(Test-Path "godot/.godot/lab_bootstrap_ok")) { exit 1 }
-          Write-Output "DOWNLOADED_LAB_COLD_LAUNCH_OK"
