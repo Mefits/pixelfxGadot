@@ -1,0 +1,55 @@
+name: Environment Lab v0.01 preview
+on:
+  push:
+    branches: ['feature/environment-lab-v001']
+    paths:
+      - 'godot/lab/environment/**'
+      - 'godot/tests/environment_preview.gd'
+      - '.github/workflows/environment-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot and capture dependencies
+        run: |
+          curl -fsSL https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          ln -s /tmp/godot/Godot_v4.4.1-stable_linux.x86_64 /tmp/godot/godot
+          echo /tmp/godot >> "$GITHUB_PATH"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb ffmpeg
+      - name: Render actual Godot frames and run checks
+        env:
+          ENV_CAPTURE_DIR: ${{ github.workspace }}/environment-capture
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          mkdir -p "$ENV_CAPTURE_DIR"
+          xvfb-run -a godot --path godot --rendering-method gl_compatibility --disable-vsync --script res://tests/environment_preview.gd
+      - name: Encode 60 fps preview and 30 fps GIF
+        run: |
+          mkdir -p environment-preview
+          cp environment-capture/cosmic_ruins*.png environment-preview/
+          ffmpeg -v error -framerate 60 -i environment-capture/frame_%04d.png -c:v libx264 -crf 18 -pix_fmt yuv420p -movflags +faststart environment-preview/cosmic_ruins_60fps.mp4
+          ffmpeg -v error -framerate 60 -i environment-capture/frame_%04d.png -filter_complex "[0:v]fps=30,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse=dither=bayer" -loop 0 environment-preview/cosmic_ruins.gif
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames -of json environment-preview/cosmic_ruins_60fps.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Environment-Lab-v001-preview
+          path: environment-preview/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Environment-Lab-v001-project
+          path: |
+            godot/project.godot
+            godot/addons/pixelfx/native/
+            godot/lab/environment/
+            godot/tests/environment_preview.gd
+            docs/ENVIRONMENT_LAB.md
+            LICENSE-PixelFX.txt
