@@ -37,7 +37,7 @@ static func normalise(d:Dictionary)->Dictionary:
     return out
 
 static func problem(d:Dictionary)->String:
-    if not d.get("version") in [1,2] or not d.get("id") is String or not d.id.is_valid_identifier() or not d.get("name") is String:return "Версия или имя движения"
+    if (d.get("version")!=1 and d.get("version")!=2) or not d.get("id") is String or not d.id.is_valid_identifier() or not d.get("name") is String:return "Версия или имя движения"
     if not d.get("goals") is Array or d.goals.size()>64:return "Список целей (до 64)"
     for g in d.goals:
         if not g is Dictionary or not g.get("joint") in JOINTS:return "Неизвестный сустав"

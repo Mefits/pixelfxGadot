@@ -28,7 +28,11 @@ func run():
     var scale:int=hz/60
     for id in Asset.IDS:
         var d:=Asset.read(Asset.DIR+id+".json")
-        check(Asset.problem(d)=="","document")
+        var problem:String=Asset.problem(d)
+        if problem!="":
+            push_error("document "+id+": "+problem)
+            quit(1)
+            return
         var base=Asset.player(d,hz)
         var target_tick:=50*scale
         if d.kind=="gait":
@@ -123,6 +127,11 @@ func run():
             check(kicker.released.has("far") and not kicker.paths[1].stance,"authored swing")
     check(foot_marker,"foot event")
     # Legacy U clip import preserves root, easing, loop and non-combat events.
+    # JSON round-trip must accept numeric versions read as floats.
+    for version in [1,2]:
+        var roundtrip:Dictionary=JSON.parse_string(JSON.stringify(j))
+        roundtrip.version=float(version)
+        check(Asset.problem(roundtrip)=="","JSON numeric schema version")
     var old_bank:Dictionary=Clips.defaults()
     var imported:Array=Asset.import_legacy_bank(old_bank,"u",30)
     check(imported.size()>=7,"legacy bank import count")
@@ -141,11 +150,18 @@ func run():
     check(not old_cast.is_empty() and old_cast.events.size()==2,"charge/cast events imported")
     var loop_doc:Dictionary=Asset.legacy_clip_to_action(old_bank.idle,"u_idle","Idle",30)
     check(not loop_doc.is_empty() and loop_doc.loop,"legacy loop imported")
+    if loop_doc.is_empty():
+        quit(1)
+        return
     var loop_player=Asset.player(loop_doc,hz)
     for t in range(loop_player.bank.u_idle.frames.size()*2+2):
         loop_player.step({"speed":0.,"action":"u_idle" if t==0 else ""})
     check(loop_player.action=="u_idle" and loop_player.age<loop_player.bank.u_idle.frames.size(),"looping action wraps")
     var root_doc:Dictionary=Asset.legacy_clip_to_action(old_bank.strike,"u_root","Root",30)
+    if root_doc.is_empty():
+        push_error("legacy root import failed")
+        quit(1)
+        return
     root_doc.goals=[]
     for key in root_doc.keys:key.root=[-3.,1.]
     var root_player=Asset.player(root_doc,hz)
