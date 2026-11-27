@@ -1,0 +1,82 @@
+name: Run to jump / native acceptance
+on:
+  push:
+    branches: [experiment/universal-motion-transitions]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  motion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: f37af5221632f7273446b625ce454c972d02ab08
+          path: baseline
+      - name: Install exact engine (no native compilation)
+        shell: bash
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=$PWD/engine/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - run: python tools/check_jump_entry.py baseline/godot godot
+  portable:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-${{ runner.os }}
+      - run: pip install scons numpy scipy pillow
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install exact upstream PixelFX and assets
+        run: |
+          npm install --no-package-lock
+          npm run bootstrap
+          npm run build:original
+      - name: Build PixelFX renderer with original JS runtime
+        run: python native_cpp/build.py --original
+      - name: Build pinned Box2D
+        run: python native_cpp/build_motionphysics.py
+      - name: Install Godot 4.4.1
+        shell: python
+        run: |
+          import os, pathlib, urllib.request, zipfile
+          windows = os.name == "nt"
+          name = "Godot_v4.4.1-stable_" + ("win64.exe" if windows else "linux.x86_64")
+          urllib.request.urlretrieve("https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/" + name + ".zip", "engine.zip")
+          with zipfile.ZipFile("engine.zip") as z:
+              z.extractall("engine")
+          exe = next(p for p in pathlib.Path("engine").rglob("*") if p.name == name)
+          exe.chmod(0o755)
+          if windows:
+              exe = exe.with_name(exe.stem + "_console.exe")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              print("GODOT=" + str(exe.resolve()), file=f)
+      - name: Register native modules
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("godot/.godot")
+          p.mkdir(exist_ok=True)
+          (p/"extension_list.cfg").write_text("res://addons/pixelfx/pixelfx.gdextension\nres://addons/motionphysics/motionphysics_099d.gdextension\n")
+      - name: Check transition in Windows engine
+        shell: pwsh
+        run: |
+          & $env:GODOT --headless --path godot --script res://tests/run_jump_entry.gd
+          exit $LASTEXITCODE
+      - run: python tools/package_lab_rc2.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lab-Transitions-Windows
+          path: dist/Lab-1.0-RC2/
+          if-no-files-found: error

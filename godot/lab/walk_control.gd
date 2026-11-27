@@ -30,6 +30,7 @@ var phase:float=0.
 var activity:float=0.
 var direction:int=0
 var pose:Dictionary={}
+var previous_pose:Dictionary={}
 var paths:Array=[]
 var ticks:int=0
 var transition_age:int=0
@@ -75,6 +76,7 @@ func guard_intent(program:Dictionary,u:float)->Dictionary:
 func set_intent(value:Dictionary)->void:
     paths=value.paths
     support_load=value.get("support_load",[.5,.5])
+    previous_pose=pose
     pose=Motion.resolve(rig,support,value)
 
 # Recenter the locomotion frame at the new support span without translating

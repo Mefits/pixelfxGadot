@@ -3,6 +3,11 @@ extends RefCounted
 const Motion=preload("res://lab/walk_motion.gd")
 const Walk=preload("res://lab/walk_control.gd")
 const Clips=preload("res://addons/creature/clips.gd")
+const Entry=preload("res://lab/motion_entry.gd")
+var moving_entry
+var push_leg:int
+var plant_tick:int
+var plant_x:float
 const PREP_TICKS:int=6
 const FLIGHT_TICKS:int=48
 const HEIGHT_SCALE:float=1.35
@@ -90,6 +95,18 @@ func start(w,command:int)->bool:
         else:launch_vx=launch_direction*maxf(MAX_SPEED,absf(inherited_speed))
     air_speed_limit=maxf(MAX_SPEED,absf(launch_vx))
     w.rig.evaluate(entry)
+    moving_entry=null
+    if w.sprint_active and absf(inherited_speed)>.01:
+        moving_entry=Entry.new(w)
+        launch_vx=inherited_speed
+        # During flight the distance calendar identifies the next receiving foot.
+        push_leg=w.run_gait.side
+        if not moving_entry.contacts[push_leg]:
+            push_leg=1-push_leg
+        plant_tick=0 if moving_entry.contacts[push_leg] else 3
+        plant_x=moving_entry.anchors[push_leg].x
+        if plant_tick>0:
+            plant_x=w.x+inherited_speed*plant_tick/60.+moving_entry.toe_at(push_leg,plant_tick,PREP_TICKS).x
     w.suspend_motion()
     w.direction=0
     w.idle_active=false
@@ -103,6 +120,15 @@ func start(w,command:int)->bool:
 func step(w,command:int)->void:
     age+=1
     if state==1:
+        if moving_entry!=null:
+            running_push(w)
+            if age==PREP_TICKS:
+                launch_pose=w.pose.duplicate(true)
+                launch_toes=Motion.toes(w.rig,w.pose)
+                state=2
+                age=0
+                vx=launch_vx
+            return
         # Dynamic prep: brief sink, then explosive extension into takeoff.
         var u:float=float(age)/PREP_TICKS
         var settle:float=_phase(0.,0.35,u)
@@ -165,15 +191,17 @@ func step(w,command:int)->void:
     var airborne:float=maxf(maxf(stretch,apex_tuck),descent)
     var launch_mix:float=_phase(0.0,0.22,u)
     var p:Dictionary=Clips.blend_pose(launch_pose,guard.pose,launch_mix)
-    p.root[0]+=2.2*lean*(0.25+0.75*airborne)
+    # Introduce flight accents from zero at lift-off, including foot pitch.
+    var onset:float=_phase(0.,.14,u) if moving_entry!=null else 1.
+    p.root[0]+=onset*2.2*lean*(0.25+0.75*airborne)
     p.root[1]-=.8*stretch
     p.angles.hips+=15.*lean*(0.5*stretch+.55*apex_tuck)-10.0*lean*descent
     p.angles.chest+=11.*lean*(0.45*stretch+.35*apex_tuck)-8.0*lean*descent
     p.angles.head+=3.0*apex_tuck-7.5*stretch+5.5*descent
-    p.angles.shoulder_turn+=11.*lean*(0.35+0.65*airborne)
-    p.angles.shoulder_near+=12.*stretch+19.*apex_tuck-9.*descent+6.*lean
+    p.angles.shoulder_turn+=onset*11.*lean*(0.35+0.65*airborne)
+    p.angles.shoulder_near+=12.*stretch+19.*apex_tuck-9.*descent+onset*6.*lean
     p.angles.elbow_near+=8.*stretch+24.*apex_tuck+10.*descent
-    p.angles.shoulder_far+=19.*stretch+11.*apex_tuck-6.*descent+4.*lean
+    p.angles.shoulder_far+=19.*stretch+11.*apex_tuck-6.*descent+onset*4.*lean
     p.angles.elbow_far+=10.*stretch+18.*apex_tuck+8.*descent
     var paths:Array=[]
     for i in 2:
@@ -188,11 +216,50 @@ func step(w,command:int)->void:
         toe.y-=(11.5 if front else 8.3)*apex_tuck
         toe.y-=(3.2 if front else 2.4)*descent
         var pitch:float=10.*stretch+7.*apex_tuck-4.5*descent
+        if moving_entry!=null:
+            pitch=lerpf(launch_pose.angles["foot_pitch_"+Motion.SIDES[i]],pitch,onset)
         paths.append({"toe":toe,"pitch":pitch,"stance":false})
     if age>=flight_ticks:
         land(w)
         return
     w.set_intent({"pose":p,"paths":paths,"support_load":[0.,0.]})
+
+# The receiver owns load/extension timing. Source tangents supply the
+# initial directions, and a single arena-space point supports the push.
+func running_push(w)->void:
+    var e=moving_entry
+    var u:=float(age)/PREP_TICKS
+    var load:=sin(PI*u)*power_scale
+    var drive:=smoothstep(.35,1.,u)*power_scale
+    w.x=clampf(w.x+e.velocity/60.,-w.travel_limit,w.travel_limit)
+    var p:Dictionary=e.continued(age,PREP_TICKS)
+    p.root[1]+=2.8*load-.5*drive
+    p.angles.chest-=3.*drive
+    var paths:Array=[]
+    for i in 2:
+        var side:String=Motion.SIDES[i]
+        var toe:Vector2=e.toe_at(i,age,PREP_TICKS)
+        var planted:bool=i==push_leg and age>=plant_tick
+        if i==push_leg:
+            var approach:=1. if plant_tick==0 else smoothstep(0.,float(plant_tick),float(age))
+            toe=toe.lerp(Vector2(plant_x-w.x,0.),approach)
+        else:
+            toe.x+=launch_direction*2.*drive
+            toe.y-=2.8*drive
+        toe.y=minf(0.,toe.y)
+        var pitch:float=p.angles["foot_pitch_"+side]
+        paths.append({"toe":toe,"pitch":pitch,"stance":planted})
+    var loads:=[0.,0.]
+    if paths[push_leg].stance:loads[push_leg]=1.
+    w.set_intent({"pose":p,"paths":paths,"support_load":loads})
+    if paths[push_leg].stance:
+        # IK may saturate its reach or ankle limit. Transfer the remaining
+        # displacement to the pelvis around the supporting toe.
+        var actual:=Motion.toe(w.rig,w.pose,Motion.SIDES[push_leg])
+        var correction:Vector2=paths[push_leg].toe-actual
+        w.pose.root[0]+=correction.x
+        w.pose.root[1]+=correction.y
+        w.rig.evaluate(w.pose)
 
 # A fresh press only, after leaving the ground; no third impulse.
 func can_second()->bool:
