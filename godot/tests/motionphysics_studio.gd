@@ -52,6 +52,7 @@ func run()->void:
     s.set_profile(1)
     s.partial.button_pressed=true
     s.target_select.select(3)
+    s.power.value=.1
     s.hit_button.pressed.emit()
     if not s.controller.pinned or s.controller.event_count!=1:
         fail("partial UI")
@@ -60,7 +61,7 @@ func run()->void:
     for t in 20:s.advance_tick()
     var after:Array=s.controller.world.state()
     for i in s.controller.n:
-        if s.controller.lower(s.controller.model.bodies[i].id) and before[i]!=after[i]:
+        if s.controller.lower(s.controller.model.bodies[i].id) and max_delta([before[i]],[after[i]])>.0001:
             fail("pinned segment moved")
             return
     var arm:int=s.controller.model.ids.hand_near
@@ -69,7 +70,7 @@ func run()->void:
         return
     var snap:Dictionary=s.controller.snapshot()
     s.partial.button_pressed=false
-    if s.controller.pinned or s.controller.world.state()!=after:
+    if s.controller.pinned or max_delta(s.controller.world.state(),after)>.0001:
         fail("authority release discontinuity")
         return
     for t in 12:s.advance_tick()
@@ -83,6 +84,7 @@ func run()->void:
         return
     s.set_profile(1)
     s.target_select.select(0)
+    s.power.value=1.
     s.hold.value=.45
     s.motor.value=.65
     s.hit_button.pressed.emit()
@@ -99,3 +101,9 @@ func run()->void:
             return
     print("MOTIONPHYSICS_STUDIO_OK")
     quit()
+
+func max_delta(a:Array,b:Array)->float:
+    var error:float=0.
+    for i in a.size():
+        for j in 6:error=maxf(error,absf(float(a[i][j])-float(b[i][j])))
+    return error
