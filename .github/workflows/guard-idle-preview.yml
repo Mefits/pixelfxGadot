@@ -1,0 +1,52 @@
+name: Guard idle lightweight update and native render
+on:
+  push:
+    branches: [audit/guard-idle-preview]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Lab-Walk-Control-Windows-portable
+          run-id: 46001744668
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: native
+      - name: Overlay new guard and build small patch
+        shell: python
+        run: |
+          import zipfile,shutil
+          from pathlib import Path
+          files=["godot/lab/walk_motion.gd","godot/tests/walk_control.gd"]
+          with zipfile.ZipFile("Lab-guard-update.zip","w",zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+              for f in files:
+                  z.write(f,f)
+                  shutil.copy2(f,Path("native")/f)
+              z.writestr("README-GUARD.txt","Close Godot. Extract to the Lab folder containing godot/project.godot, replacing files. Based on the idle/timeline update 8a59e12. User saved stance and idle are preserved. Default guard appears only if no saved override exists.")
+          shutil.copy2("godot/tests/idle_capture.gd","native/godot/tests/idle_capture.gd")
+      - name: Verify patched project and capture native guard
+        shell: pwsh
+        run: |
+          $frames = "$PWD/frames"
+          Set-Location native
+          cmd.exe /d /c START_LAB.bat --check
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & .\Godot_console.exe --headless --path godot --audio-driver Dummy --script res://tests/walk_control.gd
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & .\Godot_console.exe --headless --path godot --audio-driver Dummy --script res://tests/idle_capture.gd -- "$frames"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Assemble captured GIFs
+        run: |
+          pip install pillow
+          python tools/idle_gif.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guard-update-and-preview
+          path: |
+            Lab-guard-update.zip
+            preview/
