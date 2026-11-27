@@ -51,7 +51,7 @@ func _gui_input(e:InputEvent)->void:
             accept_event()
             return
     if e is InputEventMouseButton or e is InputEventMouseMotion:
-        var copy:InputEvent=e.duplicate()
-        copy.position.y=20. if e.position.y>=25 and e.position.y<49 else (32. if e.position.y>=49 and e.position.y<73 else 5.)
+        var copy=e.duplicate()
+        copy.position=Vector2(e.position.x,20. if e.position.y>=25 and e.position.y<49 else (32. if e.position.y>=49 and e.position.y<73 else 5.))
         super._gui_input(copy)
     else:super._gui_input(e)

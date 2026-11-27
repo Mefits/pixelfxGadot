@@ -75,7 +75,7 @@ func _ready():
     button(top,"Сохранить",save_file,"Ctrl+S")
     button(top,"Загрузить",func():request_open(document.id),"Вернуться к сохранённому документу")
     button(top,"Отмена",undo,"Ctrl+Z")
-    button(top,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn"),"Esc")
+    button(top,"Меню",request_exit,"Esc")
 
     caption(self,"ДВИЖЕНИЯ",Vector2(16,55),12)
     motion=ItemList.new()
@@ -229,7 +229,9 @@ func _ready():
     switch_dialog.title="Несохранённые изменения"
     switch_dialog.dialog_text="Отменить несохранённые правки и открыть выбранное движение?"
     add_child(switch_dialog)
-    switch_dialog.confirmed.connect(func():open_motion(requested_id))
+    switch_dialog.confirmed.connect(func():
+        if requested_id=="":get_tree().change_scene_to_file("res://lab/main.tscn")
+        else:open_motion(requested_id))
     switch_dialog.canceled.connect(func():motion.select(ids.find(document.id)))
     open_motion(ids[0])
 
@@ -278,9 +280,17 @@ func set_zoom(value:float)->void:
     position_sprite()
     queue_redraw()
 
+func request_exit()->void:
+    if JSON.stringify(document)!=saved_signature:
+        requested_id=""
+        switch_dialog.dialog_text="Выйти в меню без сохранения правок?"
+        switch_dialog.popup_centered(Vector2i(400,140))
+    else:get_tree().change_scene_to_file("res://lab/main.tscn")
+
 func request_open(id:String)->void:
     if not document.is_empty() and JSON.stringify(document)!=saved_signature:
         requested_id=id
+        switch_dialog.dialog_text="Отменить несохранённые правки и открыть выбранное движение?"
         switch_dialog.popup_centered(Vector2i(400,140))
         return
     open_motion(id)
@@ -295,9 +305,14 @@ func update_play_button()->void:
 
 func key_at_frame()->int:
     if document.kind!="action":return -1
+    var index:int=-1
+    var best:float=.50001
     for i in document.keys.size():
-        if absf(document.keys[i].t-(frame-START)/60.)<.0001:return i
-    return -1
+        var d:float=absf(document.keys[i].t*60.-(frame-START))
+        if d<best:
+            best=d
+            index=i
+    return index
 
 func sync_key()->void:
     var i:int=key_at_frame()
@@ -411,7 +426,7 @@ func refresh(value:int):
     pose_controls.visible=document.kind=="action"
     goal_list.clear()
     goal_list.add_item("+ Новая цель")
-    for g in document.goals:goal_list.add_item("%s · %.2f · %s"%[g.joint,g.center,g.clock])
+    for g in document.goals:goal_list.add_item("%s · %.0f%%"%[joint_name(g.joint),g.center*100.])
     timeline.max_value=end_frame()
     timeline.clip={"keys":[],"events":[],"goals":[],"gait":document.kind=="gait","start":START}
     var previous_channel:String=""
@@ -523,7 +538,7 @@ func _unhandled_input(event):
     if event is InputEventKey and UI.editor_shortcut(self,event):
         match UI.physical_key(event):
             KEY_SPACE:toggle_play()
-            KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
+            KEY_ESCAPE:request_exit()
             KEY_Z:
                 if event.ctrl_pressed:undo()
             KEY_S:
