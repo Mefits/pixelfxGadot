@@ -30,9 +30,10 @@ class MotionPhysics099D:public RefCounted {
     b2WorldId world=b2_nullWorldId;
     std::vector<Spec> specs;
     std::vector<b2BodyId> ids;
+    std::vector<b2JointId> joints;
     int substeps=4;
     bool live()const{return !B2_IS_NULL(world)&&b2World_IsValid(world);}
-    void clear(){if(live())b2DestroyWorld(world);world=b2_nullWorldId;ids.clear();specs.clear();}
+    void clear(){if(live())b2DestroyWorld(world);world=b2_nullWorldId;ids.clear();joints.clear();specs.clear();}
     void mass(b2BodyId id,const Spec& b){b2MassData md{};md.mass=b.m;md.center={0,0};md.rotationalInertia=b.I*S*S;b2Body_SetMassData(id,md);}
 protected:
     static void _bind_methods(){
@@ -40,6 +41,7 @@ protected:
         ClassDB::bind_method(D_METHOD("setup_pair","specification","substeps","physical_profile"),&MotionPhysics099D::setup_pair);
         ClassDB::bind_method(D_METHOD("initialize_segment","body","position","angle","velocity","angular_velocity"),&MotionPhysics099D::initialize_segment);
         ClassDB::bind_method(D_METHOD("drive_segment","body","position","angle"),&MotionPhysics099D::drive_segment);
+        ClassDB::bind_method(D_METHOD("set_joint_offset","body","offset"),&MotionPhysics099D::set_joint_offset);
         ClassDB::bind_method(D_METHOD("fighter_contacts"),&MotionPhysics099D::fighter_contacts);
         ClassDB::bind_method(D_METHOD("state"),&MotionPhysics099D::state);
         ClassDB::bind_method(D_METHOD("step","weights"),&MotionPhysics099D::step);
@@ -89,6 +91,7 @@ public:
                 for(auto q:b.circles){b2Circle circle={{(q.x-b.cx)*S,(q.y-b.cy)*S},q.r*S};b2CreateCircleShape(id,&sd,&circle);}
                 mass(id,b);
             }
+            joints.resize(ids.size(),b2_nullJointId);
             for(int i=1;i<n;i++){
                 const auto& b=specs[i];const auto& a=specs[b.parent];
                 auto jd=b2DefaultRevoluteJointDef();
@@ -99,6 +102,7 @@ public:
                 jd.base.collideConnected=false;
                 jd.enableLimit=true;jd.lowerAngle=std::max(b.lo,-.99f*PI);jd.upperAngle=std::min(b.hi,.99f*PI);
                 auto j=b2CreateRevoluteJoint(world,&jd);
+                joints[c*n+i]=j;
                 // Match 099 joint model; use native constraints only.
                 // More internal substeps improve stiffness, no projection of poses.
                 b2Joint_SetConstraintTuning(j,120.f,1.f);
@@ -118,6 +122,20 @@ public:
         auto q=b2Body_GetPosition(ids[i]);
         Vector2 v((p.x-q.x/S)/H,(p.y-q.y/S)/H);
         return set_velocity(i,v,wrap(float(a)-angle(ids[i]))/H);
+    }
+    // Projected girdle anchors are explicit pose inputs, not body teleports.
+    bool set_joint_offset(int i,Vector2 offset){
+        if(!live()||i<0||i>=int(joints.size())||!offset.is_finite()||offset.length()>32||B2_IS_NULL(joints[i]))return false;
+        const int n=int(specs.size());
+        const auto& b=specs[i%n];
+        const auto& a=specs[b.parent];
+        auto frame=b2Joint_GetLocalFrameA(joints[i]);
+        const float x=(float(offset.x)-a.cx)*S,y=(float(offset.y)-a.cy)*S;
+        if(frame.p.x!=x||frame.p.y!=y){
+            frame.p={x,y};
+            b2Joint_SetLocalFrameA(joints[i],frame);
+        }
+        return true;
     }
     // Report only cross-fighter contact impulses, once per contact (query fighter 0).
     Array fighter_contacts()const{

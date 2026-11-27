@@ -75,6 +75,7 @@ func run()->void:
     var records:Array=[]
     var times:Array=[]
     var peak_anchor:float=0.
+    var peak_precontact_anchor:float=0.
     var peak_floor:float=0.
     var peak_limit:float=0.
     var worst_anchor_tick:int=-1
@@ -92,6 +93,7 @@ func run()->void:
             var p:Dictionary=poses[c]
             var metrics:Dictionary=Common.validate(m)
             if c==1:
+                if b.contact_tick<0:peak_precontact_anchor=maxf(peak_precontact_anchor,metrics.anchor)
                 if metrics.anchor>peak_anchor:
                     peak_anchor=metrics.anchor
                     worst_anchor_tick=t
@@ -125,11 +127,12 @@ func run()->void:
     check(b.release_tick>=b.contact_tick and b.release_tick>=0,"no contact-triggered release")
     check(b.release_error<.001,"pair release continuity "+str(b.release_error))
     check(b.track_error<.05,"pair tracking "+str(b.track_error))
+    check(peak_precontact_anchor<1.,"precontact anchor residual "+str(peak_precontact_anchor))
     check(peak_anchor<3.,"pair anchor residual "+str(peak_anchor))
     check(peak_floor<3.,"pair floor residual "+str(peak_floor))
     check(peak_limit<30.,"pair angle residual "+str(peak_limit))
     times.sort()
-    var report:Dictionary={"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"attacker_release_tick":b.attacker_release_tick,"attacker_release_error":b.attacker_release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"worst_anchor_tick":worst_anchor_tick,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
+    var report:Dictionary={"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"attacker_release_tick":b.attacker_release_tick,"attacker_release_error":b.attacker_release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"peak_precontact_anchor":peak_precontact_anchor,"worst_anchor_tick":worst_anchor_tick,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
     var f:=FileAccess.open(out.path_join("report.json"),FileAccess.WRITE)
     f.store_string(JSON.stringify(report))
     f.close()

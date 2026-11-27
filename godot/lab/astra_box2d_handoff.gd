@@ -4,6 +4,7 @@ extends RefCounted
 const Common=preload("res://lab/ragdoll_common_099c.gd")
 const Asset=preload("res://lab/authoring/asset.gd")
 const DT:float=1./120.
+const GIRDLE=["shoulder_near","shoulder_far","thigh_near","thigh_far"]
 var players:Array=[]
 var models:Array=[]
 var offsets:Array=[]
@@ -41,6 +42,19 @@ func sample(c:int)->Array:
         out.append([v.x,v.y,a])
     return out
 
+# The accepted 2.5D FK changes projected shoulder/hip offsets with turn.
+# Keep the native revolute frame and the display rig consistent; freeze on release.
+func sync_projection(c:int,native:bool)->bool:
+    var m=models[c]
+    for channel in ["shoulder_turn","pelvis_turn"]:
+        m.template.angles[channel]=players[c].final_pose.angles.get(channel,0.)
+    for id in GIRDLE:
+        var i:int=m.ids[id]
+        var offset:Vector2=m.rig.joints[m.rig.ids[id]].offset
+        m.bodies[i].offset=offset
+        if native and not world.set_joint_offset(c*n+i,offset):return false
+    return true
+
 func velocity(a:Array,b:Array)->Array:
     return [(b[0]-a[0])/DT,(b[1]-a[1])/DT,wrapf(float(b[2])-float(a[2]),-PI,PI)/DT]
 
@@ -71,6 +85,7 @@ func setup(two:bool=true)->bool:
         prior.append(sample(c))
         p.step({"speed":1.85 if c==0 else 1.})
         first.append(sample(c))
+        if not sync_projection(c,false):return false
         var m=models[c]
         n=m.bodies.size()
         for i in n:
@@ -95,6 +110,8 @@ func setup(two:bool=true)->bool:
             var index:int=c*n+i
             if driven(c,i) and not world.set_kinematic(index,true):return false
             if not world.initialize_segment(index,Vector2(r[0],r[1]),r[2],Vector2(v[0],v[1]),v[2]):return false
+    for c in offsets.size():
+        if not sync_projection(c,true):return false
     rows=first
     return true
 
@@ -158,6 +175,7 @@ func step(commands:Array,force_release:bool=false)->bool:
         if (pair and c==0 and attacker_release_tick<0) or ((not pair or c==1) and release_tick<0):
             players[c].step(commands[c])
             rows[c]=sample(c)
+            if not sync_projection(c,true):return false
         for i in n:
             var idx:int=c*n+i
             var r:Array=rows[c][i]
@@ -208,12 +226,23 @@ func poses()->Array:
 func snapshot()->Dictionary:
     var states:Array=[]
     for p in players:states.append(p.save())
-    return {"world":world.snapshot(),"hash":world.state_hash(),"players":states,"rows":rows.duplicate(true),"tick":tick,"release":release_tick,"attacker_release":attacker_release_tick,"attacker_release_error":attacker_release_error,"contact":contact_tick,"impulse":contact_impulse,"contacts":contacts.duplicate(true),"release_error":release_error,"track_error":track_error}
+    var projection:Array=[]
+    for m in models:
+        var values:Array=[m.template.angles.shoulder_turn,m.template.angles.pelvis_turn]
+        for id in GIRDLE:values.append(m.bodies[m.ids[id]].offset)
+        projection.append(values)
+    return {"projection":projection,"world":world.snapshot(),"hash":world.state_hash(),"players":states,"rows":rows.duplicate(true),"tick":tick,"release":release_tick,"attacker_release":attacker_release_tick,"attacker_release_error":attacker_release_error,"contact":contact_tick,"impulse":contact_impulse,"contacts":contacts.duplicate(true),"release_error":release_error,"track_error":track_error}
 
 func restore(s:Dictionary)->bool:
     if not world.restore(s.world):return false
     for c in players.size():players[c].restore(s.players[c])
     rows=s.rows.duplicate(true)
+    for c in models.size():
+        var m=models[c]
+        var values:Array=s.projection[c]
+        m.template.angles.shoulder_turn=values[0]
+        m.template.angles.pelvis_turn=values[1]
+        for i in GIRDLE.size():m.bodies[m.ids[GIRDLE[i]]].offset=values[i+2]
     tick=s.tick
     release_tick=s.release
     attacker_release_tick=s.attacker_release
