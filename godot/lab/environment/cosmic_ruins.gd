@@ -1,6 +1,8 @@
 extends Node2D
-## Environment Lab v0.02. Original authored composition using the native PixelFX Painter.
+## Environment Lab v0.03. Original authored composition using the native PixelFX Painter.
 ## PixelFX primitives and deterministic RNG: MIT, Patch/Hugo Duprez; see toolkit notices.
+const COMBAT_LIGHTING = preload("res://lab/environment/combat_lighting.gd")
+var combat_lighting = COMBAT_LIGHTING.new()
 const P = preload("res://addons/pixelfx/native/painter.gd")
 const PAL = preload("res://addons/pixelfx/native/palette.gd")
 const M = preload("res://addons/pixelfx/native/math.gd")
@@ -47,6 +49,16 @@ func _fit() -> void:
 func _process(dt: float) -> void:
     if animate:
         set_time(phase + dt)
+    combat_lighting.tick(dt)
+
+# Positions/radii are in the arena's 640x360 coordinate space, not viewport pixels.
+func emit_combat_light(at: Vector2, radius: float, tint: Color, energy: float, lifetime: float) -> bool:
+    return combat_lighting.emit_light(at,radius,tint,energy,lifetime)
+
+# Replace the live effect source snapshot each visual frame. The caller owns its simulation.
+# Each entry: {"lights": PixelFX Lights, "origin": Vector2, "scale": float, "reach": float}.
+func publish_combat_lights(sources: Array, sustained: Array = []) -> void:
+    combat_lighting.publish(sources,sustained)
 
 func set_time(seconds: float) -> void:
     phase = fposmod(seconds, PERIOD)
@@ -360,7 +372,8 @@ func _terrain() -> void:
         var x: float = (110+_r(i,201)*166) if side else (390+_r(i,201)*155)
         var y: float = 325.0-_r(i,202)*8.0
         _ellipse(p,x,y,3+_r(i,203)*8,1.5+_r(i,204)*3.2,["0c2541","12395d","15497a"][i%3])
-    _sprite(p,"Ruins")
+    var ruins := _sprite(p,"Ruins")
+    combat_lighting.attach_receiver(ruins,p,false)
     var floor = _p()
     _rect(floor,0,330,640,30,"080e18")
     _poly(floor,[[107,330],[535,330],[514,342],[470,353],[458,360],[192,360],[170,351],[135,348]],"0a2442")
@@ -382,7 +395,8 @@ func _terrain() -> void:
                 _line(floor,x-w*0.65,y-1,x-1,y-h,"408eae")
     _rect(floor,0,330,640,1,"32677e")
     _rect(floor,107,330,428,1,"76d8ed")
-    _sprite(floor,"CombatPlane")
+    var plane := _sprite(floor,"CombatPlane")
+    combat_lighting.attach_receiver(plane,floor,true)
 
 
 # Small textures use the actual PixelFX Painter; no full-screen allocations for vegetation.
