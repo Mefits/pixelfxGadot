@@ -1,0 +1,12 @@
+import os
+env = SConscript("godot-cpp/SConstruct")
+if env["platform"] == "windows" and not env.get("use_mingw", False):
+    env.Append(CXXFLAGS=["/fp:strict"])
+else:
+    env.Append(CXXFLAGS=["-ffp-contract=off", "-fno-fast-math"])
+env.Append(CPPPATH=[os.environ["MOTION_BOX2D_INCLUDE"]], LIBS=[File(os.environ["MOTION_BOX2D_LIB"])])
+platform=env["platform"]
+if platform=="linux":
+    env.Append(LIBS=["pthread","m"])
+target="../godot/addons/motionphysics/bin/"+("motionphysics_099d.windows.x86_64" if platform=="windows" else "libmotionphysics_099d.linux.x86_64")
+Default(env.SharedLibrary(target=target+env["SHLIBSUFFIX"],source=["motionphysics_099d.cpp"],SHLIBPREFIX=""))

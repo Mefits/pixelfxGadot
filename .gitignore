@@ -19,3 +19,9 @@ tools/.original-entry.mjs
 
 godot/generated/original_bundle.txt
 godot/generated/original_catalog.json
+
+# Optional Box2D module
+native_cpp/box2d-3.2.0/
+native_cpp/box2d-build/
+godot/addons/motionphysics/bin/
+godot/addons/motionphysics/motionphysics_099d.gdextension
