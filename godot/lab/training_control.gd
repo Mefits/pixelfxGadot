@@ -89,21 +89,26 @@ func step(move:int)->void:
     var time:float=minf(float(age)/60.,float(d.duration))
     walker.set_intent(Punch.intent(d,time,walker.rig,feet,entry))
     var current:Vector2=tip(str(d.events[0].anchor))
-    if not fired and age>=ceili(float(d.events[0].t)*60.):
-        fired=true
-        strikes+=1
+    var marker:int=ceili(float(d.events[0].t)*60.)
+    var window_start:int=maxi(1,marker-3)
+    var window_end:int=mini(duration,marker+2)
+    if not fired and age>=window_start:
         if contact(previous_tip,current):
+            fired=true
+            strikes+=1
             hits+=1
             hit_flash=7
             bag_sway=4.5
             result="Попадание "+str(active)
-        else:
+        elif age>=window_end:
+            fired=true
+            strikes+=1
             misses+=1
             result="Промах "+str(active)
     previous_tip=current
     # Chain at 80% of recovery, or finish a single attack normally.
     var link:int=maxi(ceili(float(d.events[0].t)*60.)+1,ceili(duration*.8))
-    if queued!=0 and age>=link:
+    if queued!=0 and age>=link and fired:
         var next:int=queued
         if ticks-queued_tick<=BUFFER_TICKS:
             begin(next,chain+1)
