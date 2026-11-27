@@ -1,0 +1,97 @@
+name: Lab 1.0 Box2D integration
+on:
+  push:
+    branches: [feature/lab-1.0-box2d-integration]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-${{ runner.os }}
+      - run: pip install scons numpy scipy pillow
+      - name: Build PixelFX renderer
+        run: python native_cpp/build.py
+      - name: Build pinned Box2D
+        run: python native_cpp/build_motionphysics.py
+      - name: Install Godot 4.4.1
+        shell: python
+        run: |
+          import os, pathlib, urllib.request, zipfile
+          windows = os.name == "nt"
+          name = "Godot_v4.4.1-stable_" + ("win64.exe" if windows else "linux.x86_64")
+          urllib.request.urlretrieve("https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/" + name + ".zip", "engine.zip")
+          with zipfile.ZipFile("engine.zip") as z:
+              z.extractall("engine")
+          exe = next(p for p in pathlib.Path("engine").rglob("*") if p.name == name)
+          exe.chmod(0o755)
+          if windows:
+              exe = exe.with_name(exe.stem + "_console.exe")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              print("GODOT=" + str(exe.resolve()), file=f)
+      - name: Register native modules
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("godot/.godot")
+          p.mkdir(exist_ok=True)
+          (p/"extension_list.cfg").write_text("res://addons/pixelfx/pixelfx.gdextension\nres://addons/motionphysics/motionphysics_099d.gdextension\n")
+      - name: Native and Lab regression
+        run: python tools/lab_box2d_ci.py
+      - name: Linux native GIF and UI capture
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/motionphysics_099d.py --godot "$GODOT" --out results/capture
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/motionphysics_studio.gd -- "$PWD/results" 2>&1 | tee results/studio.log
+          test -s results/box2d-studio.png
+          ! grep -E 'SCRIPT ERROR|ERROR:' results/studio.log
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/workshop_ui.gd -- "$PWD/results" 2>&1 | tee results/workshop.log
+          test -s results/workshop.png
+          ! grep -E 'SCRIPT ERROR|ERROR:' results/workshop.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lab-box2d-${{ matrix.os }}
+          path: |
+            results/*.json
+            results/*.txt
+            results/*.png
+            results/*.log
+            results/capture/*.gif
+            results/capture/*.json
+            results/capture/*.log
+            results/capture/review.png
+            godot/addons/motionphysics/BOX2D_LICENSE.txt
+            godot/addons/motionphysics/bin/
+  compare:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lab-box2d-*
+      - name: Compare traces (Astra exact gate; Box2D diagnostic)
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          a=json.loads(next(Path("lab-box2d-ubuntu-latest").rglob("trace-digests.json")).read_text())
+          b=json.loads(next(Path("lab-box2d-windows-latest").rglob("trace-digests.json")).read_text())
+          print("ASTRA_CROSS_PLATFORM_EXACT",a["astra"]==b["astra"])
+          print("BOX2D_CROSS_PLATFORM_EXACT",a["box2d"]==b["box2d"])
+          assert a["astra"]==b["astra"], "Astra cross-platform regression"

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "id": "feint",
+  "name": "Ложный замах",
+  "kind": "action",
+  "duration": 0.55,
+  "keys": [
+    {
+      "t": 0,
+      "angles": {
+        "chest": 0,
+        "shoulder_near": -10,
+        "elbow_near": -100
+      }
+    },
+    {
+      "t": 0.15,
+      "angles": {
+        "chest": -14,
+        "shoulder_near": 38,
+        "elbow_near": -140
+      }
+    },
+    {
+      "t": 0.24,
+      "angles": {
+        "chest": 9,
+        "shoulder_near": -39,
+        "elbow_near": -87
+      }
+    },
+    {
+      "t": 0.55,
+      "angles": {
+        "chest": 0,
+        "shoulder_near": -10,
+        "elbow_near": -100
+      }
+    }
+  ],
+  "events": [],
+  "goals": []
+}
