@@ -23,14 +23,14 @@ jobs:
           from pathlib import Path
           import shutil,zipfile
           paths=["godot/lab/authoring/asset.gd","godot/lab/authoring/editor.gd","godot/lab/main.gd","godot/lab/training_control.gd","godot/lab/training_punch.gd","godot/lab/walk_motion.gd","godot/lab/walk_preview.gd","godot/lab/walk_studio.gd","godot/tests/lab_integration_100.gd","godot/tests/training_control.gd","godot/tests/walk_control.gd"]
-          with zipfile.ZipFile("Lab-training-update.zip","w",zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+          with zipfile.ZipFile("Lab-jab-series-update.zip","w",zipfile.ZIP_DEFLATED,compresslevel=9) as z:
               for f in paths:
                   z.write(f,f)
                   dst=Path("native")/f
                   dst.parent.mkdir(parents=True,exist_ok=True)
                   shutil.copy2(f,dst)
-              z.writestr("README-TRAINING.txt","Close Godot. Extract into the folder containing godot/project.godot. Reopen project. T: A/D movement, 1/2/3 individual punches, timed 1-2-3 combo. M: edit three separate punch documents. Saved user motions preserved.")
-          print("PATCH_BYTES",Path("Lab-training-update.zip").stat().st_size)
+              z.writestr("README-TRAINING.txt","Close Godot. Extract into the folder containing godot/project.godot. Reopen project. T: A/D movement, 1 repeated up to three times for jab combo. M: edit the source-based jab series and idle. Saved user motions preserved.")
+          print("PATCH_BYTES",Path("Lab-jab-series-update.zip").stat().st_size)
       - name: Verify actual patched Windows project
         shell: pwsh
         run: |
@@ -43,5 +43,5 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: Lab-training-small-update
-          path: Lab-training-update.zip
+          name: Lab-jab-series-small-update
+          path: Lab-jab-series-update.zip
