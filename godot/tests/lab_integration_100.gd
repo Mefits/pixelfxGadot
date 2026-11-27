@@ -109,5 +109,9 @@ func run()->void:
     if not found:
         fail("Astra event hit not found at training distances")
         return
+    if args.size()==1:
+        await process_frame
+        await RenderingServer.frame_post_draw
+        root.get_texture().get_image().save_png(args[0].path_join("combat.png"))
     print("LAB_100_INTEGRATION_OK")
     quit()

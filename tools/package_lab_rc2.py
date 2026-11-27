@@ -26,6 +26,12 @@ shutil.copy2(root/"docs"/"MOTION_AUTHORING_RU.md",dst/"MOTION_AUTHORING_RU.md")
 required=["addons/pixelfx/bin/pixelfx.windows.x86_64.dll","addons/motionphysics/bin/motionphysics_099d.windows.x86_64.dll","generated/original_bundle.txt","generated/original_catalog.json","project.godot"]
 for f in required:
     assert (target/f).is_file(),f
+# Import generated atlas PNGs into the actual portable project before launch.
+imported=subprocess.run([str(dst/"Godot_console.exe"),"--headless","--path",str(target),"--editor","--import"],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
+import_log=imported.stdout.decode("utf-8","replace")
+print(import_log)
+assert imported.returncode==0 and "Parse Error" not in import_log and "Failed to load script" not in import_log
+assert (target/".godot"/"imported").is_dir()
 # Run from the packaged copy, not from checkout.
 proc=subprocess.run([str(dst/"Godot_console.exe"),"--headless","--path",str(target),"--audio-driver","Dummy","--script","res://tests/lab_rc2_smoke.gd"],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
 log=proc.stdout.decode("utf-8","replace")
