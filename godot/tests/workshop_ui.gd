@@ -225,11 +225,84 @@ func run():
         quit(1)
         return
     editor.redo()
+    # Root handle drag creates an authored XY key as a single undoable edit.
+    editor.set_pose_tool(1)
+    var root_before:int=editor.document.keys.size()
+    var root_pos:Vector2=editor.root_handle_position()
+    press.position=root_pos
+    press.pressed=true
+    root.push_input(press,true)
+    if not editor.root_drag_active:
+        push_error("root handle selection")
+        quit(1)
+        return
+    drag.position=root_pos+Vector2(12,6)
+    root.push_input(drag,true)
+    press.position=drag.position
+    press.pressed=false
+    root.push_input(press,true)
+    if editor.document.keys.size()!=root_before+1:
+        push_error("root drag auto key")
+        quit(1)
+        return
+    var root_key:int=editor.key_at_frame()
+    if root_key<0 or absf(float(editor.document.keys[root_key].root[0]))<1.:
+        push_error("root X authored")
+        quit(1)
+        return
+    editor.undo()
+    if editor.document.keys.size()!=root_before:
+        push_error("root undo")
+        quit(1)
+        return
+    editor.redo()
+    if editor.document.keys.size()!=root_before+1:
+        push_error("root redo")
+        quit(1)
+        return
     editor.set_pose_tool(2)
     if editor.edit_pose.size()!=0 or editor.last_image==null:
         push_error("resolved preview")
         quit(1)
         return
+    # FPS/easing, event editing and legacy U bank import stay inside M.
+    editor.set_fps(1)
+    if editor.document.fps!=30 or not is_equal_approx(editor.timeline.step,2.):
+        push_error("authoring fps grid")
+        quit(1)
+        return
+    editor.set_easing(1)
+    if editor.document.easing!="smooth":
+        push_error("authoring easing")
+        quit(1)
+        return
+    editor.event_kind.select(3)
+    editor.event_anchor.select(editor.Asset.EVENT_ANCHORS.find("hand_near"))
+    editor.vfx_select.select(0)
+    editor.add_vfx_event()
+    if editor.document.events.is_empty() or editor.document.events[-1].kind!="vfx" or not editor.fx_surface.visible:
+        push_error("VFX event authoring and preview")
+        quit(1)
+        return
+    editor.select_event(editor.document.events.size()-1)
+    editor.open_quick_vfx()
+    if not editor.quick_dialog.visible:
+        push_error("quick VFX dialog")
+        quit(1)
+        return
+    editor.quick_dialog.hide()
+    var bank_path:String="user://workspace_legacy_bank.json"
+    var bank_file:=FileAccess.open(bank_path,FileAccess.WRITE)
+    bank_file.store_string(JSON.stringify(editor.Clips.defaults()))
+    bank_file.close()
+    editor.import_legacy_file(ProjectSettings.globalize_path(bank_path))
+    if not editor.ids.has("u_strike") or not FileAccess.file_exists(editor.Asset.FOLDER+"u_strike.json"):
+        push_error("legacy U bank import")
+        quit(1)
+        return
+    DirAccess.remove_absolute(ProjectSettings.globalize_path(bank_path))
+    for legacy_id in ["u_idle","u_walk","u_jump","u_strike","u_cast","u_guard","u_hurt"]:
+        if FileAccess.file_exists(editor.Asset.FOLDER+legacy_id+".json"):DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.Asset.FOLDER+legacy_id+".json"))
     DirAccess.remove_absolute(editor.Asset.FOLDER+id+".json")
     print("MOTION_WORKSPACE_UI_OK")
     quit()
