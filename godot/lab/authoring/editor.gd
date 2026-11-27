@@ -227,7 +227,6 @@ func _ready():
     quick_dialog=QuickVFX.new()
     add_child(quick_dialog)
     quick_dialog.applied.connect(apply_quick_vfx)
-    load_vfx_library()
     import_dialog=FileDialog.new()
     import_dialog.title="Импорт клипов старого редактора U"
     import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
@@ -418,6 +417,7 @@ func _ready():
     fx_visible.button_pressed=true
     events_tab.add_child(fx_visible)
     fx_visible.toggled.connect(func(_v:bool):render_vfx())
+    load_vfx_library()
     var event_note:=caption(events_tab,"Strike — игровой контакт. Charge/Cast/VFX — визуальные события; сами по себе не наносят урон.",Vector2.ZERO,11)
     event_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 
@@ -731,6 +731,12 @@ func select_event(index:int)->void:
 
 func add_event()->void:
     if document.kind!="action" or document.events.size()>=32:return
+    if event_kind.selected==0 and document.get("loop",false):
+        info.text="Циклическое действие не может содержать боевой контакт."
+        return
+    if event_kind.selected==0 and not Asset.EVENT_ANCHORS[event_anchor.selected].begins_with("hand_") and not Asset.EVENT_ANCHORS[event_anchor.selected].begins_with("foot_"):
+        info.text="Strike должен быть привязан к кисти или стопе."
+        return
     if event_kind.selected==3:
         add_vfx_event()
         return
@@ -1307,6 +1313,7 @@ func _unhandled_input(event):
 
 func set_pose_tool(mode:int)->void:
     if rotate_active:cancel_rotation()
+    if root_drag_active:finish_root_drag()
     dragging=false
     if mode==1 and document.kind!="action":
         mode=0
@@ -1407,7 +1414,7 @@ func start_root_drag(mouse:Vector2)->void:
     playing=false
     root_drag_key=key_at_frame()
     root_drag_time=float(document.keys[root_drag_key].t) if root_drag_key>=0 else clampf(snappedf(float(frame-START)/60.,1./float(document.get("fps",60))),0.,float(document.duration))
-    root_drag_initial=Vector2(sampled_pose(root_drag_time).root)
+    root_drag_initial=Vector2(float(sampled_pose(root_drag_time).root[0]),float(sampled_pose(root_drag_time).root[1]))
     root_drag_start=mouse
     root_drag_delta=Vector2.ZERO
     root_drag_changed=false
@@ -1417,7 +1424,7 @@ func start_root_drag(mouse:Vector2)->void:
 
 func update_root_drag(mouse:Vector2,snap:bool=false)->void:
     if not root_drag_active:return
-    root_drag_delta=root_drag_initial+(mouse-root_drag_start)/view_zoom-root_drag_initial
+    root_drag_delta=(mouse-root_drag_start)/view_zoom
     if snap:root_drag_delta=root_drag_delta.snapped(Vector2(.5,.5))
     root_drag_changed=root_drag_delta.length()>.02
     show_pose()
@@ -1431,7 +1438,7 @@ func finish_root_drag()->void:
     if root_drag_changed:
         remember()
         var pose_value:Dictionary=sampled_pose(t)
-        var root_value:Vector2=Vector2(pose_value.root)+delta
+        var root_value:Vector2=Vector2(float(pose_value.root[0]),float(pose_value.root[1]))+delta
         root_value.x=clampf(root_value.x,-40.,40.)
         root_value.y=clampf(root_value.y,-40.,40.)
         if existing>=0:document.keys[existing].root=[root_value.x,root_value.y]
@@ -1470,7 +1477,7 @@ func start_rotation(mouse:Vector2)->void:
     playing=false
     rotate_channel=chosen
     rotate_key=key_at_frame()
-    rotate_time=float(document.keys[rotate_key].t) if rotate_key>=0 else clampf(float(frame-START)/60.,0.,float(document.duration))
+    rotate_time=float(document.keys[rotate_key].t) if rotate_key>=0 else clampf(snappedf(float(frame-START)/60.,1./float(document.get("fps",60))),0.,float(document.duration))
     if rotate_key<0 and document.keys.size()>=600:
         info.text="Лимит 600 ключей."
         return
@@ -1605,7 +1612,7 @@ func key_pose():
     refresh(frame)
 
 func toggle_contact():
-    if player.action=="":return
+    if player.action=="" or document.get("loop",false):return
     var id:String=Asset.JOINTS[joints.selected]
     if not (id.begins_with("hand") or id.begins_with("foot")):return
     var t:=clampf((frame-START)/60.,0.,document.duration)

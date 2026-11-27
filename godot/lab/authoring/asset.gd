@@ -72,6 +72,7 @@ static func problem(d:Dictionary)->String:
     if not d.get("events") is Array or d.events.size()>32:return "Список маркеров"
     for e in d.events:
         if not e is Dictionary or not number(e.get("t"),0,d.duration) or not e.get("kind") in ["strike","charge","cast","vfx"] or not e.get("anchor") in EVENT_ANCHORS:return "Маркер"
+        if e.kind=="strike" and not (str(e.anchor).begins_with("hand_") or str(e.anchor).begins_with("foot_")):return "Strike должен быть привязан к кисти или стопе"
         if e.kind=="vfx" and not VFX.valid(e.get("preset")):return "Пресет VFX"
     if d.get("loop",false):
         for e in d.events:
@@ -133,6 +134,7 @@ static func legacy_clip_valid(c:Variant)->bool:
             if not number(v,-40,40):return false
     for e in c.events:
         if not e is Dictionary or not number(e.get("t"),0,c.duration) or not e.get("kind") in ["strike","charge","cast","vfx"] or not e.get("anchor") in EVENT_ANCHORS:return false
+        if e.kind=="strike" and not (str(e.anchor).begins_with("hand_") or str(e.anchor).begins_with("foot_")):return false
         if e.kind=="vfx" and not VFX.valid(e.get("preset")):return false
     return is_equal_approx(float(c.keys[0].t),0.) and is_equal_approx(float(last),float(c.duration))
 

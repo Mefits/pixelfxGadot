@@ -92,6 +92,11 @@ func step(cmd:Dictionary)->void:
     prepare_geometry(paths)
     var next:String=cmd.get("action","")
     if action!="" and bank[action].get("loop",false) and age>=bank[action].frames.size():
+        landing.clear()
+        for i in 2:
+            var side:String=Leg.SIDES[i]
+            if released.has(side) or old_paths[i].get("landing",false):
+                landing[side]=[anchors["foot_"+side],old_paths[i].pitch]
         age=0
         serial+=1
     var change:bool=bank.has(next) or (action!="" and age>=bank[action].frames.size())
