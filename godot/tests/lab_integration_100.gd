@@ -111,6 +111,16 @@ func run()->void:
         await process_frame
         await RenderingServer.frame_post_draw
         root.get_texture().get_image().save_png(args[0].path_join("walk-control.png"))
+    key.pressed=false
+    root.push_input(key)
+    for t in 18:walk.advance()
+    if walk.walker.activity!=0. or not walk.last_ok:
+        fail("return to idle")
+        return
+    if args.size()==1:
+        await process_frame
+        await RenderingServer.frame_post_draw
+        root.get_texture().get_image().save_png(args[0].path_join("walk-idle.png"))
     root.remove_child(walk)
     walk.queue_free()
     # Old two-dummy diagnostic retained for regression only, not in menu T.

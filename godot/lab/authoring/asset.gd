@@ -64,7 +64,7 @@ static func problem(d:Dictionary)->String:
         last=k.t
     if d.keys[0].t!=0 or (role!="walk_idle" and not is_equal_approx(last,d.duration)):return "Границы движения"
     if role!="":
-        if mask.size()!=CHANNELS.size()+LEG_CHANNELS.size() or not d.goals.is_empty() or not d.get("events",[]) is Array or not d.get("events",[]).is_empty() or not d.get("release",{}).is_empty():return "Ходьба: полный скелет, без целей и событий"
+        if mask.size()!=CHANNELS.size()+LEG_CHANNELS.size() or not d.goals.is_empty() or not d.get("events",[]) is Array or not d.get("events",[]).is_empty() or not d.get("release",{}) is Dictionary or not d.get("release",{}).is_empty():return "Ходьба: полный скелет, без целей и событий"
         if role=="walk_idle" and d.keys.size()!=1:return "Стойка содержит один ключ"
         if role!="walk_idle" and not d.get("loop",false):return "Ходьба должна быть циклической"
     var release=d.get("release",{})

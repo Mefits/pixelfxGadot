@@ -6,6 +6,8 @@ func run():
     var editor=load("res://lab/authoring/editor.tscn").instantiate()
     root.add_child(editor)
     await process_frame
+    editor.open_motion("sprint")
+    editor.set_pose_tool(0)
     editor.seek_accent()
     var start:Vector2=editor.ORIGIN+editor.at_joint("hand_near")*editor.ZOOM
     var press:=InputEventMouseButton.new()
@@ -338,5 +340,49 @@ func run():
         push_error("built-in motion protection")
         quit(1)
         return
+    # End-to-end edit of the real, bound documents: preserve any user files.
+    var walk_id:String="walk_forward"
+    var saved_path:String=editor.Asset.FOLDER+walk_id+".json"
+    var existed:bool=FileAccess.file_exists(saved_path)
+    var backup:PackedByteArray=FileAccess.get_file_as_bytes(saved_path) if existed else PackedByteArray()
+    editor.open_motion(walk_id)
+    var ok:bool=editor.document.keys.size()>=2 and editor.pose_tool.selected==1 and editor.editable_bone("thigh_near") and editor.delete_motion_button.disabled
+    # Select a key and edit an authored shoulder via the actual key inspector.
+    editor.seek(editor.START+roundi(float(editor.document.keys[1].t)*60.))
+    for index in editor.key_channels.item_count:
+        if editor.key_channels.get_item_metadata(index)=="shoulder_near":editor.key_channels.select(index)
+    editor.sync_key()
+    var before:float=editor.document.keys[1].angles.shoulder_near
+    editor.key_angle.value=before+15.
+    editor.apply_key_angle()
+    var expected:float=editor.document.keys[1].angles.shoulder_near
+    ok=ok and absf(expected-before)>10.
+    editor.save_file()
+    var loaded:Dictionary=editor.WalkMotion.document(walk_id)
+    ok=ok and is_equal_approx(float(loaded.keys[1].angles.shoulder_near),expected)
+    var stand=load("res://lab/walk_studio.tscn").instantiate()
+    stand.manual=true
+    root.add_child(stand)
+    ok=ok and stand.last_ok and is_equal_approx(float(stand.walker.programs.walk_forward.doc.keys[1].angles.shoulder_near),expected)
+    root.remove_child(stand)
+    stand.queue_free()
+    # Show the real editing screen at a cycle key before restoring fixture.
+    await process_frame
+    await RenderingServer.frame_post_draw
+    root.get_texture().get_image().save_png(out.path_join("walk-editor.png"))
+    if existed:
+        var restore:=FileAccess.open(saved_path,FileAccess.WRITE)
+        restore.store_buffer(backup)
+        restore.close()
+    else:DirAccess.remove_absolute(ProjectSettings.globalize_path(saved_path))
+    editor.open_motion("walk_idle")
+    ok=ok and editor.document.keys.size()==1 and editor.key_at_frame()==0
+    editor.open_motion("walk_backward")
+    ok=ok and editor.document.walk_role=="walk_backward" and editor.document.keys.size()>=2
+    if not ok:
+        push_error("bound locomotion editor save and T reload")
+        quit(1)
+        return
+    print("WALK_EDITOR_BINDING_OK")
     print("MOTION_WORKSPACE_UI_OK")
     quit()

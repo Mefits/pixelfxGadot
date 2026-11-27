@@ -107,6 +107,9 @@ jobs:
           test -s results/workshop.png
           test -s results/workshop-action.png
           grep MOTION_WORKSPACE_UI_OK results/workshop.log
+          grep WALK_EDITOR_BINDING_OK results/workshop.log
+          test -s results/walk-editor.png
+          test -s results/walk-idle.png
           ! grep -E 'SCRIPT ERROR|ERROR:' results/workshop.log
       - uses: actions/upload-artifact@v4
         if: always()

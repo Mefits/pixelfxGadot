@@ -610,7 +610,7 @@ func set_easing(index:int)->void:
     refresh(frame)
 
 func set_loop(value:bool)->void:
-    if syncing or document.kind!="action":return
+    if syncing or document.kind!="action" or document.has("walk_role"):return
     remember()
     document.loop=value
     var error:String=Asset.problem(document)
@@ -755,6 +755,7 @@ func select_event(index:int)->void:
     timeline.queue_redraw()
 
 func add_event()->void:
+    if document.has("walk_role"):return
     if document.kind!="action" or document.events.size()>=32:return
     if event_kind.selected==0 and document.get("loop",false):
         info.text="Циклическое действие не может содержать боевой контакт."
@@ -775,6 +776,7 @@ func add_event()->void:
     info.text="Событие добавлено."
 
 func add_vfx_event()->void:
+    if document.has("walk_role"):return
     if document.kind!="action" or document.events.size()>=32 or vfx_select.selected<0:return
     remember()
     var t:=clampf(float(frame-START)/60.,0.,document.duration)
@@ -816,7 +818,7 @@ func apply_quick_vfx(value:Dictionary)->void:
 
 func render_vfx()->void:
     if fx_surface==null or fx_visible==null:return
-    fx_surface.visible=fx_visible.button_pressed and document.kind=="action"
+    fx_surface.visible=fx_visible.button_pressed and document.kind=="action" and not document.has("walk_role")
     if not fx_surface.visible:return
     var clip:Dictionary={"duration":document.duration,"loop":document.get("loop",false),"easing":document.get("easing","linear"),"keys":[],"events":document.events}
     for key in document.keys:
@@ -1093,7 +1095,9 @@ func open_motion(id:String):
     if document.has("walk_role"):
         set_pose_tool(1)
         info.text="Сохрани движение и проверь в T. Стопы корректируются в исполнении."
-    else:info.text="Крест — цель, круг — результат."
+    else:
+        set_pose_tool(0 if d.kind=="gait" else pose_tool.selected)
+        info.text="Крест — цель, круг — результат."
 
 func end_frame()->int:
     if document.has("walk_role"):return START+roundi(document.duration*60.)
@@ -1693,6 +1697,7 @@ func copy_goal():
     if selected>=0:clip_board=document.goals[selected].duplicate(true)
 
 func paste_goal():
+    if document.has("walk_role"):return
     if clip_board.is_empty() or document.goals.size()>=64:return
     remember()
     var g:=clip_board.duplicate(true)

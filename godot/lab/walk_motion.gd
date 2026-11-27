@@ -63,7 +63,7 @@ static func default_doc(id:String)->Dictionary:
 
 static func document(id:String)->Dictionary:
     var saved:Dictionary=Asset.read(Asset.FOLDER+id+".json")
-    if saved.get("id")==id and saved.get("walk_role")==id and Asset.problem(saved)=="":return saved
+    if saved.get("id")==id and saved.get("walk_role")==id and Asset.problem(saved)=="":return Asset.normalise(saved)
     return default_doc(id)
 
 static func sample(d:Dictionary,phase:float)->Dictionary:
