@@ -1,0 +1,45 @@
+name: Astra baseline versus integration audit
+on:
+  push:
+    branches: [audit/astra-integration-regression]
+  workflow_dispatch:
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 4141c63efc1742c44f9d8893b86b8ee021648b90
+          path: baseline
+      - uses: actions/checkout@v4
+        with:
+          ref: 5418363c41f1ce14e9e513b63b09d2d09354b051
+          path: candidate
+      - name: Install Godot Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=$PWD/engine/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Install Godot Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip -OutFile engine.zip
+          Expand-Archive engine.zip engine
+          "GODOT=$PWD/engine/Godot_v4.4.1-stable_win64_console.exe" >> $env:GITHUB_ENV
+      - name: Compare original functional tests and per-tick semantic state
+        run: python tools/astra_baseline_audit.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: astra-audit-${{ runner.os }}
+          path: audit-results/
