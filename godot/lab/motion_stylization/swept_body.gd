@@ -121,13 +121,13 @@ func multiples(parts:Array)->Array:
     # orientation and material; the body/upper limb is never duplicated.
     var old:Array=history[maxi(0,history.size()-3)].parts
     if xy(old[2].b).distance_to(xy(current[2].b))<1.:return parts
-    for i in [1,2]:
+    for i in [1]:
         var p:Dictionary=old[i].duplicate(true)
         p.part_id=120+i
-        for k in ["a","b"]:p[k][2]-=.35
+        for k in ["a","b"]:p[k][2]-=.65
         for row in p.sections:
-            row[1]*=.72*minf(power,1.25)
-            row[2]*=.72*minf(power,1.25)
+            row[1]*=.65*minf(power,1.25)
+            row[2]*=.65*minf(power,1.25)
             row[3]*=.80
         out.append(p)
         last_mesh.append(p)

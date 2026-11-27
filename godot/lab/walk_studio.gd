@@ -345,11 +345,12 @@ func render_frame()->void:
     for i in [0,2,3,8,9]:parts[i].material_id=1
     for i in [5,6,7,11,12,13,15,17]:parts[i].material_id=2
     parts=visual_parts(parts)
-    var result:Dictionary=raster.render(Studio.CFG,parts)
+    var result:Dictionary=raster.render(visual_config(),parts)
     if not result.get("ok",false):
         status.text="Ошибка отрисовки"
         return
     var im:=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
+    im=visual_image(im,result)
     last_image=im
     # Publish a fresh image for T (also avoids relying on in-place texture
     # uploads on the affected compatibility-renderer setup).
@@ -361,6 +362,12 @@ func render_frame()->void:
 ## Presentation-only extension point; ordinary T remains identity.
 func visual_parts(parts:Array)->Array:
     return parts
+
+func visual_config()->Dictionary:
+    return Studio.CFG
+
+func visual_image(im:Image,_result:Dictionary)->Image:
+    return im
 
 func _physics_process(_delta:float)->void:
     if manual or paused or walker==null:return

@@ -3,7 +3,9 @@ const Stylizer=preload("res://lab/motion_stylization/stylizer.gd")
 const Painter=preload("res://addons/pixelfx/native/painter.gd")
 const Sweep=preload("res://lab/motion_stylization/swept_body.gd")
 var sweep=Sweep.new()
-const MODES=["A · Original","B · Godot Trail v0.02","C · PixelFX Blade Ribbon","D · Swept Body","E · Body + Ribbon","F · Multiples"]
+const Seamless=preload("res://lab/motion_stylization/seamless_smear.gd")
+var seamless=Seamless.new()
+const MODES=["A · Original","B · Godot Trail Control","C · Seamless Smear","D · Surface Accent","E · Offset Trail","F · Multiples refined"]
 var stylizer=Stylizer.new()
 var mode:int=0
 var choice:OptionButton
@@ -35,7 +37,7 @@ func _ready()->void:
     panel.z_index=25
     add_child(panel)
     var heading:=Label.new()
-    heading.text="MOTION STYLIZATION v0.03"
+    heading.text="MOTION STYLIZATION v0.04"
     panel.add_child(heading)
     choice=OptionButton.new()
     choice.focus_mode=Control.FOCUS_NONE
@@ -93,6 +95,7 @@ func _ready()->void:
 func reset()->void:
     stylizer.reset()
     sweep.reset()
+    seamless.reset()
     repeat_clock=0
     if repeat_choice!=null:repeat_choice.select(0)
     super.reset()
@@ -146,20 +149,31 @@ func visual_parts(parts:Array)->Array:
     sweep.speed_threshold=maxf(20.,stylizer.smear_threshold*.65)
     # Broader pre-impact window; no smear on the accent or recovery.
     sweep.sample(training.ticks,key,anchor,age,gate and not accent,accent,parts,walker.x,world)
+    seamless.reset()
+    var out:Array=parts
+    if mode in [2,3,4]:out=seamless.build(parts,sweep)
+    if mode==5:out=sweep.multiples(parts)
     if trail_line!=null:render_trail()
-    if mode==3:return sweep.swept(parts,0)
-    if mode==4:return sweep.swept(parts,1)
-    if mode==5:return sweep.multiples(parts)
-    return parts
+    return out
+
+func visual_config()->Dictionary:
+    if mode!=3 or not seamless.changed:return super.visual_config()
+    var cfg:Dictionary=super.visual_config().duplicate(true)
+    cfg.debug=true
+    return cfg
+
+func visual_image(im:Image,result:Dictionary)->Image:
+    if mode==3:return seamless.paint_surface(im,result)
+    return im
 
 func render_trail()->void:
     trail_line.clear_points()
     trail_line.visible=mode==1
-    pixel_sprite.visible=mode in [2,4]
+    pixel_sprite.visible=mode==4
     var points:Array[Dictionary]=stylizer.trail()
     if fx_status!=null:fx_status.text="Скорость %.0f · Смаз %.2f"%[stylizer.delta.length()*60.,sweep.envelope]
-    if mode in [2,4]:
-        render_ribbon()
+    if mode==4:
+        render_offset()
         return
     if points.size()<2:
         pixel_sprite.hide()
@@ -185,28 +199,17 @@ func render_trail()->void:
         gradient.colors=colors
         trail_line.width_curve=widths
         trail_line.gradient=gradient
-func render_ribbon()->void:
-    var rows:Array[Dictionary]=sweep.ribbon()
-    if rows.size()<2:
+func render_offset()->void:
+    var rows:Array[Dictionary]=seamless.offset_segments()
+    if rows.is_empty():
         pixel_sprite.hide()
         return
     painter.clear()
     var origin:=Vector2(240,219)
-    var shift:=Vector2(walker.x,0.)
-    # Fill narrow cross sections between actual paired edge samples.
-    # Taper in time and preserve a light inner edge; no disconnected discs.
-    for i in range(1,rows.size()):
-        var a:Dictionary=rows[i-1]
-        var b:Dictionary=rows[i]
-        var count:int=clampi(ceili(maxf(Vector2(a.a).distance_to(Vector2(b.a)),Vector2(a.b).distance_to(Vector2(b.b)))*3.),1,96)
-        for j in range(count+1):
-            var u:float=float(j)/count
-            var left:Vector2=origin+(Vector2(a.a).lerp(Vector2(b.a),u)-shift)*3.
-            var right:Vector2=origin+(Vector2(a.b).lerp(Vector2(b.b),u)-shift)*3.
-            var alpha:float=lerpf(float(a.alpha),float(b.alpha),u)
-            painter.beam(left.x,left.y,right.x,right.y,1.8,0xff98c9e8,alpha)
-            var inner:Vector2=left.lerp(right,.23)
-            painter.beam(inner.x,inner.y,right.x,right.y,1.1,0xffd5efff,alpha*.85)
+    for row in rows:
+        var a:Vector2=origin+Vector2(row.a)*3.
+        var b:Vector2=origin+Vector2(row.b)*3.
+        painter.beam(a.x,a.y,b.x,b.y,float(row.width)*3.,0xffa0d4ff,float(row.alpha))
     present_pixels()
 
 func present_pixels()->void:

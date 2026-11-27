@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageChops
 import sys,json,subprocess,shutil
 root=Path(sys.argv[1])
-modes=["A Original","B Godot v02","C Blade ribbon","D Swept body","E Body + ribbon","F Multiples"]
+modes=["A Original","B Godot control","C Seamless","D Surface accent","E Offset trail","F Multiples"]
 report={}
 def encode(frames,filename,slow=False):
     # At 0.5x each source tick lasts 33.33 ms. Use video instead of relying
@@ -45,7 +45,20 @@ for attack in ("punch","heel"):
         # Static peak panel is useful even if client fails to play animation.
         peak=max(range(78),key=lambda i:pixels[i])
         frames[peak].save(root/f"{attack}_A{j}_peak.png")
-        if j in (3,4,5):encode(frames,f"{attack}_A{j}_half",True)
+        if j in (2,3,4,5):encode(frames,f"{attack}_A{j}_half",True)
+    for j in (3,4):
+        pixels=[sum(1 for rgb in ImageChops.difference(a,b).getdata() if rgb!=(0,0,0)) for a,b in zip(lanes[2],lanes[j])]
+        assert max(pixels)>0,(attack,"accent not visible",j)
+        frames=[]
+        for i in range(78):
+            im=Image.new("RGB",(630,414),(29,38,48))
+            d=ImageDraw.Draw(im)
+            d.text((8,5),modes[2],fill="white");d.text((323,5),modes[j],fill="white")
+            im.paste(lanes[2][i],(0,24));im.paste(lanes[j][i],(315,24))
+            frames.append(im)
+        frames[max(range(78),key=lambda i:pixels[i])].save(root/f"{attack}_C{j}_peak.png")
+        encode(frames,f"{attack}_C{j}_half",True)
+        counts["C vs "+modes[j]]={"frames":sum(n>0 for n in pixels),"peak_pixels":max(pixels)}
     report[attack]=counts
     sheet=[]
     for i in range(78):
