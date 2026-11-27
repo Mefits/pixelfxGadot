@@ -12,6 +12,8 @@ var world
 var n:int=0
 var tick:int=0
 var release_tick:int=-1
+var attacker_release_tick:int=-1
+var attacker_release_error:float=0.
 var contact_tick:int=-1
 var contact_impulse:float=0.
 var contacts:Array=[]
@@ -24,7 +26,7 @@ func lower(id:String)->bool:
     return id=="hips" or id.begins_with("thigh_") or id.begins_with("knee_") or id.begins_with("foot_")
 
 func driven(c:int,i:int)->bool:
-    return (pair and c==0) or (release_tick<0 and lower(models[c].bodies[i].id))
+    return attacker_release_tick<0 if pair and c==0 else (release_tick<0 and lower(models[c].bodies[i].id))
 
 func sample(c:int)->Array:
     var p=players[c]
@@ -50,6 +52,8 @@ func setup(two:bool=true)->bool:
     offsets=[0.,36.] if pair else [0.]
     tick=0
     release_tick=-1
+    attacker_release_tick=-1
+    attacker_release_error=0.
     contact_tick=-1
     contact_impulse=0.
     contacts.clear()
@@ -82,7 +86,7 @@ func setup(two:bool=true)->bool:
     if world==null:return false
     var spec:String=Common.specification(models[0])
     if pair:
-        if not world.setup_pair(spec,8,1):return false
+        if not world.setup_pair(spec,16,1):return false
     elif not world.setup(spec,8,1,1):return false
     for c in offsets.size():
         for i in n:
@@ -110,7 +114,40 @@ func release()->bool:
     release_tick=tick
     return true
 
+# Release the approaching body BEFORE impact, from actual native collision
+# proxies, so the contact solver sees finite mass rather than an infinite motor.
+func cross_gap()->float:
+    var state:Array=world.state()
+    var gap:float=INF
+    for i in n:
+        var a:Dictionary=models[0].bodies[i]
+        var ra:Array=state[i]
+        for j in n:
+            var b:Dictionary=models[1].bodies[j]
+            var rb:Array=state[n+j]
+            for ca in a.samples:
+                var pa:Vector2=Vector2(ra[0],ra[1])+(Vector2(ca[0])-Vector2(a.com)).rotated(ra[2])
+                for cb in b.samples:
+                    var pb:Vector2=Vector2(rb[0],rb[1])+(Vector2(cb[0])-Vector2(b.com)).rotated(rb[2])
+                    gap=minf(gap,pa.distance_to(pb)-float(ca[1])-float(cb[1]))
+    return gap
+
+func release_attacker()->bool:
+    var before:Array=world.state()
+    for i in n:
+        if not world.set_kinematic(i,false):return false
+    var after:Array=world.state()
+    for i in n:
+        for k in 6:
+            var d:float=absf(float(before[i][k])-float(after[i][k]))
+            if k==2:d=absf(wrapf(float(before[i][k])-float(after[i][k]),-PI,PI))
+            attacker_release_error=maxf(attacker_release_error,d)
+    attacker_release_tick=tick
+    return true
+
 func step(commands:Array,force_release:bool=false)->bool:
+    if pair and attacker_release_tick<0 and cross_gap()<2.5:
+        if not release_attacker():return false
     if force_release and release_tick<0:
         if not release():return false
     var weights:=PackedFloat64Array()
@@ -118,7 +155,7 @@ func step(commands:Array,force_release:bool=false)->bool:
     weights.resize(n*offsets.size())
     targets.resize(weights.size())
     for c in offsets.size():
-        if pair and c==0 or release_tick<0:
+        if (pair and c==0 and attacker_release_tick<0) or ((not pair or c==1) and release_tick<0):
             players[c].step(commands[c])
             rows[c]=sample(c)
         for i in n:
@@ -130,11 +167,12 @@ func step(commands:Array,force_release:bool=false)->bool:
             var parent:int=b.parent
             var target:float=0. if parent<0 else wrapf(float(r[2])-float(rows[c][parent][2]),-PI,PI)
             if not driven(c,i):
-                if release_tick<0:
+                var released_at:int=attacker_release_tick if pair and c==0 else release_tick
+                if released_at<0:
                     weights[idx]=.85
                 else:
                     # Release authority progressively; retain bounded residual muscle tone.
-                    var u:float=smoothstep(0.,.25,float(tick-release_tick)*DT)
+                    var u:float=smoothstep(0.,.25,float(tick-released_at)*DT)
                     weights[idx]=lerpf(.65,.08,u)
                     target=lerpf(target,float(b.goal),u)
             targets[idx]=clampf(target,float(b.lo),float(b.hi))
@@ -170,7 +208,7 @@ func poses()->Array:
 func snapshot()->Dictionary:
     var states:Array=[]
     for p in players:states.append(p.save())
-    return {"world":world.snapshot(),"hash":world.state_hash(),"players":states,"rows":rows.duplicate(true),"tick":tick,"release":release_tick,"contact":contact_tick,"impulse":contact_impulse,"contacts":contacts.duplicate(true),"release_error":release_error,"track_error":track_error}
+    return {"world":world.snapshot(),"hash":world.state_hash(),"players":states,"rows":rows.duplicate(true),"tick":tick,"release":release_tick,"attacker_release":attacker_release_tick,"attacker_release_error":attacker_release_error,"contact":contact_tick,"impulse":contact_impulse,"contacts":contacts.duplicate(true),"release_error":release_error,"track_error":track_error}
 
 func restore(s:Dictionary)->bool:
     if not world.restore(s.world):return false
@@ -178,6 +216,8 @@ func restore(s:Dictionary)->bool:
     rows=s.rows.duplicate(true)
     tick=s.tick
     release_tick=s.release
+    attacker_release_tick=s.attacker_release
+    attacker_release_error=s.attacker_release_error
     contact_tick=s.contact
     contact_impulse=s.impulse
     contacts=s.contacts.duplicate(true)

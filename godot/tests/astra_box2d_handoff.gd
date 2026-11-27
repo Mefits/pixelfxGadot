@@ -2,7 +2,7 @@ extends SceneTree
 const Bridge=preload("res://lab/astra_box2d_handoff.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
 const Common=preload("res://lab/ragdoll_common_099c.gd")
-const CFG={"width":960,"height":420,"origin":[100,310],"density":3,"ink":0xff000000,"outline":3,"light":[-.48,-.64,.6],"seams":false,"materials":[[0xffe6ded7,0xffbdb3a8,0xff9e9081,0xff746759],[0xffa09d74,0xff827d50,0xff656139,0xff4a4628],[0xff655a4c,0xff50473b,0xff3c342c,0xff29231e],[0xffd8b2a0,0xffab8173,0xff7d574a,0xff523b32]]}
+const CFG={"width":1200,"height":420,"origin":[100,310],"density":3,"ink":0xff000000,"outline":3,"light":[-.48,-.64,.6],"seams":false,"materials":[[0xffe6ded7,0xffbdb3a8,0xff9e9081,0xff746759],[0xffa09d74,0xff827d50,0xff656139,0xff4a4628],[0xff655a4c,0xff50473b,0xff3c342c,0xff29231e],[0xffd8b2a0,0xffab8173,0xff7d574a,0xff523b32]]}
 var failures:Array=[]
 func _initialize():call_deferred("run")
 func check(ok:bool,msg:String)->void:
@@ -19,11 +19,11 @@ func replay(b,count:int)->void:
     var states:Array=[]
     for t in count:
         check(b.step(commands(b)),"forward step")
-        states.append([b.world.state(),b.world.state_hash(),b.release_tick,b.contact_tick,b.contact_impulse])
+        states.append([b.world.state(),b.world.state_hash(),b.release_tick,b.attacker_release_tick,b.contact_tick,b.contact_impulse])
     check(b.restore(snap),"restore")
     for t in count:
         check(b.step(commands(b)),"replay step")
-        check(states[t]==[b.world.state(),b.world.state_hash(),b.release_tick,b.contact_tick,b.contact_impulse],"exact replay "+str(t))
+        check(states[t]==[b.world.state(),b.world.state_hash(),b.release_tick,b.attacker_release_tick,b.contact_tick,b.contact_impulse],"exact replay "+str(t))
     check(b.restore(snap),"restore end")
 
 func run()->void:
@@ -50,16 +50,16 @@ func run()->void:
         push_error("pair setup")
         quit(1)
         return
-    root.size=Vector2i(960,450)
+    root.size=Vector2i(1200,450)
     root.content_scale_size=root.size
     var bg:=ColorRect.new()
     bg.color=Color("#34424d")
-    bg.size=Vector2(960,450)
+    bg.size=Vector2(1200,450)
     root.add_child(bg)
     var floor_line:=Line2D.new()
     floor_line.default_color=Color("#8ca1aa")
     floor_line.width=1.
-    floor_line.points=PackedVector2Array([Vector2(0,310.+b.floor_y*3.+22),Vector2(960,310.+b.floor_y*3.+22)])
+    floor_line.points=PackedVector2Array([Vector2(0,310.+b.floor_y*3.+22),Vector2(1200,310.+b.floor_y*3.+22)])
     root.add_child(floor_line)
     var sp:=Sprite2D.new()
     sp.centered=false
@@ -77,6 +77,7 @@ func run()->void:
     var peak_anchor:float=0.
     var peak_floor:float=0.
     var peak_limit:float=0.
+    var worst_anchor_tick:int=-1
     for t in 360:
         if t in [12,80,180]:replay(b,12)
         var start:int=Time.get_ticks_usec()
@@ -91,14 +92,16 @@ func run()->void:
             var p:Dictionary=poses[c]
             var metrics:Dictionary=Common.validate(m)
             if c==1:
-                peak_anchor=maxf(peak_anchor,metrics.anchor)
+                if metrics.anchor>peak_anchor:
+                    peak_anchor=metrics.anchor
+                    worst_anchor_tick=t
                 peak_floor=maxf(peak_floor,metrics.penetration)
                 peak_limit=maxf(peak_limit,metrics.angle_error_deg)
             if capture and t%2==1:
                 var mesh:Array=body.make(m.rig.points,p.angles,m.rig.rotations.head)
                 for i in mesh.size():mesh[i].material_id=(1 if c==0 else 3) if i in [0,2,3,8,9] else (2 if i in [5,6,7,11,12,13,15,17] else 0)
                 parts.append_array(mesh)
-        records.append({"tick":t,"state":b.world.state(),"contact":b.contacts,"release":b.release_tick})
+        records.append({"tick":t,"state":b.world.state(),"contact":b.contacts,"release":b.release_tick,"attacker_release":b.attacker_release_tick})
         if capture and t%2==1:
             var result:Dictionary=raster.render(cfg,parts)
             if not result.get("ok",false):
@@ -106,7 +109,7 @@ func run()->void:
                 break
             var im:=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
             var bounds:Rect2i=im.get_used_rect()
-            if bounds.size.x==0 or bounds.position.x<=0 or bounds.position.y<=0 or bounds.end.x>=960 or bounds.end.y>=420:
+            if bounds.size.x==0 or bounds.position.x<=0 or bounds.position.y<=0 or bounds.end.x>=1200 or bounds.end.y>=420:
                 failures.append("capture bounds "+str(t)+" "+str(bounds))
             if sp.texture==null:sp.texture=ImageTexture.create_from_image(im)
             else:sp.texture.update(im)
@@ -117,6 +120,8 @@ func run()->void:
                 failures.append("capture failed")
                 break
     check(b.contact_tick>=0,"no cross-fighter normal impulse")
+    check(b.attacker_release_tick>=0 and b.attacker_release_tick<b.contact_tick,"attacker not finite mass before contact")
+    check(b.attacker_release_error<.001,"attacker release continuity")
     check(b.release_tick>=b.contact_tick and b.release_tick>=0,"no contact-triggered release")
     check(b.release_error<.001,"pair release continuity "+str(b.release_error))
     check(b.track_error<.05,"pair tracking "+str(b.track_error))
@@ -124,7 +129,7 @@ func run()->void:
     check(peak_floor<3.,"pair floor residual "+str(peak_floor))
     check(peak_limit<30.,"pair angle residual "+str(peak_limit))
     times.sort()
-    var report:Dictionary={"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
+    var report:Dictionary={"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"attacker_release_tick":b.attacker_release_tick,"attacker_release_error":b.attacker_release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"worst_anchor_tick":worst_anchor_tick,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
     var f:=FileAccess.open(out.path_join("report.json"),FileAccess.WRITE)
     f.store_string(JSON.stringify(report))
     f.close()

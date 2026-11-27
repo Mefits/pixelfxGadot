@@ -61,7 +61,7 @@ jobs:
           for label in ("handoff-a","handoff-b"):
               p=pathlib.Path("results",label).resolve()
               p.mkdir(parents=True,exist_ok=True)
-              r=subprocess.run(base+["--",str(p)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+              r=subprocess.run(base+["--",str(p)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
               log=r.stdout.decode("utf-8","replace")
               (p/"test.log").write_text(log,encoding="utf-8")
               print(log,flush=True)
@@ -76,7 +76,7 @@ jobs:
         run: |
           mkdir -p results/handoff-capture
           set +e
-          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --disable-vsync --script res://tests/astra_box2d_handoff.gd -- "$PWD/results/handoff-capture" capture 2>&1 | tee results/handoff-capture/render.log
+          timeout 180 xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --disable-vsync --script res://tests/astra_box2d_handoff.gd -- "$PWD/results/handoff-capture" capture 2>&1 | tee results/handoff-capture/render.log
           STATUS=${PIPESTATUS[0]}
           set -e
           python tools/astra_box2d_preview.py results/handoff-capture
