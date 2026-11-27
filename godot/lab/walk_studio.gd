@@ -85,12 +85,15 @@ func render_frame()->void:
     last_ok=true
 
 func _process(delta:float)->void:
-    if manual:return
+    if manual or walker==null:return
     accumulator+=minf(delta,.1)
+    var changed:bool=false
     while accumulator>=1./60.:
-        walker.step(command())
+        if command()!=0 or walker.activity>0. or walker.direction!=0:
+            walker.step(command())
+            changed=true
         accumulator-=1./60.
-    render_frame()
+    if changed:render_frame()
 
 func _input(event:InputEvent)->void:
     if not event is InputEventKey:return

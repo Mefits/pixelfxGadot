@@ -1055,7 +1055,7 @@ func field(parent:Control,title:String,lo:float,hi:float,step:float,initial:floa
     row.add_child(spin)
     return spin
 
-func button(row:Control,title:String,fn:Callable,hint:String="")->Button:
+func button(row:Node,title:String,fn:Callable,hint:String="")->Button:
     var b:=Button.new()
     b.text=title
     b.tooltip_text=hint
