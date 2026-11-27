@@ -19,10 +19,11 @@ var state_label:Label
 var accumulator:float=0.
 var manual:bool=false
 var last_ok:bool=false
+var last_image:Image
 
 func _ready()->void:
     label("БОЕВОЙ СТЕНД / ТРЕНИРОВКА",Vector2(24,15),23)
-    label("A / ← назад   D / → вперёд   1 — джеб   R — сброс",Vector2(24,56),15)
+    label("A / ← назад   D / → вперёд   1 — атака   R — сброс",Vector2(24,56),15)
     label("Нажми 1 до трёх раз: 1 → 1 → 1. Удержание не повторяет.",Vector2(24,83),13)
     var back:=Button.new()
     back.text="Меню / Esc"
@@ -38,7 +39,7 @@ func _ready()->void:
     add_child(sprite)
     state_label=label("",Vector2(24,454),18)
     status=label("",Vector2(24,486),13)
-    label("M: «Джеб · серия ×3» и «Idle · дыхание». Сохрани и снова открой T.",Vector2(24,514),12)
+    label("M: Комбо 1 / 2 / 3 и Idle. Сохрани и снова открой T.",Vector2(24,514),12)
     if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
     reset()
 
@@ -70,6 +71,8 @@ func advance()->void:
 
 func render_frame()->void:
     state_label.text="Действие: "+("Остановка" if walker.direction==0 and walker.activity>0. else ("Idle" if walker.action_name()=="walk_breathe" else ["Ходьба назад","Стойка","Ходьба вперёд"][walker.direction+1]))
+    if walker.action_name()=="walk_breathe" and training.active==0:
+        state_label.text="Действие: Idle · %.2f с"%fposmod(float(maxi(0,walker.transition_age-walker.STOP_TICKS-2))/60.,float(walker.programs.walk_breathe.doc.duration))
     if training.active!=0:state_label.text="Удар %d  ·  комбо %d  ·  %s"%[training.active,training.chain,"В буфере: "+str(training.queued) if training.queued else ""]
     status.text="Попадания: %d   Промахи: %d   Последнее комбо: %d   ·   %s"%[training.hits,training.misses,training.last_chain,training.result]
     queue_redraw()
@@ -86,6 +89,7 @@ func render_frame()->void:
         status.text="Ошибка отрисовки"
         return
     var im:=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
+    last_image=im
     if sprite.texture==null:sprite.texture=ImageTexture.create_from_image(im)
     else:sprite.texture.update(im)
     sprite.position=ORIGIN+Vector2.RIGHT*walker.x*SCALE-Vector2(240,219)*SCALE/3.

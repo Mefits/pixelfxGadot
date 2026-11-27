@@ -29,10 +29,10 @@ var fired:bool=false
 
 func _init(overrides:Dictionary={}):
     walker=Walk.new()
-    var jab:Dictionary=overrides.get(1,Punch.document(Punch.IDS[0]))
-    for i in 3:docs[i+1]=jab
+    for i in 3:docs[i+1]=overrides.get(i+1,Punch.document(Punch.IDS[i]))
     # Idle starts at once, not after a hidden warm-up.
     walker.transition_age=walker.STOP_TICKS+3
+    walker.step(0)
 
 func press(key:int=1)->bool:
     if key!=1:return false
@@ -53,13 +53,15 @@ func begin(key:int,count:int)->void:
     fired=false
     chain=count
     starts.append(key)
-    entry=walker.pose.duplicate(true)
+    entry=walker.pose.duplicate(true) if key==1 else {}
     feet=Motion.toes(walker.rig,walker.pose)
     walker.direction=0
     previous_tip=tip(str(docs[key].events[0].anchor))
-    result="Джеб "+str(key)
+    result="Удар "+str(key)
 
 func tip(anchor:String)->Vector2:
+    if anchor.begins_with("foot_"):
+        return Motion.toe(walker.rig,walker.pose,anchor.trim_prefix("foot_"))+Vector2.RIGHT*walker.x
     var wrist:Vector2=walker.rig.point(anchor)
     var elbow:Vector2=walker.rig.point(anchor.replace("hand_","elbow_"))
     return wrist+(wrist-elbow).normalized()*2.55+Vector2.RIGHT*walker.x
@@ -85,7 +87,7 @@ func step(move:int)->void:
     var duration:int=roundi(float(d.duration)*60.)
     age+=1
     var time:float=minf(float(age)/60.,float(d.duration))
-    walker.set_intent(Punch.intent(d,time,walker.rig,feet,entry))
+    Punch.apply(walker,Punch.intent(d,time,walker.rig,feet,entry))
     var current:Vector2=tip(str(d.events[0].anchor))
     var marker:int=ceili(float(d.events[0].t)*60.)
     var window_start:int=maxi(1,marker-3)
@@ -104,10 +106,8 @@ func step(move:int)->void:
             misses+=1
             result="Промах "+str(active)
     previous_tip=current
-    # Preserve the source strike and its retraction. The next accepted
-    # press cancels only the final guard recovery, not the contact.
-    var link:int=maxi(window_end+1,ceili(duration*.78))
-    if queued>0 and active<MAX_CHAIN and age>=link and fired:
+    # Shared boundary frame: next slice starts at the same source pose.
+    if queued>0 and active<MAX_CHAIN and age>=duration and fired:
         queued-=1
         begin(active+1,chain+1)
         return

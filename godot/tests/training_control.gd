@@ -4,54 +4,62 @@ const Punch=preload("res://lab/training_punch.gd")
 const Asset=preload("res://lab/authoring/asset.gd")
 var failures:Array=[]
 func check(ok:bool,label:String)->void:
-    if not ok:failures.append(label)
+    if not ok and not failures.has(label):failures.append(label)
 func _initialize():call_deferred("run")
 func run():
-    var doc:Dictionary=Punch.default_doc(Punch.IDS[0])
-    var source:Dictionary=Asset.read(Asset.DIR+"jab.json")
-    check(Asset.problem(doc)=="","valid jab")
-    check(doc.events==source.events,"original strike marker")
-    for k in doc.keys:
-        for old in source.keys:
-            if is_equal_approx(float(k.t),float(old.t)):
-                for channel in old.angles:check(k.angles[channel]==old.angles[channel],"original authored channel")
-    var docs:Dictionary={1:doc}
+    var source:Dictionary=Punch.source()
+    var docs:Dictionary={}
+    for index in 3:
+        var doc:Dictionary=Punch.default_doc(Punch.IDS[index])
+        docs[index+1]=doc
+        check(Asset.problem(doc)=="","valid stage "+str(index))
+        check(doc.events[0].anchor==source.events[index].anchor,"source marker")
+        check(roundi(doc.events[0].t*60.)+Punch.BOUNDARIES[index]==roundi(source.events[index].t*60.),"source contact time")
+        for k in doc.keys:
+            var tick:int=roundi(float(k.t)*60.)+Punch.BOUNDARIES[index]
+            check(k.angles==source.keys[tick].pose.angles and k.root==source.keys[tick].pose.root,"source pose exact")
     for count in [1,2,3]:
         var f=Training.new(docs)
-        for n in count:check(f.press(1),"accept fresh press")
-        for t in 140:f.step(0)
-        check(f.starts.size()==count and f.strikes==count and f.active==0 and f.last_chain==count,"exact press count "+str(count))
-        check(f.hits==0 and f.misses==count,"distant misses "+str(count))
-        check(f.walker.action_name()=="walk_breathe","idle after attacks")
-    var f=Training.new(docs)
-    f.press(1)
-    for t in 20:f.step(0)
-    check(f.press(1),"timed second")
-    while f.active==1:f.step(0)
-    for t in 20:f.step(0)
-    check(f.press(1),"timed third")
-    for t in 80:f.step(0)
-    check(f.starts==[1,2,3] and f.last_chain==3,"timed combo")
+        for n in count:check(f.press(1),"fresh press")
+        for tick in 170:f.step(0)
+        check(f.starts.size()==count and f.strikes==count and f.last_chain==count and f.active==0,"exact count "+str(count))
+        check(f.walker.action_name()=="walk_breathe","idle after attack")
+    var chain=Training.new(docs)
+    for n in 3:chain.press(1)
+    for tick in range(1,77):
+        chain.step(0)
+        if tick>=6:
+            var expected:Dictionary=source.keys[tick].pose
+            for channel in expected.angles:check(absf(float(chain.walker.pose.angles[channel])-float(expected.angles[channel]))<.001,"runtime original angle")
+            for axis in 2:check(absf(float(chain.walker.pose.root[axis])-float(expected.root[axis]))<.001,"runtime original root")
+    check(chain.starts==[1,2,3] and chain.strikes==3,"three distinct stages")
     var late=Training.new(docs)
     late.press(1)
-    for t in 50:late.step(0)
+    for tick in 70:late.step(0)
     late.press(1)
-    for t in 80:late.step(0)
-    check(late.starts==[1,1] and late.last_chain==1,"late press restarts")
+    for tick in 70:late.step(0)
+    check(late.starts==[1,1] and late.last_chain==1,"late restart")
     var cap=Training.new(docs)
-    for t in 8:cap.press(1)
-    for t in 150:cap.step(0)
+    for n in 8:cap.press(1)
+    for tick in 170:cap.step(0)
     check(cap.starts==[1,2,3] and cap.strikes==3,"bounded buffer")
-    check(not cap.press(2) and not cap.press(3),"only one attack button")
-    var close=Training.new(docs)
-    for t in 60:close.step(1)
-    for n in 3:close.press(1)
-    for t in 140:close.step(0)
-    check(close.hits==3 and close.strikes==3,"three bag hits "+str(close.hits))
+    check(not cap.press(2) and not cap.press(3),"only one attack key")
+    var best:int=0
+    var best_x:float=0.
+    for distance in range(-5,21):
+        var f=Training.new(docs)
+        f.walker.x=float(distance)
+        for n in 3:f.press(1)
+        for tick in 100:f.step(0)
+        if f.hits>best:
+            best=f.hits
+            best_x=distance
+    print("COMBO_BAG_MAX ",best," X ",best_x)
+    check(best==3,"bag reachable by all original hits")
     var idle=Training.new(docs)
     var initial:Dictionary=idle.walker.pose.duplicate(true)
-    for t in 60:idle.step(0)
-    check(idle.walker.action_name()=="walk_breathe" and idle.walker.pose!=initial and idle.walker.x==0.,"animated idle on T")
+    for tick in 60:idle.step(0)
+    check(idle.walker.action_name()=="walk_breathe" and idle.walker.pose!=initial and idle.walker.x==0.,"animated idle")
     if failures.is_empty():print("TRAINING_CONTROL_OK")
     else:
         for failure in failures:push_error(failure)

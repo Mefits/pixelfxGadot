@@ -84,6 +84,14 @@ func run()->void:
     if not walk.last_ok:
         fail("walk native render")
         return
+    var hashes:Dictionary={}
+    for tick in 144:
+        walk.advance()
+        if tick%6==0 and walk.last_image!=null:hashes[walk.last_image.get_data().hex_encode().sha256_text()]=true
+    print("T_IDLE_NATIVE_UNIQUE ",hashes.size())
+    if hashes.size()<8 or walk.walker.action_name()!="walk_breathe":
+        fail("visible idle raster")
+        return
     var key:=InputEventKey.new()
     key.physical_keycode=KEY_D
     key.pressed=true

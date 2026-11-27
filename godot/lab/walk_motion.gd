@@ -77,15 +77,15 @@ static func breathing_doc(stance:Dictionary)->Dictionary:
     var rear:Array=[0.,.40,.85,1.,0.]
     for i in phases.size():
         var p:Dictionary={"angles":start.angles.duplicate(true),"root":start.root.duplicate()}
-        p.root[1]+=.9*lift[i]
+        p.root[1]+=1.5*lift[i]
         p.angles.hips-=.9*lift[i]
         p.angles.chest-=2.2*chest[i]
         p.angles.head+=1.5*arms[i]
         p.angles.shoulder_turn-=2.5*chest[i]
-        p.angles.shoulder_near-=5.5*arms[i]
-        p.angles.elbow_near+=7.5*arms[i]
-        p.angles.shoulder_far+=4.5*rear[i]
-        p.angles.elbow_far-=7.*rear[i]
+        p.angles.shoulder_near-=8.*arms[i]
+        p.angles.elbow_near+=11.*arms[i]
+        p.angles.shoulder_far+=7.*rear[i]
+        p.angles.elbow_far-=10.*rear[i]
         keys.append(key(phases[i]*duration,p))
     return {"version":2,"id":"walk_breathe","name":"Idle · дыхание","kind":"action","walk_role":"walk_breathe","duration":duration,"fps":60,"easing":"smooth","loop":true,"keys":keys,"goals":[],"events":[]}
 

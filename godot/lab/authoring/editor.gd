@@ -1446,7 +1446,7 @@ func sync_pose_hint()->void:
 func editable_bone(id:String)->bool:
     if document.kind!="action" or not document.keys[0].angles.has(id):return false
     if id.begins_with("thigh_") or id.begins_with("knee_") or id.begins_with("foot_pitch_"):
-        return document.has("walk_role") or document.get("release",{}).has(id.get_slice("_",id.get_slice_count("_")-1))
+        return is_bound() or document.get("release",{}).has(id.get_slice("_",id.get_slice_count("_")-1))
     return id in BONE_END or id=="head"
 
 func bone_points(id:String)->Array:

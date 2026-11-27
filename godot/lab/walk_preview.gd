@@ -30,6 +30,9 @@ func step(_cmd:Dictionary)->void:
 func update(phase:float)->void:
     var intent:Dictionary=Punch.intent(program.doc,phase*float(program.doc.duration),rig,program.fixed) if program.doc.get("training_attack",false) else Motion.intent(program,phase,rig)
     paths=intent.paths
-    final_pose=Motion.resolve(rig,support,intent)
+    if program.doc.get("training_attack",false):
+        final_pose=intent.pose
+        rig.evaluate(final_pose)
+    else:final_pose=Motion.resolve(rig,support,intent)
     for i in 2:
         anchors["foot_"+Motion.SIDES[i]]=Motion.toe(rig,final_pose,Motion.SIDES[i])
