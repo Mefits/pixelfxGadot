@@ -1,0 +1,89 @@
+name: Motion Stylization Lab v0.02
+on:
+  push:
+    branches: [experiment/motion-stylization-v002]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: pip install scons pillow
+      - name: Install Godot 4.4.1
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp
+          chmod +x /tmp/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=/tmp/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Logic tests before native build
+        run: |
+          mkdir -p results
+          set -o pipefail
+          "$GODOT" --headless --path godot --script res://tests/motion_stylization_v002.gd 2>&1 | tee results/logic.log
+          grep 'MOTION_STYLIZATION_V002' results/logic.log
+          ! grep -E 'SCRIPT ERROR|Parse Error' results/logic.log
+      - name: Native PixelFX
+        run: python native_cpp/build.py
+      - name: Actual Godot render and identical-motion gate
+        run: |
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+          set -o pipefail
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/motion_stylization_capture.gd -- "$PWD/results/frames" 2>&1 | tee results/capture.log
+          grep 'MOTION_STYLIZATION_CAPTURE_V002' results/capture.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|ERROR:' results/capture.log
+      - name: Encode comparison GIFs (60 Hz samples)
+        run: python tools/motion_stylization_gifs.py results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motion-stylization-v002
+          path: |
+            results/*.gif
+            results/*.json
+            results/*.log
+            results/*.png
+  portable:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-windows-latest
+      - run: pip install scons numpy scipy pillow
+      - run: |
+          npm install --no-package-lock
+          npm run bootstrap
+          npm run build:original
+      - run: python native_cpp/build.py --original
+      - run: python native_cpp/build_motionphysics.py
+      - name: Install Godot
+        shell: python
+        run: |
+          import os, pathlib, urllib.request, zipfile
+          name="Godot_v4.4.1-stable_win64.exe"
+          urllib.request.urlretrieve("https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/"+name+".zip","engine.zip")
+          with zipfile.ZipFile("engine.zip") as z: z.extractall("engine")
+          exe=next(pathlib.Path("engine").rglob(name)).with_name("Godot_v4.4.1-stable_win64_console.exe")
+          with open(os.environ["GITHUB_ENV"],"a") as f: print("GODOT="+str(exe.resolve()),file=f)
+      - run: python tools/package_lab_rc2.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Motion-Stylization-Lab-v002-Windows-portable
+          path: dist/Lab-1.0-RC2/
+          if-no-files-found: error

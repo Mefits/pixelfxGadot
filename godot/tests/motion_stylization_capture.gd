@@ -18,7 +18,7 @@ func run()->void:
         return
     for attack in ["punch","heel"]:
         var expected:Array=[]
-        for mode in 5:
+        for mode in 6:
             s.reset()
             s.set_mode(mode)
             var started:bool=s.training.press(1) if attack=="punch" else s.training.press_kick()
@@ -29,12 +29,12 @@ func run()->void:
             for tick in 78:
                 s.advance(false)
                 if not s.last_ok:failures.append("raster error")
-                trace.append([s.walker.pose.duplicate(true),s.walker.x,s.training.hits,s.training.misses])
+                trace.append([s.walker.pose.duplicate(true),s.walker.x,s.training.hits,s.training.misses,s.training.strikes,s.training.active,s.training.kick.age,s.training.kick.active,s.training.hit_flash])
                 await process_frame
                 await RenderingServer.frame_post_draw
                 var im:Image=root.get_texture().get_image()
                 if im.save_png(dir+"/%03d.png"%tick)!=OK:failures.append("save frame")
             if mode==0:expected=trace
             elif trace!=expected:failures.append("simulation diverged "+attack+" "+str(mode))
-    print("MOTION_STYLIZATION_CAPTURE ",JSON.stringify({"failures":failures}))
+    print("MOTION_STYLIZATION_CAPTURE_V002 ",JSON.stringify({"failures":failures}))
     quit(0 if failures.is_empty() else 1)
