@@ -1,4 +1,5 @@
 extends Node2D
+const Training=preload("res://lab/training_control.gd")
 const Walk=preload("res://lab/walk_control.gd")
 const Studio=preload("res://lab/hybrid_studio.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
@@ -7,6 +8,8 @@ const UI=preload("res://lab/ui_ru.gd")
 const SCALE:float=5.
 const ORIGIN=Vector2(480,413)
 var walker
+var training
+var attack_held:Dictionary={}
 var held:Dictionary={}
 var body=Body.new(2)
 var raster
@@ -18,9 +21,9 @@ var manual:bool=false
 var last_ok:bool=false
 
 func _ready()->void:
-    label("СТЕНД УПРАВЛЕНИЯ / ХОДЬБА",Vector2(24,15),23)
-    label("A / ← — назад     D / → — вперёд     R — сброс     Esc — меню",Vector2(24,56),15)
-    label("Персонаж всегда смотрит вправо. Отпусти клавиши для остановки.",Vector2(24,83),13)
+    label("БОЕВОЙ СТЕНД / ТРЕНИРОВКА",Vector2(24,15),23)
+    label("A / ← назад   D / → вперёд   1 джеб   2 прямой   3 боковой   R сброс",Vector2(24,56),15)
+    label("Один удар за нажатие. Введи 1 → 2 → 3 в ритме ударов.",Vector2(24,83),13)
     var back:=Button.new()
     back.text="Меню / Esc"
     back.position=Vector2(812,15)
@@ -35,7 +38,7 @@ func _ready()->void:
     add_child(sprite)
     state_label=label("",Vector2(24,454),18)
     status=label("",Vector2(24,486),13)
-    label("M → Стойка / Idle / Ходьба вперёд / Ходьба назад → Сохранить.",Vector2(24,514),12)
+    label("M: три удара редактируются отдельно. Сохрани и снова открой T.",Vector2(24,514),12)
     if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
     reset()
 
@@ -50,7 +53,9 @@ func label(value:String,at:Vector2,font_size:int)->Label:
 
 func reset()->void:
     held.clear()
-    walker=Walk.new()
+    attack_held.clear()
+    training=Training.new()
+    walker=training.walker
     accumulator=0.
     render_frame()
 
@@ -60,12 +65,14 @@ func command()->int:
     return int(right)-int(left)
 
 func advance()->void:
-    walker.step(command())
+    training.step(command())
     render_frame()
 
 func render_frame()->void:
     state_label.text="Действие: "+("Остановка" if walker.direction==0 and walker.activity>0. else ("Idle" if walker.action_name()=="walk_breathe" else ["Ходьба назад","Стойка","Ходьба вперёд"][walker.direction+1]))
-    status.text="Положение: %.1f    ·    направление взгляда: вправо    ·    %s"%[walker.x,walker.action_name()]
+    if training.active!=0:state_label.text="Удар %d  ·  комбо %d  ·  %s"%[training.active,training.chain,"Следующий: "+str(training.queued) if training.queued else ""]
+    status.text="Попадания: %d   Промахи: %d   Последнее комбо: %d   ·   %s"%[training.hits,training.misses,training.last_chain,training.result]
+    queue_redraw()
     last_ok=false
     if raster==null:
         status.text="Нет нативного тела. Запусти полный пакет START_LAB.bat."
@@ -89,7 +96,7 @@ func _process(delta:float)->void:
     accumulator+=minf(delta,.1)
     var changed:bool=false
     while accumulator>=1./60.:
-        walker.step(command())
+        training.step(command())
         changed=true
         accumulator-=1./60.
     if changed:render_frame()
@@ -100,12 +107,18 @@ func _input(event:InputEvent)->void:
     if key in [KEY_A,KEY_D,KEY_LEFT,KEY_RIGHT]:
         held[key]=event.pressed
         get_viewport().set_input_as_handled()
+    elif key in [KEY_1,KEY_2,KEY_3]:
+        if event.pressed and not event.echo and not attack_held.get(key,false):training.press(key-KEY_1+1)
+        attack_held[key]=event.pressed
+        get_viewport().set_input_as_handled()
     elif event.pressed and not event.echo:
         if key==KEY_R:reset()
         elif key==KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
 
 func _notification(what:int)->void:
-    if what==NOTIFICATION_APPLICATION_FOCUS_OUT:held.clear()
+    if what==NOTIFICATION_APPLICATION_FOCUS_OUT:
+        held.clear()
+        attack_held.clear()
 
 func _draw()->void:
     draw_rect(Rect2(0,0,960,540),Color("#17232e"))
@@ -115,3 +128,18 @@ func _draw()->void:
         draw_line(Vector2(x,114),Vector2(x,413),Color("#40515d"))
     draw_line(Vector2(20,413),Vector2(940,413),Color("#a0adb8"),2.)
     draw_line(Vector2(480,413),Vector2(480,430),Color("#a0adb8"),2.)
+
+    if training:
+        var center:Vector2=ORIGIN+Vector2(Training.BAG_X*SCALE,Training.BAG_TOP*SCALE)
+        var shift:float=training.bag_sway*SCALE
+        draw_line(center+Vector2(0,-65),center+Vector2(shift,0),Color("#85929e"),3.)
+        var top:Vector2=center+Vector2(shift,0)
+        var bottom:Vector2=top+Vector2(0,(Training.BAG_BOTTOM-Training.BAG_TOP)*SCALE)
+        var fill:Color=Color("#b76a50") if training.hit_flash==0 else Color("#f4c47c")
+        draw_line(top,bottom,Color("#20252c"),Training.BAG_RADIUS*SCALE*2.+4.,true)
+        draw_circle(top,Training.BAG_RADIUS*SCALE+2.,Color("#20252c"))
+        draw_circle(bottom,Training.BAG_RADIUS*SCALE+2.,Color("#20252c"))
+        draw_line(top,bottom,fill,Training.BAG_RADIUS*SCALE*2.,true)
+        draw_circle(top,Training.BAG_RADIUS*SCALE,fill)
+        draw_circle(bottom,Training.BAG_RADIUS*SCALE,fill)
+        draw_line(top+Vector2(-12,0),bottom+Vector2(-12,0),Color("#ffffff22"),3.)

@@ -121,6 +121,16 @@ func run()->void:
         await process_frame
         await RenderingServer.frame_post_draw
         root.get_texture().get_image().save_png(args[0].path_join("walk-idle.png"))
+    walk.reset()
+    key.physical_keycode=KEY_1
+    key.pressed=true
+    root.push_input(key)
+    for t in 70:walk.advance()
+    if walk.training.starts!=[1] or walk.training.strikes!=1:
+        fail("held attack repeats")
+        return
+    key.pressed=false
+    root.push_input(key)
     root.remove_child(walk)
     walk.queue_free()
     # Old two-dummy diagnostic retained for regression only, not in menu T.

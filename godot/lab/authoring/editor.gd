@@ -1,5 +1,6 @@
 extends Node2D
 const Asset=preload("asset.gd")
+const Punch=preload("res://lab/training_punch.gd")
 const WalkMotion=preload("res://lab/walk_motion.gd")
 const WalkPreview=preload("res://lab/walk_preview.gd")
 const Goals=preload("goals.gd")
@@ -132,7 +133,7 @@ var gesture_phase:=0.
 var gesture_clock:=""
 var syncing:=false
 var frame:=0
-var ids:Array=Asset.WALK_IDS+Asset.IDS
+var ids:Array=Asset.WALK_IDS+Asset.TRAIN_IDS+Asset.IDS
 
 func _ready():
     panel(Rect2(0,0,960,540),"#101822")
@@ -177,7 +178,7 @@ func _ready():
             if file.ends_with(".json") and id.is_valid_identifier() and not ids.has(id):ids.append(id)
     for id in ids:
         var path:String=Asset.FOLDER+id+".json"
-        var entry:=WalkMotion.document(id) if id in Asset.WALK_IDS else Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
+        var entry:=bound_document(id,path)
         motion.add_item(str(entry.get("name",id)))
     motion.item_selected.connect(func(i):request_open(ids[i]))
     channel_mode=OptionButton.new()
@@ -471,7 +472,7 @@ func _ready():
     timeline.marker_moved.connect(move_marker)
     timeline.marker_selected.connect(func(lane:int,i:int):
         if lane==0:inspector.current_tab=2
-        else:
+        elif not is_bound():
             inspector.current_tab=4
             event_list.select(i)
             select_event(i))
@@ -610,7 +611,7 @@ func set_easing(index:int)->void:
     refresh(frame)
 
 func set_loop(value:bool)->void:
-    if syncing or document.kind!="action" or document.has("walk_role"):return
+    if syncing or document.kind!="action" or is_bound():return
     remember()
     document.loop=value
     var error:String=Asset.problem(document)
@@ -642,7 +643,7 @@ func mirror_id(id:String)->String:
     return id
 
 func mirror_action()->void:
-    if document.kind!="action" or document.has("walk_role"):return
+    if document.kind!="action" or is_bound():return
     remember()
     for k in document.keys:
         var mirrored:Dictionary={}
@@ -759,7 +760,7 @@ func select_event(index:int)->void:
     timeline.queue_redraw()
 
 func add_event()->void:
-    if document.has("walk_role"):return
+    if is_bound():return
     if document.kind!="action" or document.events.size()>=32:return
     if event_kind.selected==0 and document.get("loop",false):
         info.text="Циклическое действие не может содержать боевой контакт."
@@ -780,7 +781,7 @@ func add_event()->void:
     info.text="Событие добавлено."
 
 func add_vfx_event()->void:
-    if document.has("walk_role"):return
+    if is_bound():return
     if document.kind!="action" or document.events.size()>=32 or vfx_select.selected<0:return
     remember()
     var t:=clampf(float(frame-START)/60.,0.,document.duration)
@@ -822,7 +823,7 @@ func apply_quick_vfx(value:Dictionary)->void:
 
 func render_vfx()->void:
     if fx_surface==null or fx_visible==null:return
-    fx_surface.visible=fx_visible.button_pressed and document.kind=="action" and not document.has("walk_role")
+    fx_surface.visible=fx_visible.button_pressed and document.kind=="action" and not is_bound()
     if not fx_surface.visible:return
     var clip:Dictionary={"duration":document.duration,"loop":document.get("loop",false),"easing":document.get("easing","linear"),"keys":[],"events":document.events}
     for key in document.keys:
@@ -881,7 +882,7 @@ func side_id()->String:
     return "near" if release_side.selected==0 else "far"
 
 func sync_release()->void:
-    release_panel.visible=document.kind=="action" and not document.has("walk_role")
+    release_panel.visible=document.kind=="action" and not is_bound()
     if not release_panel.visible:return
     var r:Dictionary=document.get("release",{})
     var enabled:bool=r.has(side_id())
@@ -891,7 +892,7 @@ func sync_release()->void:
     release_remove.disabled=not enabled
 
 func apply_release()->void:
-    if document.kind!="action" or document.has("walk_role"):return
+    if document.kind!="action" or is_bound():return
     var side:String=side_id()
     var knots:Array=[]
     for field in release_fields:knots.append(field.value/100.)
@@ -1075,9 +1076,17 @@ func button(row:Node,title:String,fn:Callable,hint:String="")->Button:
     b.pressed.connect(fn)
     return b
 
+func bound_document(id:String,path:String)->Dictionary:
+    if id in Asset.WALK_IDS:return WalkMotion.document(id)
+    if id in Asset.TRAIN_IDS:return Punch.document(id)
+    return Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
+
+func is_bound()->bool:
+    return document.has("walk_role") or document.get("training_attack",false)
+
 func open_motion(id:String):
     var path:=Asset.FOLDER+id+".json"
-    var d:=WalkMotion.document(id) if id in Asset.WALK_IDS else Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
+    var d:=bound_document(id,path)
     var error:=Asset.problem(d)
     if error=="" and d.id!=id:error="Имя файла расходится с id"
     if error!="":
@@ -1087,7 +1096,7 @@ func open_motion(id:String):
     rotate_active=false
     root_drag_active=false
     if d.kind=="gait":pose_tool.select(0)
-    elif document.has("walk_role"):pose_tool.select(1)
+    elif is_bound():pose_tool.select(1)
     saved_signature=JSON.stringify(document)
     motion.select(ids.find(id))
     delete_motion_button.disabled=not can_delete_motion(id)
@@ -1096,7 +1105,7 @@ func open_motion(id:String):
     redo_history.clear()
     playing=false
     refresh(0 if document.kind=="gait" else START)
-    if document.has("walk_role"):
+    if is_bound():
         set_pose_tool(1)
         info.text="Сохрани движение и проверь в T. Стопы корректируются в исполнении."
     else:
@@ -1114,7 +1123,7 @@ func command(t:int)->Dictionary:
     return {"speed":preview_speed,"action":document.id if t==START else ""}
 
 func build_preview_player():
-    if document.has("walk_role"):return WalkPreview.new(document)
+    if is_bound():return WalkPreview.new(document)
     if document.kind=="gait":return Asset.player(document,60)
     var gait_doc:Dictionary=Asset.read(Asset.DIR+"sprint.json")
     return Asset.ensemble(gait_doc,[document],60)
@@ -1164,14 +1173,14 @@ func refresh(value:int):
         param.value=document.duration
     pose_controls.visible=document.kind=="action"
     var is_action:bool=document.kind=="action"
-    var is_walk:bool=document.has("walk_role")
+    var is_walk:bool=is_bound()
     pose_tool.set_item_disabled(0,is_walk)
     inspector.set_tab_disabled(1,is_walk)
     inspector.set_tab_disabled(4,is_walk)
     if is_walk and pose_tool.selected==0:pose_tool.select(1)
     if is_walk and inspector.current_tab in [1,4]:inspector.current_tab=2
-    param.editable=not (is_walk and document.walk_role=="walk_idle")
-    fps_select.visible=is_action and not (is_walk and document.walk_role=="walk_idle")
+    param.editable=not (is_walk and document.get("walk_role","")=="walk_idle")
+    fps_select.visible=is_action and not (is_walk and document.get("walk_role","")=="walk_idle")
     easing_select.visible=is_action
     loop_toggle.visible=is_action and not is_walk
     preview_speed_select.visible=is_action and not is_walk
@@ -1294,6 +1303,7 @@ func _draw():
 func move_marker(lane:int,index:int,value:float):
     if document.kind!="action":return
     var entries:Array=document.keys if lane==0 else document.events
+    if index<0 or index>=entries.size():return
     if lane==0 and index in [0,entries.size()-1]:return
     var t:=clampf((value-START)/60.,0.,document.duration)
     t=clampf(snappedf(t,1./float(document.get("fps",60))),0.,document.duration)
@@ -1375,7 +1385,7 @@ func set_pose_tool(mode:int)->void:
     if rotate_active:cancel_rotation()
     if root_drag_active:finish_root_drag()
     dragging=false
-    if mode==0 and document.has("walk_role"):mode=1
+    if mode==0 and is_bound():mode=1
     if mode==1 and document.kind!="action":
         mode=0
         info.text="Бег редактируется целями и параметрами."
@@ -1411,7 +1421,7 @@ func sync_edit_pose()->void:
     var t:float=clampf(float(frame-START)/60.,0.,float(document.duration))
     var authored:Dictionary=sampled_pose(t)
     edit_pose=player.final_pose.duplicate(true)
-    if document.has("walk_role"):edit_pose=authored.duplicate(true)
+    if is_bound():edit_pose=authored.duplicate(true)
     else:
         var base:Dictionary=player.gait.intent().pose
         edit_pose.root=base.root.duplicate()
@@ -1425,7 +1435,7 @@ func sync_edit_pose()->void:
     pose_rig.evaluate(edit_pose)
 
 func sync_pose_hint()->void:
-    if document.has("walk_role") and pose_tool.selected==2:
+    if is_bound() and pose_tool.selected==2:
         pose_hint.text="Исполнение T · контакт стоп с землёй"
         return
     match pose_tool.selected:
@@ -1594,7 +1604,7 @@ func cancel_rotation()->void:
     info.text="Вращение отменено."
 
 func begin_drag(joint:String):
-    if document.has("walk_role"):return
+    if is_bound():return
     playing=false
     var phase_clock:="action"
     if document.kind=="gait":
@@ -1685,7 +1695,7 @@ func key_pose():
     refresh(frame)
 
 func toggle_contact():
-    if document.has("walk_role"):return
+    if is_bound():return
     if player.action=="" or document.get("loop",false):return
     var id:String=Asset.JOINTS[joints.selected]
     if not (id.begins_with("hand") or id.begins_with("foot")):return
@@ -1703,7 +1713,7 @@ func copy_goal():
     if selected>=0:clip_board=document.goals[selected].duplicate(true)
 
 func paste_goal():
-    if document.has("walk_role"):return
+    if is_bound():return
     if clip_board.is_empty() or document.goals.size()>=64:return
     remember()
     var g:=clip_board.duplicate(true)
@@ -1754,7 +1764,7 @@ func save_file():
     show_pose()
 
 func can_delete_motion(id:String)->bool:
-    return id.is_valid_identifier() and not Asset.IDS.has(id) and not Asset.WALK_IDS.has(id) and ids.has(id) and FileAccess.file_exists(Asset.FOLDER+id+".json")
+    return id.is_valid_identifier() and not Asset.IDS.has(id) and not Asset.WALK_IDS.has(id) and not Asset.TRAIN_IDS.has(id) and ids.has(id) and FileAccess.file_exists(Asset.FOLDER+id+".json")
 
 func ask_delete_motion()->void:
     if not can_delete_motion(str(document.id)):return

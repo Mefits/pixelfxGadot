@@ -8,6 +8,7 @@ const VFX=preload("res://addons/pixelfx/composer/preset.gd")
 const DIR="res://lab/authoring/motions/"
 const FOLDER="user://motion_authoring/"
 const IDS=["sprint","jab","feint"]
+const TRAIN_IDS=["train_jab","train_cross","train_hook"]
 const WALK_IDS=["walk_idle","walk_breathe","walk_forward","walk_backward"]
 const JOINTS=["hand_near","hand_far","elbow_near","elbow_far","foot_near","foot_far","knee_near","knee_far"]
 const CHANNELS=["chest","head","shoulder_turn","shoulder_near","elbow_near","shoulder_far","elbow_far"]
@@ -67,6 +68,11 @@ static func problem(d:Dictionary)->String:
         if mask.size()!=CHANNELS.size()+LEG_CHANNELS.size() or not d.goals.is_empty() or not d.get("events",[]) is Array or not d.get("events",[]).is_empty() or not d.get("release",{}) is Dictionary or not d.get("release",{}).is_empty():return "Ходьба: полный скелет, без целей и событий"
         if role=="walk_idle" and d.keys.size()!=1:return "Стойка содержит один ключ"
         if role!="walk_idle" and not d.get("loop",false):return "Ходьба должна быть циклической"
+    if d.get("training_attack",false):
+        if mask.size()!=CHANNELS.size()+LEG_CHANNELS.size() or d.get("loop",false) or not d.goals.is_empty() or not d.get("release",{}) is Dictionary or not d.get("release",{}).is_empty():return "Тренировка: полный скелет, без цикла и IK-целей"
+        if not d.get("events") is Array or d.events.size()!=1:return "Тренировка: один контакт"
+        var marker=d.events[0]
+        if not marker is Dictionary or marker.get("kind")!="strike" or not marker.get("anchor") in ["hand_near","hand_far"]:return "Тренировка: контакт кисти"
     var release=d.get("release",{})
     if not release is Dictionary:return "Фазы опоры"
     for side in release:
