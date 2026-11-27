@@ -115,7 +115,7 @@ static func build(d:Dictionary,hz:int)->Dictionary:
         for side in d.get("release",{}):
             release[side]=[]
             for knot in d.release[side]:release[side].append(knot*d.duration*60.)
-        var channels:Array=(CHANNELS+LEG_CHANNELS).filter(func(id):return d.keys[0].angles.has(id))
+        var channels:Array=d.keys[0].angles.keys().filter(func(id):return id in CHANNELS or id in ["hips","pelvis_turn"])
         out.bank[d.id]=Motion.compile(clip,0,ceili(d.duration*60.-.000001),channels,hz,Body.make_rig() if not release.is_empty() else null,release)
     return out
 
