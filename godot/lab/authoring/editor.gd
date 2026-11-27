@@ -236,6 +236,7 @@ func select_goal(i:int):
     syncing=was
 
 func show_pose():
+    var rendered:bool=false
     if raster:
         var p:Dictionary=player.final_pose
         var parts:Array=body.make(player.rig.points,p.angles,player.rig.rotations.head)
@@ -246,11 +247,16 @@ func show_pose():
         if result.ok:
             var im:=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
             last_image=im
+            rendered=true
             if sprite.texture:sprite.texture.update(im)
             else:sprite.texture=ImageTexture.create_from_image(im)
     var state:String="стойка" if player.stopped else ("полёт" if airborne() else "опора")
     if player.action!="":state=player.action
     status.text="%s   ·   тик %d   ·   %s"%[document.name,frame,state]
+    if not rendered:
+        status.text+="  |  НЕТ НАТИВНОГО ТЕЛА — нужен полный пакет"
+        sprite.hide()
+    else:sprite.show()
     var joint:String=Asset.JOINTS[joints.selected]
     if player.goal_report.has(joint):
         var r:Dictionary=player.goal_report[joint]

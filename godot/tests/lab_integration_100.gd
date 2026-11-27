@@ -10,8 +10,11 @@ func run()->void:
     var menu=load("res://lab/main.tscn").instantiate()
     root.add_child(menu)
     await process_frame
-    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 RC1" or menu.routes.size()!=10 or menu.routes.get("P")!="res://lab/motionphysics_studio.tscn" or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
+    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 RC2" or menu.routes.size()!=10 or menu.routes.get("T")!="res://lab/combat_astra.tscn" or menu.routes.get("P")!="res://lab/motionphysics_studio.tscn" or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
         fail("launcher routing")
+        return
+    if menu.SECTIONS[0].items.map(func(x):return x[0])!=["M","H","T","P","Y"] or menu.SECTIONS[1].items.map(func(x):return x[0])!=["J","U","I","A","L"]:
+        fail("launcher categories")
         return
     for route in menu.routes.values():
         if not ResourceLoader.exists(route):
@@ -71,6 +74,40 @@ func run()->void:
     scene.set_mode(0)
     if scene.player.tick!=0 or not scene.last_ok:
         fail("mode reset")
+        return
+    root.remove_child(scene)
+    scene.queue_free()
+    var fight=load("res://lab/combat_astra.tscn").instantiate()
+    fight.manual=true
+    root.add_child(fight)
+    if not fight.last_ok:
+        fail("Astra combat render")
+        return
+    var reference:Array=[]
+    fight.hit_enabled=false
+    fight.queue_attack(0)
+    for t in 60:
+        fight.advance()
+        reference.append(fight.players[0].final_pose.duplicate(true))
+    if fight.hits[0]!=0:
+        fail("reference attack hit")
+        return
+    var found:bool=false
+    for distance in [24.,20.,28.,16.,32.]:
+        fight.distance=distance
+        fight.hit_enabled=true
+        fight.reset()
+        fight.queue_attack(0)
+        for t in 60:
+            fight.advance()
+            if fight.players[0].final_pose!=reference[t]:
+                fail("contact changed attack pose")
+                return
+        if fight.hits[0]==1 and fight.hp[1]==95:
+            found=true
+            break
+    if not found:
+        fail("Astra event hit not found at training distances")
         return
     print("LAB_100_INTEGRATION_OK")
     quit()

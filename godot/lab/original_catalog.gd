@@ -29,6 +29,7 @@ func _ready() -> void:
     ui.add_child(menu)
     mode_button=CheckButton.new()
     mode_button.text="Оригинальная постановка"
+    mode_button.button_pressed=true
     mode_button.position=Vector2(434,50)
     ui.add_child(mode_button)
     status=Label.new()
@@ -39,7 +40,7 @@ func _ready() -> void:
     title.position=Vector2(24,16)
     ui.add_child(title)
     if not runtime.open():
-        status.text=runtime.error
+        status.text=runtime.error+" — запусти полный Windows-пакет Lab."
         set_process(false)
         return
     entries=runtime.entries

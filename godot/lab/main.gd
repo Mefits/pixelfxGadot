@@ -1,262 +1,66 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
-## Launcher only. No effect renderer, pool or simulation created until a lab opens.
-const VERSION="1.0 RC1"
-const EXP=preload("res://addons/creature/kit_export.gd")
-const CAT=preload("res://addons/creature/catalog.gd")
-const PREVIEW=preload("res://lab/catalog_preview.gd")
+const VERSION="1.0 RC2"
 const SECTIONS=[
-    {"label":"СПЕЦЭФФЕКТЫ","color":"#79b9d4","items":[
-        ["Y","Конструктор эффектов","Слои, кривые параметров и свои пресеты.","vfx_workshop"],
-        ["J","Каталог PixelFX","Оригинальные эффекты и постановки.","original_catalog"],
-        ["A","Тест атласов","Готовые кадры и тест нагрузки.","atlas_lab"],
-        ["L","Молния","Процедурный разряд в реальном времени.","live_lightning"]
+    {"label":"РАБОЧИЕ ИНСТРУМЕНТЫ","color":"#9dd5b7","items":[
+        ["M","Мастерская движений","Авторские позы, цели и ключи на модели.","authoring/editor"],
+        ["H","Гибридное движение","Просмотр Astra: бег, атаки, ткань, реакции.","hybrid_studio"],
+        ["T","Бой","Новый стенд Astra: атака и реакция без ragdoll.","combat_astra"],
+        ["P","Box2D · физика попаданий","Отдельный тест импульсов и падений.","motionphysics_studio"],
+        ["Y","Настройки эффектов","Слои, кривые, параметры и пресеты VFX.","vfx_workshop"]
     ]},
-    {"label":"АНИМАЦИЯ И СУЩЕСТВА","color":"#92c6af","items":[
-        ["M","Мастерская движений","Фазовые цели и исполнение Hybrid.","authoring/editor"],
-        ["U","Редактор анимаций","Позы скелета и ключевые кадры.","pose_workshop"],
-        ["T","Бой (прежний стенд)","Два бойца и проверка прежних атак.","combat_lab"],
-        ["H","Гибридное движение","Ядро Astra, объёмное тело, ткань, реакции.","hybrid_studio"],
-        ["P","Box2D · физика попаданий","Импульсы, параметры и частичная физика.","motionphysics_studio"],
-        ["I","Физика и эволюция","Физика, атаки, изменение анатомии.","physics_lab"]
+    {"label":"В РАЗРАБОТКЕ","color":"#b2bac6","items":[
+        ["J","Оригинальные анимации PixelFX","Исходные эффекты и постановки PixelFX.","original_catalog"],
+        ["U","Редактор анимаций (старый)","Скелет и ключевые кадры.","pose_workshop"],
+        ["I","Физика и эволюция","Экспериментальная анатомия и физика.","physics_lab"],
+        ["A","Тест атласов","Готовые кадры и тест нагрузки.","atlas_lab"],
+        ["L","Молния","Процедурный разряд.","live_lightning"]
     ]}
 ]
-var routes: Dictionary={}
-var buttons: Array[Button]=[]
-var status: Label
-var entries:Array=[]
-var filtered:Array=[]
-var catalog_list:ItemList
-var category:OptionButton
-var search:LineEdit
-var detail_label:Label
-var open_button:Button
-var copy_button:Button
-var viewport:SubViewport
-var picture:TextureRect
-var preview
-var import_dialog:FileDialog
-var export_dialog:FileDialog
-var export_button:Button
-var pending_export:Dictionary={}
-func _ready() -> void:
+var routes:Dictionary={}
+var buttons:Array[Button]=[]
+var status:Label
+func _ready()->void:
     var layer:=CanvasLayer.new()
     add_child(layer)
-    var theme0:=Theme.new()
-    theme0.default_font_size=14
     var root:=Control.new()
-    root.theme=theme0
     root.size=Vector2(960,540)
     layer.add_child(root)
-    _label(root,"CREATURE & PIXELFX",Vector2(28,20),28,Color("#e5edf4"))
-    _label(root,"ИНСТРУМЕНТАРИЙ РАЗРАБОТКИ    /    "+VERSION,Vector2(30,56),13,Color("#91a5b9"))
+    _label(root,"CREATURE & PIXELFX",Vector2(28,18),27,Color("#e5edf4"))
+    _label(root,"LAB "+VERSION+"  /  ИНСТРУМЕНТАРИЙ РАЗРАБОТКИ",Vector2(30,52),13,Color("#91a5b9"))
     var help:=Button.new()
     help.text="Горячие клавиши"
-    help.position=Vector2(748,26)
+    help.position=Vector2(748,23)
     help.size=Vector2(184,32)
     root.add_child(help)
     help.pressed.connect(_show_help)
-    _label(root,"ИНСТРУМЕНТЫ",Vector2(28,96),14,Color("#92c6af"))
-    var y:float=122
-    for section in SECTIONS:
-        for spec in section.items:
+    for col in SECTIONS.size():
+        var section:Dictionary=SECTIONS[col]
+        var x:float=28.+col*464.
+        _label(root,section.label,Vector2(x,94),15,Color(section.color))
+        for row in section.items.size():
+            var spec:Array=section.items[row]
             var path:String="res://lab/"+str(spec[3])+".tscn"
             routes[spec[0]]=path
+            var y:float=124.+row*65.
             var button:=Button.new()
-            button.position=Vector2(28,y)
-            button.size=Vector2(226,35)
-            button.text=spec[0]+"  "+spec[1]
-            button.alignment=HORIZONTAL_ALIGNMENT_LEFT
+            button.position=Vector2(x,y)
+            button.size=Vector2(440,58)
             button.tooltip_text=spec[2]
             button.add_theme_stylebox_override("normal",_style(Color("#1e2b39"),Color("#34465a")))
             button.add_theme_stylebox_override("hover",_style(Color("#293b4b"),Color(section.color)))
             root.add_child(button)
             buttons.append(button)
             button.pressed.connect(func():_open(path))
-            y+=36
-    _label(root,"БИБЛИОТЕКА ШАБЛОНОВ",Vector2(274,96),14,Color("#79b9d4"))
-    category=OptionButton.new()
-    category.position=Vector2(274,122)
-    category.size=Vector2(143,32)
-    category.add_item("Все категории")
-    for kind in CAT.KINDS:category.add_item(CAT.LABELS[kind])
-    root.add_child(category)
-    category.item_selected.connect(func(_i:int):_filter())
-    search=LineEdit.new()
-    search.position=Vector2(423,122)
-    search.size=Vector2(190,32)
-    search.placeholder_text="Поиск…"
-    root.add_child(search)
-    search.text_changed.connect(func(_s:String):_filter())
-    catalog_list=ItemList.new()
-    catalog_list.position=Vector2(274,162)
-    catalog_list.size=Vector2(339,278)
-    catalog_list.add_theme_constant_override("v_separation",5)
-    root.add_child(catalog_list)
-    catalog_list.item_selected.connect(_select_entry)
-    catalog_list.item_activated.connect(func(_i:int):_open_entry())
-    var import_button:=Button.new()
-    import_button.text="Импорт JSON"
-    import_button.position=Vector2(274,448)
-    import_button.size=Vector2(157,32)
-    root.add_child(import_button)
-    import_button.pressed.connect(func():import_dialog.popup_centered_ratio(.75))
-    var refresh:=Button.new()
-    refresh.text="Обновить"
-    refresh.position=Vector2(439,448)
-    refresh.size=Vector2(174,32)
-    root.add_child(refresh)
-    refresh.pressed.connect(_reload)
-    _label(root,"ПРЕДПРОСМОТР",Vector2(632,96),14,Color("#79b9d4"))
-    viewport=SubViewport.new()
-    viewport.size=Vector2i(240,160)
-    viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
-    root.add_child(viewport)
-    picture=TextureRect.new()
-    picture.position=Vector2(632,122)
-    picture.size=Vector2(300,200)
-    picture.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
-    picture.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
-    picture.texture=viewport.get_texture()
-    picture.hide()
-    root.add_child(picture)
-    detail_label=_label(root,"Выбери шаблон из списка.",Vector2(632,330),14,Color("#c4d0db"))
-    detail_label.size=Vector2(300,76)
-    detail_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    open_button=Button.new()
-    open_button.text="Открыть в редакторе"
-    open_button.position=Vector2(632,448)
-    open_button.size=Vector2(169,32)
-    open_button.disabled=true
-    root.add_child(open_button)
-    open_button.pressed.connect(_open_entry)
-    copy_button=Button.new()
-    copy_button.text="Копия"
-    copy_button.position=Vector2(809,448)
-    copy_button.size=Vector2(123,32)
-    copy_button.disabled=true
-    root.add_child(copy_button)
-    copy_button.pressed.connect(_copy_entry)
-    export_button=Button.new()
-    export_button.text="Экспорт в игру (ZIP)"
-    export_button.position=Vector2(632,412)
-    export_button.size=Vector2(300,30)
-    export_button.disabled=true
-    root.add_child(export_button)
-    export_button.pressed.connect(_begin_export)
-    export_dialog=FileDialog.new()
-    export_dialog.file_mode=FileDialog.FILE_MODE_SAVE_FILE
-    export_dialog.access=FileDialog.ACCESS_FILESYSTEM
-    export_dialog.filters=PackedStringArray(["*.zip ; Godot runtime package"])
-    root.add_child(export_dialog)
-    export_dialog.file_selected.connect(_export_entry)
-    export_dialog.canceled.connect(func():pending_export.clear())
-    import_dialog=FileDialog.new()
-    import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
-    import_dialog.access=FileDialog.ACCESS_FILESYSTEM
-    import_dialog.filters=PackedStringArray(["*.json ; JSON шаблон"])
-    root.add_child(import_dialog)
-    import_dialog.file_selected.connect(_import_entry)
-    status=_label(root,"Выбор мышью или клавишей. Esc — вернуться в главное меню.",Vector2(28,501),13,Color("#91a5b9"))
-    _reload()
-
-func _reload()->void:
-    entries=CAT.scan()
-    _filter()
-
-func _filter()->void:
-    filtered.clear()
-    catalog_list.clear()
-    var kind:String="" if category.selected<=0 else CAT.KINDS[category.selected-1]
-    for e in entries:
-        if not CAT.matches(e,kind,search.text):continue
-        filtered.append(e)
-        var prefix:String="★ " if e.source=="library" else ("● " if e.source=="saved" else "")
-        catalog_list.add_item(prefix+e.name+" · "+CAT.LABELS[e.kind])
-    _clear_preview()
-    status.text="Шаблонов: %d / %d · ★ копия библиотеки · ● сохранённый"%[filtered.size(),entries.size()]
-
-func _clear_preview()->void:
-    if is_instance_valid(preview):
-        viewport.remove_child(preview)
-        preview.queue_free()
-        preview=null
-    viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
-    picture.hide()
-    detail_label.text="Выбери шаблон из списка."
-    open_button.disabled=true
-    copy_button.disabled=true
-    export_button.disabled=true
-
-func _selected_entry()->Dictionary:
-    var selected:PackedInt32Array=catalog_list.get_selected_items()
-    if selected.is_empty() or selected[0]>=filtered.size():return {}
-    return filtered[selected[0]]
-
-func _select_entry(i:int)->void:
-    if i<0 or i>=filtered.size():return
-    _clear_preview()
-    var e:Dictionary=filtered[i]
-    preview=PREVIEW.new()
-    viewport.add_child(preview)
-    preview.set_entry(e)
-    viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
-    picture.show()
-    var source:String={"builtin":"Встроенный шаблон","library":"Копия библиотеки","saved":"Сохранённый файл"}.get(e.source,"")
-    var detail:String=""
-    match e.kind:
-        "vfx":detail="%d слоёв"%e.payload.layers.size()
-        "animation":detail="%.2f с · %d ключей"%[e.payload.clip.duration,e.payload.clip.keys.size()]
-        "ability":
-            if e.payload.get("engine","")=="physical":detail="Физическая способность · %.2f с · %d урона"%[e.payload.duration,int(e.payload.damage)]
-            else:detail="%d урона · 4 фазы · постановочный просмотр"%int(e.payload.damage)
-        "creature":detail="Лап: %d · хвост: %d · щупалец: %d"%[int(e.payload.get("leg_count",4)) if e.payload.limbs else 0,int(e.payload.tail),int(e.payload.get("tentacles",0))]
-    detail_label.text=e.name+"\n"+source+"\n"+detail
-    open_button.disabled=false
-    copy_button.disabled=false
-    export_button.disabled=not EXP.available()
-    if not EXP.available():export_button.tooltip_text="Runtime ZIP не включён. Используй полный проверенный пакет."
-
-func _open_entry()->void:
-    var e:Dictionary=_selected_entry()
-    if e.is_empty():return
-    get_tree().set_meta(CAT.HANDOFF,e.duplicate(true))
-    var err:Error=get_tree().change_scene_to_file("res://lab/"+CAT.route(e)+".tscn")
-    if err!=OK:
-        get_tree().remove_meta(CAT.HANDOFF)
-        status.text="Ошибка открытия шаблона: "+str(err)
-
-func _copy_entry()->void:
-    var e:Dictionary=_selected_entry()
-    if e.is_empty():return
-    var value:Dictionary=e.duplicate(true)
-    value.name=(str(e.name)+" — копия").left(120)
-    if e.kind in ["vfx","ability"]:value.payload.name=value.name
-    var saved:Dictionary=CAT.save_copy(value)
-    if saved.is_empty():status.text="Не удалось сохранить копию";return
-    _reload()
-    status.text="Копия сохранена: "+str(saved.name)
-
-func _begin_export()->void:
-    pending_export=_selected_entry().duplicate(true)
-    if pending_export.is_empty():return
-    export_dialog.current_file="creature_template_"+str(int(Time.get_unix_time_from_system()))+".zip"
-    export_dialog.popup_centered_ratio(.75)
-
-func _export_entry(path:String)->void:
-    if pending_export.is_empty():return
-    var err:Error=EXP.export_entry(pending_export,path)
-    pending_export.clear()
-    if err==OK:status.text="ZIP сохранён: "+path.get_file()
-    elif err==ERR_ALREADY_EXISTS:status.text="Файл уже существует. Выбери новое имя."
-    else:status.text="Ошибка экспорта: "+error_string(err)
-
-func _import_entry(path:String)->void:
-    var saved:Dictionary=CAT.import_file(path)
-    if saved.is_empty():status.text="Файл не поддерживается или не прошёл проверку";return
-    _reload()
-    status.text="Импортировано: "+str(saved.name)
-
+            var name_label:=_label(button,spec[0]+"   "+spec[1],Vector2(13,6),17,Color("#e5edf4"))
+            name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
+            var desc:=_label(button,spec[2],Vector2(14,32),13,Color("#a4b4c4"))
+            desc.mouse_filter=Control.MOUSE_FILTER_IGNORE
+    var native_body:bool=ClassDB.class_exists("PixelFXBodyRaster")
+    var native_physics:bool=ClassDB.class_exists("MotionPhysics099D")
+    var original:bool=ClassDB.class_exists("PixelFXOriginal") and FileAccess.file_exists("res://generated/original_bundle.txt")
+    status=_label(root,"Нативные модули:  тело "+("OK" if native_body else "НЕТ")+"  ·  Box2D "+("OK" if native_physics else "НЕТ")+"  ·  PixelFX Original "+("OK" if original else "НЕТ"),Vector2(28,466),13,Color("#9dd5b7") if native_body and native_physics and original else Color("#e4bb85"))
+    _label(root,"Выбор мышью или клавишей. Esc — меню. При отсутствии модулей используй полный Windows-пакет.",Vector2(28,501),12,Color("#91a5b9"))
 func _label(parent: Control,value: String,at: Vector2,font_size: int,color: Color) -> Label:
     var l:=Label.new()
     l.position=at
@@ -274,12 +78,11 @@ func _style(bg: Color,border: Color) -> StyleBoxFlat:
     s.set_corner_radius_all(5)
     return s
 
-func _draw() -> void:
+func _draw()->void:
     draw_rect(Rect2(0,0,960,540),Color("#111923"))
-    draw_rect(Rect2(0,0,960,81),Color("#192634"))
-    draw_line(Vector2(264,92),Vector2(264,480),Color("#34465a"),1)
-    draw_line(Vector2(622,92),Vector2(622,480),Color("#34465a"),1)
-    draw_line(Vector2(28,485),Vector2(932,485),Color("#34465a"),1)
+    draw_rect(Rect2(0,0,960,80),Color("#192634"))
+    draw_line(Vector2(480,92),Vector2(480,445),Color("#34465a"),1)
+    draw_line(Vector2(28,451),Vector2(932,451),Color("#34465a"),1)
 
 func _open(path: String) -> void:
     if not ResourceLoader.exists(path):
@@ -289,7 +92,6 @@ func _open(path: String) -> void:
     if err!=OK:status.text="Ошибка открытия: "+str(err)
 
 func _unhandled_input(e: InputEvent) -> void:
-    if search.has_focus():return
     if e is InputEventKey and e.pressed and not e.echo:
         var key: String=OS.get_keycode_string(UI.physical_key(e))
         if routes.has(key):_open(routes[key])
