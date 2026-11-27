@@ -131,6 +131,16 @@ func run()->void:
         return
     key.pressed=false
     root.push_input(key)
+    walk.reset()
+    for n in 3:
+        key.pressed=true
+        root.push_input(key)
+        key.pressed=false
+        root.push_input(key)
+    for n in 140:walk.advance()
+    if walk.training.starts!=[1,2,3] or walk.training.strikes!=3 or walk.walker.action_name()!="walk_breathe":
+        fail("single-key combo and idle")
+        return
     root.remove_child(walk)
     walk.queue_free()
     # Old two-dummy diagnostic retained for regression only, not in menu T.

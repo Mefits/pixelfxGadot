@@ -6,13 +6,12 @@ const BAG_X:float=34.
 const BAG_RADIUS:float=6.
 const BAG_TOP:float=-45.
 const BAG_BOTTOM:float=-13.
-const BUFFER_TICKS:int=12
+const MAX_CHAIN:int=3
 var walker
 var docs:Dictionary={}
 var active:int=0
 var age:int=0
 var queued:int=0
-var queued_tick:int=0
 var ticks:int=0
 var chain:int=0
 var last_chain:int=0
@@ -30,28 +29,27 @@ var fired:bool=false
 
 func _init(overrides:Dictionary={}):
     walker=Walk.new()
-    for i in 3:docs[i+1]=overrides.get(i+1,Punch.document(Punch.IDS[i]))
+    var jab:Dictionary=overrides.get(1,Punch.document(Punch.IDS[0]))
+    for i in 3:docs[i+1]=jab
+    # Idle starts at once, not after a hidden warm-up.
+    walker.transition_age=walker.STOP_TICKS+3
 
-func press(key:int)->bool:
-    if key<1 or key>3:return false
+func press(key:int=1)->bool:
+    if key!=1:return false
     if active==0:
-        begin(key,1)
+        queued=0
+        begin(1,1)
         return true
-    # One buffered follow-up only. An out-of-order/early/late input
-    # cannot cause another attack, and holding is handled by the UI.
-    var d:Dictionary=docs[active]
-    var duration:int=roundi(float(d.duration)*60.)
-    var contact:int=ceili(float(d.events[0].t)*60.)
-    if active<3 and key==active+1 and queued==0 and age>=maxi(1,contact-3) and age<duration:
-        queued=key
-        queued_tick=ticks
+    # Each fresh press buys exactly one future strike. Fast 1,1,1
+    # is valid; no repeated/held input or extra stage can overflow.
+    if active+queued<MAX_CHAIN:
+        queued+=1
         return true
     return false
 
 func begin(key:int,count:int)->void:
     active=key
     age=0
-    queued=0
     fired=false
     chain=count
     starts.append(key)
@@ -59,7 +57,7 @@ func begin(key:int,count:int)->void:
     feet=Motion.toes(walker.rig,walker.pose)
     walker.direction=0
     previous_tip=tip(str(docs[key].events[0].anchor))
-    result="Удар "+str(key)
+    result="Джеб "+str(key)
 
 func tip(anchor:String)->Vector2:
     var wrist:Vector2=walker.rig.point(anchor)
@@ -106,14 +104,13 @@ func step(move:int)->void:
             misses+=1
             result="Промах "+str(active)
     previous_tip=current
-    # Chain at 80% of recovery, or finish a single attack normally.
-    var link:int=maxi(ceili(float(d.events[0].t)*60.)+1,ceili(duration*.8))
-    if queued!=0 and age>=link and fired:
-        var next:int=queued
-        if ticks-queued_tick<=BUFFER_TICKS:
-            begin(next,chain+1)
-            return
-        queued=0
+    # Preserve the source strike and its retraction. The next accepted
+    # press cancels only the final guard recovery, not the contact.
+    var link:int=maxi(window_end+1,ceili(duration*.78))
+    if queued>0 and active<MAX_CHAIN and age>=link and fired:
+        queued-=1
+        begin(active+1,chain+1)
+        return
     if age>=duration:
         last_chain=chain
         active=0

@@ -22,8 +22,8 @@ var last_ok:bool=false
 
 func _ready()->void:
     label("БОЕВОЙ СТЕНД / ТРЕНИРОВКА",Vector2(24,15),23)
-    label("A / ← назад   D / → вперёд   1 джеб   2 прямой   3 боковой   R сброс",Vector2(24,56),15)
-    label("Один удар за нажатие. Введи 1 → 2 → 3 в ритме ударов.",Vector2(24,83),13)
+    label("A / ← назад   D / → вперёд   1 — джеб   R — сброс",Vector2(24,56),15)
+    label("Нажми 1 до трёх раз: 1 → 1 → 1. Удержание не повторяет.",Vector2(24,83),13)
     var back:=Button.new()
     back.text="Меню / Esc"
     back.position=Vector2(812,15)
@@ -38,7 +38,7 @@ func _ready()->void:
     add_child(sprite)
     state_label=label("",Vector2(24,454),18)
     status=label("",Vector2(24,486),13)
-    label("M: три удара редактируются отдельно. Сохрани и снова открой T.",Vector2(24,514),12)
+    label("M: «Джеб · серия ×3» и «Idle · дыхание». Сохрани и снова открой T.",Vector2(24,514),12)
     if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
     reset()
 
@@ -70,7 +70,7 @@ func advance()->void:
 
 func render_frame()->void:
     state_label.text="Действие: "+("Остановка" if walker.direction==0 and walker.activity>0. else ("Idle" if walker.action_name()=="walk_breathe" else ["Ходьба назад","Стойка","Ходьба вперёд"][walker.direction+1]))
-    if training.active!=0:state_label.text="Удар %d  ·  комбо %d  ·  %s"%[training.active,training.chain,"Следующий: "+str(training.queued) if training.queued else ""]
+    if training.active!=0:state_label.text="Удар %d  ·  комбо %d  ·  %s"%[training.active,training.chain,"В буфере: "+str(training.queued) if training.queued else ""]
     status.text="Попадания: %d   Промахи: %d   Последнее комбо: %d   ·   %s"%[training.hits,training.misses,training.last_chain,training.result]
     queue_redraw()
     last_ok=false
@@ -107,8 +107,8 @@ func _input(event:InputEvent)->void:
     if key in [KEY_A,KEY_D,KEY_LEFT,KEY_RIGHT]:
         held[key]=event.pressed
         get_viewport().set_input_as_handled()
-    elif key in [KEY_1,KEY_2,KEY_3]:
-        if event.pressed and not event.echo and not attack_held.get(key,false):training.press(key-KEY_1+1)
+    elif key==KEY_1:
+        if event.pressed and not event.echo and not attack_held.get(key,false):training.press(1)
         attack_held[key]=event.pressed
         get_viewport().set_input_as_handled()
     elif event.pressed and not event.echo:
