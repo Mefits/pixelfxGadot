@@ -1,7 +1,7 @@
-name: Astra Box2D live authority handoff
+name: Astra Box2D active attacker
 on:
   push:
-    branches: [experiment/astra-box2d-handoff]
+    branches: [experiment/astra-box2d-active-attacker]
   workflow_dispatch:
 permissions:
   contents: read
@@ -70,6 +70,9 @@ jobs:
               reports.append(json.loads((p/"report.json").read_text()))
               traces.append(json.loads((p/"trace.json").read_text()))
           assert traces[0]==traces[1], "fresh process divergence"
+          p=pathlib.Path("results","handoff-baseline").resolve()
+          p.mkdir(parents=True,exist_ok=True)
+          subprocess.run(base+["--",str(p),"baseline"],check=True,timeout=180)
       - name: Actual native preview
         if: runner.os == 'Linux' && always()
         shell: bash

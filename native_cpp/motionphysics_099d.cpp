@@ -42,6 +42,7 @@ protected:
         ClassDB::bind_method(D_METHOD("initialize_segment","body","position","angle","velocity","angular_velocity"),&MotionPhysics099D::initialize_segment);
         ClassDB::bind_method(D_METHOD("drive_segment","body","position","angle"),&MotionPhysics099D::drive_segment);
         ClassDB::bind_method(D_METHOD("set_joint_offset","body","offset"),&MotionPhysics099D::set_joint_offset);
+        ClassDB::bind_method(D_METHOD("drive_dynamic","body","velocity","angular_velocity","acceleration","angular_acceleration"),&MotionPhysics099D::drive_dynamic);
         ClassDB::bind_method(D_METHOD("fighter_contacts"),&MotionPhysics099D::fighter_contacts);
         ClassDB::bind_method(D_METHOD("state"),&MotionPhysics099D::state);
         ClassDB::bind_method(D_METHOD("step","weights"),&MotionPhysics099D::step);
@@ -135,6 +136,22 @@ public:
             frame.p={x,y};
             b2Joint_SetLocalFrameA(joints[i],frame);
         }
+        return true;
+    }
+    // Bounded active drive: finite masses, no position/velocity overwrite.
+    // Inputs are desired velocity in art units/s and desired rad/s.
+    bool drive_dynamic(int i,Vector2 desired,double desired_w,Vector2 accel,double angular_accel){
+        if(!live()||i<0||i>=int(ids.size())||!desired.is_finite()||!accel.is_finite()||
+            !std::isfinite(desired_w)||!std::isfinite(angular_accel)||accel.x<0||accel.y<0||
+            accel.x>1500||accel.y>1500||angular_accel<0||angular_accel>1500||
+            b2Body_GetType(ids[i])!=b2_dynamicBody)return false;
+        const auto& b=specs[i%specs.size()];
+        auto v=b2Body_GetLinearVelocity(ids[i]);
+        float dx=std::clamp(float(desired.x)-v.x/S,-float(accel.x)*H,float(accel.x)*H);
+        float dy=std::clamp(float(desired.y)-v.y/S,-float(accel.y)*H,float(accel.y)*H);
+        b2Body_ApplyLinearImpulseToCenter(ids[i],{dx*b.m*S,dy*b.m*S},true);
+        float dw=std::clamp(float(desired_w)-b2Body_GetAngularVelocity(ids[i]),-float(angular_accel)*H,float(angular_accel)*H);
+        b2Body_ApplyAngularImpulse(ids[i],dw*b.I*S*S,true);
         return true;
     }
     // Report only cross-fighter contact impulses, once per contact (query fighter 0).

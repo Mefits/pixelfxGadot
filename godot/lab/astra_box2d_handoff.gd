@@ -21,6 +21,7 @@ var contacts:Array=[]
 var release_error:float=0.
 var track_error:float=0.
 var pair:bool=false
+var active_attacker:bool=true
 var floor_y:float=0.
 
 func lower(id:String)->bool:
@@ -58,8 +59,9 @@ func sync_projection(c:int,native:bool)->bool:
 func velocity(a:Array,b:Array)->Array:
     return [(b[0]-a[0])/DT,(b[1]-a[1])/DT,wrapf(float(b[2])-float(a[2]),-PI,PI)/DT]
 
-func setup(two:bool=true)->bool:
+func setup(two:bool=true,active:bool=true)->bool:
     pair=two
+    active_attacker=active
     players.clear()
     models.clear()
     rows.clear()
@@ -164,6 +166,30 @@ func release_attacker()->bool:
     attacker_release_tick=tick
     return true
 
+# Track authored local shape about actual physical root, not a world-space
+# position that keeps accumulating behind an obstacle. The vertical controller
+# is an explicit balance assist, not a claim of realistic muscle actuation.
+func assist_attacker(previous:Array)->bool:
+    var state:Array=world.state()
+    var root:int=int(models[0].ids.hips)
+    var root_ref:Array=rows[0][root]
+    var root_state:Array=state[root]
+    var x_shift:float=float(root_state[0])-float(root_ref[0])
+    var gain:float=22.
+    for i in n:
+        var r:Array=rows[0][i]
+        var s:Array=state[i]
+        var v:Array=velocity(previous[i],r)
+        var pos_error:=Vector2(float(r[0])+x_shift-float(s[0]),float(r[1])-float(s[1]))
+        var wanted:=Vector2(v[0],v[1])+pos_error*gain
+        # 180 art units/s^2 gravity compensation expressed as target delta-v.
+        wanted.y-=180.*DT
+        wanted=wanted.limit_length(260.)
+        var angle_error:float=wrapf(float(r[2])-float(s[2]),-PI,PI)
+        var wanted_w:float=clampf(float(v[2])+18.*angle_error,-35.,35.)
+        if not world.drive_dynamic(i,wanted,wanted_w,Vector2(420.,900.),900.):return false
+    return true
+
 func step(commands:Array,force_release:bool=false)->bool:
     if pair and attacker_release_tick<0 and cross_gap()<2.5:
         if not release_attacker():return false
@@ -174,10 +200,13 @@ func step(commands:Array,force_release:bool=false)->bool:
     weights.resize(n*offsets.size())
     targets.resize(weights.size())
     for c in offsets.size():
-        if (pair and c==0 and attacker_release_tick<0) or ((not pair or c==1) and release_tick<0):
+        var previous:Array=rows[c]
+        if (pair and c==0 and (attacker_release_tick<0 or active_attacker)) or ((not pair or c==1) and release_tick<0):
             players[c].step(commands[c])
             rows[c]=sample(c)
             if not sync_projection(c,true):return false
+        if pair and c==0 and active_attacker and attacker_release_tick>=0:
+            if not assist_attacker(previous):return false
         for i in n:
             var idx:int=c*n+i
             var r:Array=rows[c][i]
@@ -188,7 +217,9 @@ func step(commands:Array,force_release:bool=false)->bool:
             var target:float=0. if parent<0 else wrapf(float(r[2])-float(rows[c][parent][2]),-PI,PI)
             if not driven(c,i):
                 var released_at:int=attacker_release_tick if pair and c==0 else release_tick
-                if released_at<0:
+                if pair and c==0 and active_attacker:
+                    weights[idx]=.85
+                elif released_at<0:
                     weights[idx]=.85
                 else:
                     # Release authority progressively; retain bounded residual muscle tone.
@@ -233,9 +264,10 @@ func snapshot()->Dictionary:
         var values:Array=[m.template.angles.shoulder_turn,m.template.angles.pelvis_turn]
         for id in GIRDLE:values.append(m.bodies[m.ids[id]].offset)
         projection.append(values)
-    return {"projection":projection,"world":world.snapshot(),"hash":world.state_hash(),"players":states,"rows":rows.duplicate(true),"tick":tick,"release":release_tick,"attacker_release":attacker_release_tick,"attacker_release_error":attacker_release_error,"contact":contact_tick,"impulse":contact_impulse,"contacts":contacts.duplicate(true),"release_error":release_error,"track_error":track_error}
+    return {"active_attacker":active_attacker,"projection":projection,"world":world.snapshot(),"hash":world.state_hash(),"players":states,"rows":rows.duplicate(true),"tick":tick,"release":release_tick,"attacker_release":attacker_release_tick,"attacker_release_error":attacker_release_error,"contact":contact_tick,"impulse":contact_impulse,"contacts":contacts.duplicate(true),"release_error":release_error,"track_error":track_error}
 
 func restore(s:Dictionary)->bool:
+    if bool(s.get("active_attacker",false))!=active_attacker:return false
     if not world.restore(s.world):return false
     for c in players.size():players[c].restore(s.players[c])
     rows=s.rows.duplicate(true)

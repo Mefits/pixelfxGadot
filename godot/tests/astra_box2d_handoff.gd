@@ -11,7 +11,10 @@ func commands(b)->Array:
     var c:Array=[]
     for i in b.players.size():
         var cmd:Dictionary={"speed":1.85 if i==0 and b.release_tick<0 else (0. if i==0 else 1.)}
-        if b.pair and i==0 and b.tick==38:cmd.action="jab"
+        if b.pair and i==0:
+            if b.active_attacker and b.release_tick>=0:
+                cmd.speed=1.35 if b.tick>=190 and b.tick<240 else 0.
+            if b.tick==38 or (b.active_attacker and b.tick==130):cmd.action="jab"
         c.append(cmd)
     return c
 func replay(b,count:int)->void:
@@ -46,7 +49,8 @@ func run()->void:
     replay(solo,12)
     for t in 96:check(solo.step(commands(solo)),"solo dynamic")
     var b=Bridge.new()
-    if not b.setup(true):
+    var baseline:bool=args.has("baseline")
+    if not b.setup(true,not baseline):
         push_error("pair setup")
         quit(1)
         return
@@ -79,6 +83,17 @@ func run()->void:
     var peak_floor:float=0.
     var peak_limit:float=0.
     var worst_anchor_tick:int=-1
+    var attacker_peak_anchor:float=0.
+    var attacker_peak_tilt:float=0.
+    var attacker_post_tilt:float=0.
+    var attacker_post_height_error:float=0.
+    var attacker_floor:float=0.
+    var attacker_limit:float=0.
+    var followup_seen:bool=false
+    var post_x:Dictionary={}
+    var followup_hand_range:float=0.
+    var followup_hand_start:=Vector2.ZERO
+    var followup_hand_target_error:float=0.
     for t in 360:
         if t in [12,80,180]:replay(b,12)
         var start:int=Time.get_ticks_usec()
@@ -88,10 +103,33 @@ func run()->void:
         times.append(Time.get_ticks_usec()-start)
         var poses:Array=b.poses()
         var parts:Array=[]
+        var physical_state:Array=b.world.state()
+        if b.pair and not baseline:
+            var h:int=b.models[0].ids.hips
+            var root_row:Array=physical_state[h]
+            if t in [110,180,190,245,300,359]:post_x[str(t)]=root_row[0]
+            if b.contact_tick>=0:
+                attacker_peak_tilt=maxf(attacker_peak_tilt,absf(rad_to_deg(wrapf(float(root_row[2]),-PI,PI))))
+            if t>=100:
+                attacker_post_tilt=maxf(attacker_post_tilt,absf(rad_to_deg(wrapf(float(root_row[2]),-PI,PI))))
+                attacker_post_height_error=maxf(attacker_post_height_error,absf(float(root_row[1])-float(b.rows[0][h][1])))
+            var hand:int=b.models[0].ids.hand_near
+            var hp:=Vector2(physical_state[hand][0]-root_row[0],physical_state[hand][1]-root_row[1])
+            if t==129:followup_hand_start=hp
+            if t>=130 and t<185:
+                followup_seen=followup_seen or b.players[0].action=="jab"
+                followup_hand_range=maxf(followup_hand_range,hp.distance_to(followup_hand_start))
+                var q:Array=b.rows[0][hand]
+                var hr:Array=b.rows[0][h]
+                followup_hand_target_error=maxf(followup_hand_target_error,hp.distance_to(Vector2(q[0]-hr[0],q[1]-hr[1])))
         for c in 2:
             var m=b.models[c]
             var p:Dictionary=poses[c]
             var metrics:Dictionary=Common.validate(m)
+            if c==0 and not baseline:
+                attacker_peak_anchor=maxf(attacker_peak_anchor,metrics.anchor)
+                attacker_floor=maxf(attacker_floor,metrics.penetration)
+                attacker_limit=maxf(attacker_limit,metrics.angle_error_deg)
             if c==1:
                 if b.contact_tick<0:peak_precontact_anchor=maxf(peak_precontact_anchor,metrics.anchor)
                 if metrics.anchor>peak_anchor:
@@ -103,7 +141,7 @@ func run()->void:
                 var mesh:Array=body.make(m.rig.points,p.angles,m.rig.rotations.head)
                 for i in mesh.size():mesh[i].material_id=(1 if c==0 else 3) if i in [0,2,3,8,9] else (2 if i in [5,6,7,11,12,13,15,17] else 0)
                 parts.append_array(mesh)
-        records.append({"tick":t,"state":b.world.state(),"contact":b.contacts,"release":b.release_tick,"attacker_release":b.attacker_release_tick})
+        records.append({"tick":t,"state":b.world.state(),"contact":b.contacts,"release":b.release_tick,"attacker_release":b.attacker_release_tick,"attacker_action":b.players[0].action,"attacker_clock":b.players[0].tick})
         if capture and t%2==1:
             var result:Dictionary=raster.render(cfg,parts)
             if not result.get("ok",false):
@@ -115,7 +153,7 @@ func run()->void:
                 failures.append("capture bounds "+str(t)+" "+str(bounds))
             if sp.texture==null:sp.texture=ImageTexture.create_from_image(im)
             else:sp.texture.update(im)
-            label.text="ASTRA -> BOX2D | 120 Hz | tick %03d | contact %d | release %d | impulse %.1f"%[t,b.contact_tick,b.release_tick,b.contact_impulse]
+            label.text=("%s | tick %03d | contact %d | action %s | impulse %.1f"%["PASSIVE CONTROL" if baseline else "ACTIVE ASTRA",t,b.contact_tick,b.players[0].action,b.contact_impulse])
             await process_frame
             await RenderingServer.frame_post_draw
             if root.get_texture().get_image().save_png(out.path_join("frame-%03d.png"%((t-1)/2)))!=OK:
@@ -131,8 +169,20 @@ func run()->void:
     check(peak_anchor<3.,"pair anchor residual "+str(peak_anchor))
     check(peak_floor<3.,"pair floor residual "+str(peak_floor))
     check(peak_limit<30.,"pair angle residual "+str(peak_limit))
+    if not baseline:
+        check(b.players[0].tick==361,"attacker command clock stopped")
+        check(followup_seen,"followup action not accepted")
+        check(followup_hand_range>4.,"no followup physical hand movement")
+        check(followup_hand_target_error<10.,"followup physical hand target error "+str(followup_hand_target_error))
+        check(attacker_post_tilt<35.,"attacker balance "+str(attacker_post_tilt))
+        check(attacker_post_height_error<6.,"attacker height "+str(attacker_post_height_error))
+        check(attacker_peak_anchor<3.,"attacker anchor "+str(attacker_peak_anchor))
+        check(attacker_floor<3.,"attacker floor "+str(attacker_floor))
+        check(attacker_limit<30.,"attacker angle "+str(attacker_limit))
+        check(float(post_x.get("245",0))-float(post_x.get("190",0))>10.,"attacker failed to resume locomotion")
+        check(absf(float(post_x.get("359",0))-float(post_x.get("300",0)))<5.,"attacker failed to stop")
     times.sort()
-    var report:Dictionary={"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"attacker_release_tick":b.attacker_release_tick,"attacker_release_error":b.attacker_release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"peak_precontact_anchor":peak_precontact_anchor,"worst_anchor_tick":worst_anchor_tick,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
+    var report:Dictionary={"active":not baseline,"attacker_clock":b.players[0].tick,"attacker_peak_tilt":attacker_peak_tilt,"attacker_post_tilt":attacker_post_tilt,"attacker_height_error":attacker_post_height_error,"attacker_anchor":attacker_peak_anchor,"attacker_floor":attacker_floor,"attacker_limit":attacker_limit,"followup_seen":followup_seen,"followup_hand_range":followup_hand_range,"followup_hand_target_error":followup_hand_target_error,"attacker_x":post_x,"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"attacker_release_tick":b.attacker_release_tick,"attacker_release_error":b.attacker_release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"peak_precontact_anchor":peak_precontact_anchor,"worst_anchor_tick":worst_anchor_tick,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
     var f:=FileAccess.open(out.path_join("report.json"),FileAccess.WRITE)
     f.store_string(JSON.stringify(report))
     f.close()
