@@ -8,7 +8,7 @@ const SECTIONS=[
         ["T","Боевой стенд","Ходьба, серия джебов одной кнопкой и груша.","walk_studio"],
         ["P","Box2D","Изолированный стенд импульсов и падений.","motionphysics_studio"],
         ["Y","Настройки эффектов","Слои, кривые, параметры и пресеты VFX.","vfx_workshop"],
-        ["S","Motion Stylization v0.02","Сравнение трейлов и деформации тела.","motion_stylization/studio"]
+        ["S","Motion Stylization v0.03","Сравнение трейлов и деформации тела.","motion_stylization/studio"]
     ]},
     {"label":"В РАЗРАБОТКЕ / ДИАГНОСТИКА","color":"#b2bac6","items":[
         ["H","Диагностика Astra / ткань","Дополнительный стенд ядра, ткани и реакций.","hybrid_studio"],
