@@ -318,6 +318,25 @@ func run():
         for file in imported_dir.get_files():
             if file.get_basename().begins_with("u_"):
                 DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.Asset.FOLDER.path_join(file)))
-    DirAccess.remove_absolute(editor.Asset.FOLDER+id+".json")
+    editor.open_motion(id)
+    if editor.delete_motion_button.disabled or not editor.can_delete_motion(id):
+        push_error("user deletion eligibility")
+        quit(1)
+        return
+    editor.ask_delete_motion()
+    if not editor.delete_motion_dialog.visible:
+        push_error("delete confirmation")
+        quit(1)
+        return
+    editor.delete_motion_dialog.hide()
+    if not editor.delete_user_motion(id) or editor.ids.has(id) or FileAccess.file_exists(editor.Asset.FOLDER+id+".json"):
+        push_error("user motion deletion")
+        quit(1)
+        return
+    editor.open_motion("jab")
+    if not editor.delete_motion_button.disabled or editor.delete_user_motion("jab"):
+        push_error("built-in motion protection")
+        quit(1)
+        return
     print("MOTION_WORKSPACE_UI_OK")
     quit()

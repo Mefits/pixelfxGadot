@@ -11,7 +11,7 @@ func run()->void:
     var menu=load("res://lab/main.tscn").instantiate()
     root.add_child(menu)
     await process_frame
-    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 Motion Workspace" or menu.routes.size()!=10 or menu.routes.get("T")!="res://lab/combat_astra.tscn" or menu.routes.get("P")!="res://lab/motionphysics_studio.tscn" or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
+    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 Motion Workspace" or menu.routes.size()!=10 or menu.routes.get("T")!="res://lab/walk_studio.tscn" or menu.routes.get("P")!="res://lab/motionphysics_studio.tscn" or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
         fail("launcher routing")
         return
     if menu.SECTIONS[0].items.map(func(x):return x[0])!=["M","T","P","Y"] or menu.SECTIONS[1].items.map(func(x):return x[0])!=["H","J","U","I","A","L"]:
@@ -78,6 +78,42 @@ func run()->void:
         return
     root.remove_child(scene)
     scene.queue_free()
+    var walk=load("res://lab/walk_studio.tscn").instantiate()
+    walk.manual=true
+    root.add_child(walk)
+    if not walk.last_ok:
+        fail("walk native render")
+        return
+    var key:=InputEventKey.new()
+    key.physical_keycode=KEY_D
+    key.pressed=true
+    root.push_input(key)
+    for t in 24:walk.advance()
+    if walk.walker.x<=0. or walk.walker.action_name()!="walk_forward" or walk.sprite.flip_h:
+        fail("forward input")
+        return
+    key.pressed=false
+    root.push_input(key)
+    walk.advance()
+    var stopped_x:float=walk.walker.x
+    for t in 10:walk.advance()
+    if walk.walker.x!=stopped_x or walk.walker.activity!=0.:
+        fail("stop input")
+        return
+    key.physical_keycode=KEY_A
+    key.pressed=true
+    root.push_input(key)
+    for t in 30:walk.advance()
+    if walk.walker.x>=0. or walk.walker.action_name()!="walk_backward" or walk.sprite.flip_h:
+        fail("backward input or facing")
+        return
+    if args.size()==1:
+        await process_frame
+        await RenderingServer.frame_post_draw
+        root.get_texture().get_image().save_png(args[0].path_join("walk-control.png"))
+    root.remove_child(walk)
+    walk.queue_free()
+    # Old two-dummy diagnostic retained for regression only, not in menu T.
     var fight=load("res://lab/combat_astra.tscn").instantiate()
     fight.manual=true
     root.add_child(fight)

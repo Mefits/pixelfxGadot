@@ -1,0 +1,161 @@
+name: Lab walk control and portable package
+on:
+  push:
+    branches: [feature/lab-walk-control]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install exact engine (no native compilation)
+        shell: bash
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=$PWD/engine/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Check editor scripts and pure Astra execution before building native libraries
+        run: python tools/lab_motion_preflight.py
+  verify:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-${{ runner.os }}
+      - run: pip install scons numpy scipy pillow
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install exact upstream PixelFX and assets
+        run: |
+          npm install --no-package-lock
+          npm run bootstrap
+          npm run build:original
+      - name: Build PixelFX renderer with original JS runtime
+        run: python native_cpp/build.py --original
+      - name: Build pinned Box2D
+        run: python native_cpp/build_motionphysics.py
+      - name: Install Godot 4.4.1
+        shell: python
+        run: |
+          import os, pathlib, urllib.request, zipfile
+          windows = os.name == "nt"
+          name = "Godot_v4.4.1-stable_" + ("win64.exe" if windows else "linux.x86_64")
+          urllib.request.urlretrieve("https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/" + name + ".zip", "engine.zip")
+          with zipfile.ZipFile("engine.zip") as z:
+              z.extractall("engine")
+          exe = next(p for p in pathlib.Path("engine").rglob("*") if p.name == name)
+          exe.chmod(0o755)
+          if windows:
+              exe = exe.with_name(exe.stem + "_console.exe")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              print("GODOT=" + str(exe.resolve()), file=f)
+      - name: Register native modules
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("godot/.godot")
+          p.mkdir(exist_ok=True)
+          (p/"extension_list.cfg").write_text("res://addons/pixelfx/pixelfx.gdextension\nres://addons/motionphysics/motionphysics_099d.gdextension\n")
+      - name: Parse editor dependencies with exact Godot version
+        shell: python
+        run: |
+          import os,subprocess
+          p=subprocess.run([os.environ["GODOT"],"--headless","--path","godot","--script","res://tests/editor_parse.gd"],capture_output=True,text=True,timeout=60)
+          print(p.stdout+p.stderr)
+          assert p.returncode==0 and "SCRIPT ERROR" not in p.stderr+p.stdout and "ERROR:" not in p.stderr+p.stdout
+      - name: Native and Lab regression
+        run: python tools/lab_box2d_ci.py
+      - name: Verify original runtime and package contents
+        run: python tools/lab_rc2_smoke.py
+      - name: Windows portable package
+        if: runner.os == 'Windows'
+        run: python tools/package_lab_rc2.py
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && success()
+        with:
+          name: Lab-Walk-Control-Windows-portable
+          path: dist/Lab-1.0-RC2/
+          if-no-files-found: error
+      - name: Linux native GIF and UI capture
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/lab_integration_100.gd -- "$PWD/results" 2>&1 | tee results/rc2-menu.log
+          test -s results/menu.png
+          python tools/motionphysics_099d.py --godot "$GODOT" --out results/capture
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/motionphysics_studio.gd -- "$PWD/results" 2>&1 | tee results/studio.log
+          test -s results/box2d-studio.png
+          ! grep -E 'SCRIPT ERROR|ERROR:' results/studio.log
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/workshop_ui.gd -- "$PWD/results" 2>&1 | tee results/workshop.log
+          test -s results/workshop.png
+          test -s results/workshop-action.png
+          grep MOTION_WORKSPACE_UI_OK results/workshop.log
+          ! grep -E 'SCRIPT ERROR|ERROR:' results/workshop.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lab-box2d-${{ matrix.os }}
+          path: |
+            results/*.json
+            results/*.txt
+            results/*.png
+            results/*.log
+            results/capture/*.gif
+            results/capture/*.json
+            results/capture/*.log
+            results/capture/review.png
+            godot/addons/motionphysics/BOX2D_LICENSE.txt
+            godot/addons/motionphysics/bin/
+  compare:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: lab-box2d-*
+      - name: Compare traces (Astra exact gate; Box2D diagnostic)
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          a=json.loads(next(Path("lab-box2d-ubuntu-latest").rglob("trace-digests.json")).read_text())
+          b=json.loads(next(Path("lab-box2d-windows-latest").rglob("trace-digests.json")).read_text())
+          print("ASTRA_CROSS_PLATFORM_EXACT",a["astra"]==b["astra"])
+          print("BOX2D_CROSS_PLATFORM_EXACT",a["box2d"]==b["box2d"])
+          assert a["astra"]==b["astra"], "Astra cross-platform regression"
+
+  verify_download:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Lab-Motion-Workspace-Windows-portable
+          path: "Fresh Lab Download"
+      - name: Verify actual downloaded archive from clean cache
+        shell: pwsh
+        run: |
+          Set-Location "Fresh Lab Download"
+          if (Test-Path "godot/.godot") { Remove-Item -Recurse -Force "godot/.godot" }
+          cmd.exe /d /c START_LAB.bat --check
+          if ($LASTEXITCODE -ne 0) { Get-Content LAB_STARTUP.log; exit 1 }
+          if (!(Test-Path "godot/.godot/lab_bootstrap_ok")) { exit 1 }
+          Write-Output "DOWNLOADED_LAB_COLD_LAUNCH_OK"

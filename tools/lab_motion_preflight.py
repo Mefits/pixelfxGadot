@@ -4,6 +4,7 @@ import subprocess
 
 base = [os.environ["GODOT"], "--headless", "--path", "godot", "--audio-driver", "Dummy", "--script"]
 for script, args, marker in [
+    ("tests/walk_control.gd", [], "WALK_CONTROL_OK"),
     ("tests/editor_parse.gd", [], "EDITOR_RESOURCE_PARSE res://lab/authoring/editor.gd true"),
     ("tests/motion_authoring.gd", ["60"], "TRACE "),
     ("tests/motion_authoring.gd", ["120"], "TRACE "),

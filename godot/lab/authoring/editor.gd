@@ -25,6 +25,9 @@ var timeline
 var status:Label
 var info:Label
 var motion:ItemList
+var delete_motion_button:Button
+var delete_motion_dialog:ConfirmationDialog
+var delete_motion_id:String=""
 var target_list:ItemList
 var channel_tree:Tree
 var channel_mode:OptionButton
@@ -152,6 +155,14 @@ func _ready():
     button(top,"Меню",request_exit,"Esc")
 
     caption(self,"ДВИЖЕНИЯ",Vector2(16,55),12)
+    delete_motion_button=button(self,"Удалить",ask_delete_motion,"Удалить пользовательское движение")
+    delete_motion_button.position=Vector2(101,50)
+    delete_motion_button.size=Vector2(75,24)
+    delete_motion_dialog=ConfirmationDialog.new()
+    delete_motion_dialog.title="Удаление движения"
+    delete_motion_dialog.ok_button_text="Удалить"
+    delete_motion_dialog.confirmed.connect(func():delete_user_motion(delete_motion_id))
+    add_child(delete_motion_dialog)
     motion=ItemList.new()
     motion.position=Vector2(14,76)
     motion.size=Vector2(162,97)
@@ -1067,6 +1078,7 @@ func open_motion(id:String):
     if d.kind=="gait":pose_tool.select(0)
     saved_signature=JSON.stringify(document)
     motion.select(ids.find(id))
+    delete_motion_button.disabled=not can_delete_motion(id)
     selected=-1
     history.clear()
     redo_history.clear()
@@ -1689,6 +1701,31 @@ func save_file():
     if err==OK:saved_signature=JSON.stringify(document)
     info.text="Сохранено: "+document.id+".json" if err==OK else error_string(err)
     show_pose()
+
+func can_delete_motion(id:String)->bool:
+    return id.is_valid_identifier() and not Asset.IDS.has(id) and ids.has(id) and FileAccess.file_exists(Asset.FOLDER+id+".json")
+
+func ask_delete_motion()->void:
+    if not can_delete_motion(str(document.id)):return
+    playing=false
+    delete_motion_id=document.id
+    delete_motion_dialog.dialog_text="Удалить «"+str(document.name)+"» и все несохранённые изменения этого движения? Встроенные анимации не затрагиваются."
+    delete_motion_dialog.popup_centered(Vector2i(420,150))
+
+func delete_user_motion(id:String)->bool:
+    if not can_delete_motion(id) or document.id!=id:return false
+    var index:int=ids.find(id)
+    var err:=DirAccess.remove_absolute(ProjectSettings.globalize_path(Asset.FOLDER+id+".json"))
+    if err!=OK:
+        info.text="Не удалось удалить: "+error_string(err)
+        return false
+    playing=false
+    ids.remove_at(index)
+    motion.remove_item(index)
+    delete_motion_id=""
+    open_motion(ids[clampi(index-1,0,ids.size()-1)])
+    info.text="Пользовательское движение удалено."
+    return true
 
 func duplicate_motion():
     var d:=document.duplicate(true)
