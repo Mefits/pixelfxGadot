@@ -148,7 +148,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: Lab-Motion-Workspace-Windows-portable
+          name: Lab-Walk-Control-Windows-portable
           path: "Fresh Lab Download"
       - name: Verify actual downloaded archive from clean cache
         shell: pwsh
