@@ -1,0 +1,49 @@
+name: Idle and timeline lightweight update verification
+on:
+  push:
+    branches: [audit/idle-authoring-patch]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  patch:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Lab-Walk-Control-Windows-portable
+          path: previous
+          run-id: 45991828068
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build cumulative source-only update
+        shell: python
+        run: |
+          from pathlib import Path
+          import shutil,zipfile
+          paths=["godot/lab/authoring/asset.gd","godot/lab/authoring/dopesheet.gd","godot/lab/authoring/editor.gd","godot/lab/walk_control.gd","godot/lab/walk_motion.gd","godot/lab/walk_preview.gd","godot/lab/walk_studio.gd","godot/tests/lab_integration_100.gd","godot/tests/walk_control.gd","godot/tests/workshop_ui.gd"]
+          with zipfile.ZipFile("Lab-idle-update.zip","w",zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+              for file in paths:
+                  z.write(file,file)
+                  dest=Path("previous")/file
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(file,dest)
+              z.writestr("README-IDLE.txt","Close Godot. Extract into the Lab folder containing godot/project.godot, replacing files. Open Godot 4.4.1 project and F5. User motion documents are not overwritten. M: static stance and independent idle; T uses saved idle. Cumulative patch from c0c774ca798f87c3728c519017749eb5a428c360 to bc7e04cab8f109c8f4c7d843641dfdda3cf0d647.")
+          shutil.copy2("godot/tests/idle_patch_binding.gd","previous/godot/tests/idle_patch_binding.gd")
+          print("PATCH_BYTES",Path("Lab-idle-update.zip").stat().st_size)
+      - name: Cold start and test actual patched project
+        shell: pwsh
+        run: |
+          Set-Location previous
+          if (Test-Path godot/.godot) { Remove-Item -Recurse -Force godot/.godot }
+          cmd.exe /d /c START_LAB.bat --check
+          if ($LASTEXITCODE -ne 0) { Get-Content LAB_STARTUP.log; exit 1 }
+          & .\Godot_console.exe --headless --path godot --audio-driver Dummy --script res://tests/walk_control.gd
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & .\Godot_console.exe --headless --path godot --audio-driver Dummy --script res://tests/idle_patch_binding.gd
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lab-idle-small-update
+          path: Lab-idle-update.zip
