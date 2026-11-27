@@ -63,7 +63,7 @@ static func default_doc(id:String)->Dictionary:
     return d
 
 static func breathing_doc(stance:Dictionary)->Dictionary:
-    # Five sparse, smoothly interpolated poses. The rising motion starts
+    # Five sparse, smoothly interpolated poses. The compression starts
     # at the pelvis; chest and arms peak slightly later. Same foot anchors.
     var start:Dictionary=stance.keys[0]
     var keys:Array=[]
@@ -74,7 +74,7 @@ static func breathing_doc(stance:Dictionary)->Dictionary:
     var arms:Array=[0.,.15,1.,.65,0.]
     for i in phases.size():
         var p:Dictionary={"angles":start.angles.duplicate(true),"root":start.root.duplicate()}
-        p.root[1]-=.8*lift[i]
+        p.root[1]+=.9*lift[i]
         p.angles.hips-=.9*lift[i]
         p.angles.chest-=2.2*chest[i]
         p.angles.head+=1.5*arms[i]

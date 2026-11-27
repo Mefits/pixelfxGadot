@@ -29,7 +29,7 @@ jobs:
                   dest=Path("previous")/file
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   shutil.copy2(file,dest)
-              z.writestr("README-IDLE.txt","Close Godot. Extract into the Lab folder containing godot/project.godot, replacing files. Open Godot 4.4.1 project and F5. User motion documents are not overwritten. M: static stance and independent idle; T uses saved idle. Cumulative patch from c0c774ca798f87c3728c519017749eb5a428c360 to bc7e04cab8f109c8f4c7d843641dfdda3cf0d647.")
+              z.writestr("README-IDLE.txt","Close Godot. Extract into the Lab folder containing godot/project.godot, replacing files. Open Godot 4.4.1 project and F5. User motion documents are not overwritten. M: static stance and independent idle; T uses saved idle. Cumulative patch from c0c774ca798f87c3728c519017749eb5a428c360 to 8a59e12cc8cda504af6a154d93eb159b3c23824b.")
           shutil.copy2("godot/tests/idle_patch_binding.gd","previous/godot/tests/idle_patch_binding.gd")
           print("PATCH_BYTES",Path("Lab-idle-update.zip").stat().st_size)
       - name: Cold start and test actual patched project
