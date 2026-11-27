@@ -540,6 +540,34 @@ func set_zoom(value:float)->void:
     position_sprite()
     queue_redraw()
 
+func import_legacy_file(path:String)->void:
+    var parsed=JSON.parse_string(FileAccess.get_file_as_string(path))
+    if not parsed is Dictionary:
+        info.text="Файл U не является JSON-банком."
+        return
+    var imported:Array=[]
+    if Asset.legacy_clip_valid(parsed):
+        var base_id:String="u_"+path.get_file().get_basename().to_snake_case()
+        imported.append(Asset.legacy_clip_to_action(parsed,base_id,path.get_file().get_basename(),30))
+    else:imported=Asset.import_legacy_bank(parsed,"u",30)
+    var count:int=0
+    for source in imported:
+        var d:Dictionary=source.duplicate(true)
+        var stem:String=d.id
+        var suffix:int=1
+        while ids.has(d.id) or FileAccess.file_exists(Asset.FOLDER+d.id+".json"):
+            d.id=stem+"_"+str(suffix)
+            suffix+=1
+        if Asset.persist(d)!=OK:continue
+        ids.append(d.id)
+        motion.add_item(d.name)
+        count+=1
+    if count>0:
+        info.text="Импортировано клипов U: %d. Исходный банк не изменён."%count
+        motion.select(ids.size()-1)
+        open_motion(ids[-1])
+    else:info.text="В файле не найдено поддерживаемых клипов U."
+
 func request_exit()->void:
     if JSON.stringify(document)!=saved_signature:
         requested_id=""
@@ -568,7 +596,7 @@ func update_play_button()->void:
 func key_at_frame()->int:
     if document.kind!="action":return -1
     var index:int=-1
-    var best:float=.50001
+    var best:float=30./float(document.get("fps",60))+.0001
     for i in document.keys.size():
         var d:float=absf(document.keys[i].t*60.-(frame-START))
         if d<best:
@@ -581,9 +609,13 @@ func sync_key()->void:
     key_apply.disabled=i<0 or key_channels.item_count==0
     key_angle.editable=not key_apply.disabled
     key_info.text="Выбери ромб ключа. Углы редактируют исходную позу, не результат IK." if i<0 else "Ключ %d · кадр %d"%[i+1,frame-START]
+    root_x.editable=i>=0
+    root_y.editable=i>=0
     if not key_apply.disabled:
         var channel:String=key_channels.get_item_metadata(key_channels.selected)
         key_angle.set_value_no_signal(float(document.keys[i].angles[channel]))
+        root_x.set_value_no_signal(float(document.keys[i].get("root",[0.,0.])[0]))
+        root_y.set_value_no_signal(float(document.keys[i].get("root",[0.,0.])[1]))
 
 func load_reference(path:String)->void:
     var file:=FileAccess.open(path,FileAccess.READ)
@@ -751,7 +783,7 @@ func create_action(label:String,duration:float)->void:
     var index:int=1
     while ids.has("action_%d"%index) or FileAccess.file_exists(Asset.FOLDER+"action_%d.json"%index):index+=1
     var id:String="action_%d"%index
-    var d:Dictionary={"version":1,"id":id,"name":label.strip_edges(),"kind":"action","duration":duration,"keys":[{"t":0.,"angles":angles.duplicate(true)},{"t":duration,"angles":angles.duplicate(true)}],"events":[],"goals":[]}
+    var d:Dictionary={"version":2,"id":id,"name":label.strip_edges(),"kind":"action","duration":duration,"fps":60,"easing":"linear","loop":false,"keys":[{"t":0.,"angles":angles.duplicate(true),"root":[0.,0.]},{"t":duration,"angles":angles.duplicate(true),"root":[0.,0.]}],"events":[],"goals":[]}
     var err:=Asset.persist(d)
     if err!=OK:
         info.text=error_string(err)
@@ -836,8 +868,9 @@ func open_motion(id:String):
     if error!="":
         info.text="Загрузка: "+error
         return
-    document=d
+    document=Asset.normalise(d)
     rotate_active=false
+    root_drag_active=false
     if d.kind=="gait":pose_tool.select(0)
     saved_signature=JSON.stringify(d)
     motion.select(ids.find(id))
@@ -849,11 +882,17 @@ func open_motion(id:String):
     info.text="Крест — цель, круг — результат."
 
 func end_frame()->int:
-    return 220 if document.kind=="gait" else START+ceili(document.duration*60.)+22
+    if document.kind=="gait":return 220
+    return START+ceili(document.duration*60.)*(3 if document.get("loop",false) else 1)+22
 
 func command(t:int)->Dictionary:
     if document.kind=="gait":return {"speed":1. if t<24 else (document.speed if t<132 else 0.)}
-    return {"speed":0.,"action":document.id if t==START else ""}
+    return {"speed":preview_speed,"action":document.id if t==START else ""}
+
+func build_preview_player():
+    if document.kind=="gait":return Asset.player(document,60)
+    var gait_doc:Dictionary=Asset.read(Asset.DIR+"sprint.json")
+    return Asset.ensemble(gait_doc,[document],60)
 
 func seek(value:int):
     playing=false
@@ -863,7 +902,7 @@ func seek(value:int):
 func simulate(value:int):
     rotate_active=false
     if not player or value<=frame:
-        player=Asset.player(document,60)
+        player=build_preview_player()
         frame=-1
     while frame<value:
         frame+=1
@@ -893,6 +932,17 @@ func refresh(value:int):
         param.max_value=5.
         param.value=document.duration
     pose_controls.visible=document.kind=="action"
+    var is_action:bool=document.kind=="action"
+    fps_select.visible=is_action
+    easing_select.visible=is_action
+    loop_toggle.visible=is_action
+    preview_speed_select.visible=is_action
+    if is_action:
+        fps_select.select([24,30,60].find(int(document.get("fps",60))))
+        easing_select.select(Asset.EASING.find(str(document.get("easing","linear"))))
+        loop_toggle.set_pressed_no_signal(bool(document.get("loop",false)))
+        timeline.step=60./float(document.get("fps",60))
+    else:timeline.step=1.
     goal_list.clear()
     goal_list.add_item("+ Новая цель")
     for g in document.goals:goal_list.add_item("%s · %.0f%%"%[joint_name(g.joint),g.center*100.])
@@ -913,6 +963,7 @@ func refresh(value:int):
     if document.kind=="action":
         for k in document.keys:timeline.clip.keys.append({"t":START+k.t*60})
         for e in document.events:timeline.clip.events.append({"t":START+e.t*60,"kind":e.kind})
+    sync_events()
     refresh_channel_tree()
     sync_release()
     select_goal(selected)
@@ -957,6 +1008,7 @@ func show_pose():
         status.text+="  |  НЕТ НАТИВНОГО ТЕЛА — нужен полный пакет"
         sprite.hide()
     else:sprite.show()
+    render_vfx()
     var joint:String=Asset.JOINTS[joints.selected]
     if player.goal_report.has(joint):
         var r:Dictionary=player.goal_report[joint]
@@ -1002,7 +1054,8 @@ func move_marker(lane:int,index:int,value:float):
     if document.kind!="action":return
     var entries:Array=document.keys if lane==0 else document.events
     if lane==0 and index in [0,entries.size()-1]:return
-    var t:=clampf((roundf(value)-START)/60.,0.,document.duration)
+    var t:=clampf((value-START)/60.,0.,document.duration)
+    t=clampf(snappedf(t,1./float(document.get("fps",60))),0.,document.duration)
     if lane==0 and (t<=entries[index-1].t or t>=entries[index+1].t):return
     remember()
     entries[index].t=t
@@ -1016,6 +1069,12 @@ func seek_accent():
     while frame<130 and not airborne():simulate(frame+1)
 
 func _unhandled_input(event):
+    if root_drag_active and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed:
+        finish_root_drag()
+        return
+    if root_drag_active and event is InputEventMouseMotion:
+        update_root_drag(event.position,event.shift_pressed)
+        return
     if rotate_active and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed:
         finish_rotation()
         return
@@ -1087,21 +1146,30 @@ func set_pose_tool(mode:int)->void:
         channel_tree.hide()
     show_pose()
 
-func sampled_angles(t:float)->Dictionary:
+func sampled_pose(t:float)->Dictionary:
     var keys:Array=[]
     for k in document.keys:
-        keys.append({"t":k.t,"pose":{"angles":k.angles,"root":[0.,0.]}})
-    return Clips.sample({"duration":document.duration,"loop":false,"easing":"linear","keys":keys},t,false).angles
+        keys.append({"t":k.t,"pose":{"angles":k.angles,"root":k.get("root",[0.,0.])},"easing":k.get("easing",document.get("easing","linear"))})
+    return Clips.sample({"duration":document.duration,"loop":false,"easing":document.get("easing","linear"),"keys":keys},t,false)
+
+func sampled_angles(t:float)->Dictionary:
+    return sampled_pose(t).angles
 
 func sync_edit_pose()->void:
     if document.kind!="action" or pose_tool.selected!=1:
         edit_pose={}
         return
-    edit_pose=player.final_pose.duplicate(true)
     var t:float=clampf(float(frame-START)/60.,0.,float(document.duration))
-    var angles:Dictionary=sampled_angles(t)
-    edit_pose.angles.merge(angles,true)
+    var authored:Dictionary=sampled_pose(t)
+    var base:Dictionary=player.gait.intent().pose
+    edit_pose=base.duplicate(true)
+    edit_pose.angles.merge(authored.angles,true)
+    edit_pose.root[0]+=authored.root[0]
+    edit_pose.root[1]+=authored.root[1]
     if rotate_active:edit_pose.angles[rotate_channel]=clampf(rotate_initial+rotate_delta,-360.,360.)
+    if root_drag_active:
+        edit_pose.root[0]+=root_drag_delta.x
+        edit_pose.root[1]+=root_drag_delta.y
     pose_rig.evaluate(edit_pose)
 
 func sync_pose_hint()->void:
@@ -1149,8 +1217,51 @@ func draw_pose_bones()->void:
             if rotate_active:
                 draw_string(ThemeDB.fallback_font,a+Vector2(20,-9),"%.1f°"%clampf(rotate_initial+rotate_delta,-360.,360.),HORIZONTAL_ALIGNMENT_LEFT,-1,12,c)
 
+func root_handle_position()->Vector2:
+    return ORIGIN+pose_rig.point("hips")*view_zoom
+
+func start_root_drag(mouse:Vector2)->void:
+    if document.kind!="action":return
+    playing=false
+    root_drag_key=key_at_frame()
+    root_drag_time=float(document.keys[root_drag_key].t) if root_drag_key>=0 else clampf(float(frame-START)/60.,0.,float(document.duration))
+    root_drag_initial=sampled_pose(root_drag_time).root
+    root_drag_start=mouse
+    root_drag_delta=Vector2.ZERO
+    root_drag_changed=false
+    root_drag_active=true
+    inspector.current_tab=2
+    show_pose()
+
+func update_root_drag(mouse:Vector2,snap:bool=false)->void:
+    if not root_drag_active:return
+    root_drag_delta=(mouse-root_drag_start)/view_zoom
+    if snap:root_drag_delta=root_drag_delta.snapped(Vector2(.5,.5))
+    root_drag_changed=root_drag_delta.length()>.02
+    show_pose()
+
+func finish_root_drag()->void:
+    if not root_drag_active:return
+    var delta:=root_drag_delta
+    var t:=root_drag_time
+    var existing:=root_drag_key
+    root_drag_active=false
+    if root_drag_changed:
+        remember()
+        var pose_value:Dictionary=sampled_pose(t)
+        var root_value:Vector2=Vector2(pose_value.root)+delta
+        if existing>=0:document.keys[existing].root=[root_value.x,root_value.y]
+        else:document.keys.append({"t":t,"angles":pose_value.angles.duplicate(true),"root":[root_value.x,root_value.y]})
+        document.keys.sort_custom(func(a,b):return a.t<b.t)
+        refresh(START+roundi(t*60.))
+        info.text="Перемещение корня записано в ключ."
+    else:show_pose()
+
 func start_rotation(mouse:Vector2)->void:
     if document.kind!="action" or frame<START or frame>START+roundi(float(document.duration)*60.):return
+    if mouse.distance_to(root_handle_position())<=9.:
+        start_root_drag(mouse)
+        return
     var chosen:String=""
     var best:float=12.
     var preferred:String=selected_channel()
@@ -1208,7 +1319,8 @@ func finish_rotation()->void:
         rotate_angles[rotate_channel]=angle
         if rotate_key>=0:document.keys[rotate_key].angles=rotate_angles
         else:
-            document.keys.append({"t":rotate_time,"angles":rotate_angles})
+            var root:Array=sampled_pose(rotate_time).root
+            document.keys.append({"t":rotate_time,"angles":rotate_angles,"root":root})
             document.keys.sort_custom(func(a,b):return a.t<b.t)
         refresh(frame)
         info.text="Ключ записан. 3 — проверить исполнение."
@@ -1284,18 +1396,22 @@ func choose_param(i:int):
         refresh(frame)
 
 func key_pose():
-    if player.action=="":return
+    if document.kind!="action":return
     var t:=clampf((frame-START)/60.,0.,document.duration)
+    t=clampf(snappedf(t,1./float(document.get("fps",60))),0.,document.duration)
     var angles:Dictionary={}
-    for id in document.keys[0].angles:angles[id]=edit_pose.angles[id] if pose_tool.selected==1 else player.final_pose.angles[id]
+    var sampled:Dictionary=sampled_pose(t)
+    for id in document.keys[0].angles:angles[id]=edit_pose.angles[id] if pose_tool.selected==1 else (player.final_pose.angles[id] if player.action!="" else sampled.angles[id])
+    var root:Array=sampled.root.duplicate()
     remember()
     for k in document.keys:
         if absf(t-k.t)<.00001:
             k.angles=angles
+            k.root=root
             refresh(frame)
             return
     if document.keys.size()<256:
-        document.keys.append({"t":t,"angles":angles})
+        document.keys.append({"t":t,"angles":angles,"root":root})
         document.keys.sort_custom(func(a,b):return a.t<b.t)
     refresh(frame)
 
@@ -1360,6 +1476,7 @@ func redo():
     refresh(frame)
 
 func save_file():
+    document=Asset.normalise(document)
     var err:=Asset.persist(document)
     if err==OK:saved_signature=JSON.stringify(document)
     info.text="Сохранено: "+document.id+".json" if err==OK else error_string(err)
