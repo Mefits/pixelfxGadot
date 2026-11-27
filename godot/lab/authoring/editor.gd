@@ -1,5 +1,7 @@
 extends Node2D
 const Asset=preload("asset.gd")
+const AttackRecovery=preload("res://lab/attack_recovery.gd")
+const AttackAdapt=preload("res://lab/attack_adaptation.gd")
 const Punch=preload("res://lab/training_punch.gd")
 const WalkMotion=preload("res://lab/walk_motion.gd")
 const WalkPreview=preload("res://lab/walk_preview.gd")
@@ -76,6 +78,8 @@ var quick_dialog
 var import_dialog:FileDialog
 var fps_select:OptionButton
 var easing_select:OptionButton
+var attack_role_select:OptionButton
+var landing_select:OptionButton
 var loop_toggle:CheckButton
 var root_x:SpinBox
 var root_y:SpinBox
@@ -307,6 +311,14 @@ func _ready():
     for label in ["Линейно","Плавно","Ускорение","Ступень"]:easing_select.add_item(label)
     movement.add_child(easing_select)
     easing_select.item_selected.connect(set_easing)
+    attack_role_select=OptionButton.new()
+    for label in ["Роль: автоматически","Роль: передняя","Роль: задняя","Роль: ближняя","Роль: дальняя","Роль: авторская"]:attack_role_select.add_item(label)
+    movement.add_child(attack_role_select)
+    attack_role_select.item_selected.connect(set_attack_role)
+    landing_select=OptionButton.new()
+    for label in ["Финиш: авторский","Финиш: шаг вперёд"]:landing_select.add_item(label)
+    movement.add_child(landing_select)
+    landing_select.item_selected.connect(set_landing_policy)
     loop_toggle=CheckButton.new()
     loop_toggle.text="Циклическое движение"
     movement.add_child(loop_toggle)
@@ -601,6 +613,18 @@ func set_fps(index:int)->void:
     if syncing or document.kind!="action":return
     remember()
     document.fps=[24,30,60][index]
+    refresh(frame)
+
+func set_attack_role(index:int)->void:
+    if syncing or not document.get("training_attack",false):return
+    remember()
+    document.limb_role=AttackAdapt.ROLES[index]
+    refresh(frame)
+
+func set_landing_policy(index:int)->void:
+    if syncing or not document.get("training_attack",false):return
+    remember()
+    document.landing_policy=["authored","forward_land"][index]
     refresh(frame)
 
 func set_easing(index:int)->void:
@@ -1182,6 +1206,10 @@ func refresh(value:int):
     param.editable=not (is_walk and document.get("walk_role","")=="walk_idle")
     fps_select.visible=is_action and not (is_walk and document.get("walk_role","")=="walk_idle")
     easing_select.visible=is_action
+    attack_role_select.visible=document.get("training_attack",false)
+    if attack_role_select.visible:attack_role_select.select(AttackAdapt.ROLES.find(AttackAdapt.role(document)))
+    landing_select.visible=document.get("training_attack",false) and not document.get("events",[]).is_empty() and str(document.events[0].anchor).begins_with("foot_")
+    if landing_select.visible:landing_select.select(1 if AttackRecovery.policy(document)=="forward_land" else 0)
     loop_toggle.visible=is_action and not is_walk
     preview_speed_select.visible=is_action and not is_walk
     if is_action:

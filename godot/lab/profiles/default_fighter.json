@@ -1,0 +1,10 @@
+{
+  "body": {
+    "id": "lab_humanoid_069",
+    "rig_preset": "humanoid_069"
+  },
+  "guard": {
+    "id": "standard_guard",
+    "width_scale": 1.0
+  }
+}

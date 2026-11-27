@@ -26,9 +26,9 @@ func run():
         check(f.walker.action_name()=="walk_breathe","idle after attack")
     var chain=Training.new(docs)
     for n in 3:chain.press(1)
-    for tick in range(1,77):
+    for tick in range(1,65):
         chain.step(0)
-        if tick>=6:
+        if tick>=44 and tick<=52:
             var expected:Dictionary=source.keys[tick].pose
             for channel in expected.angles:check(absf(float(chain.walker.pose.angles[channel])-float(expected.angles[channel]))<.001,"runtime original angle")
             for axis in 2:check(absf(float(chain.walker.pose.root[axis])-float(expected.root[axis]))<.001,"runtime original root")

@@ -68,6 +68,8 @@ static func problem(d:Dictionary)->String:
         if mask.size()!=CHANNELS.size()+LEG_CHANNELS.size() or not d.goals.is_empty() or not d.get("events",[]) is Array or not d.get("events",[]).is_empty() or not d.get("release",{}) is Dictionary or not d.get("release",{}).is_empty():return "Ходьба: полный скелет, без целей и событий"
         if role=="walk_idle" and d.keys.size()!=1:return "Стойка содержит один ключ"
         if role!="walk_idle" and not d.get("loop",false):return "Ходьба должна быть циклической"
+    if d.has("landing_policy") and (not d.get("training_attack",false) or not d.landing_policy in ["authored","forward_land"]):return "Политика приземления"
+    if d.has("limb_role") and not d.get("limb_role") in ["auto","leading","trailing","near","far","authored"]:return "Роль конечности"
     if d.get("training_attack",false):
         if mask.size()!=CHANNELS.size()+LEG_CHANNELS.size() or d.get("loop",false) or not d.goals.is_empty() or not d.get("release",{}) is Dictionary or not d.get("release",{}).is_empty():return "Тренировка: полный скелет, без цикла и IK-целей"
         if not d.get("events") is Array or d.events.size()!=1:return "Тренировка: один контакт"

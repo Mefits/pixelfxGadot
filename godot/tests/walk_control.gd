@@ -15,7 +15,6 @@ func run():
         check(Asset.problem(doc)=="","valid "+id+" "+Asset.problem(doc))
         check(doc.keys.size()==(1 if id=="walk_idle" else (5 if id=="walk_breathe" else 9)),"sparse keys")
     var idle=Walk.new(docs)
-    var expected:Dictionary=idle.pose.duplicate(true)
     var stance_toes:Array=Motion.toes(idle.rig,idle.pose)
     var span:float=absf(stance_toes[0].x-stance_toes[1].x)
     print("GUARD_STANCE_SPAN ",span)
@@ -25,8 +24,10 @@ func run():
             var w=Walk.new(docs)
             for t in phase_tick+1:w.step(direction)
             var old:float=w.x
+            var expected_lead:int=Walk.lead_of(Motion.toes(w.rig,w.pose),w.guard_lead)
             for t in Walk.STOP_TICKS+1:w.step(0)
-            check(w.x==old and w.activity==0. and w.pose==expected,"stop returns exact idle")
+            check(w.x==old and w.activity==0. and w.guard_lead==expected_lead,"stop preserves lead")
+            check(Walk.lead_of(Motion.toes(w.rig,w.pose),expected_lead)==expected_lead,"physical lead matches guard")
             check(w.FACING==1,"fixed facing")
     var w=Walk.new(docs)
     var max_slip:float=0.
@@ -78,9 +79,9 @@ func run():
         for side in 2:
             slip=maxf(slip,Motion.toe(still.rig,still.pose,Motion.SIDES[side]).distance_to(foot_targets[side]))
         check(still.x==origin,"idle no travel")
-    check(hi-lo>1.5,"idle visible breath")
-    check(x_max-x_min>5.5,"weight transfers both ways")
-    check(heel_lifts[0]>1.2 and heel_lifts[1]>1.2,"both heels lift")
+    check(hi-lo>.15 and hi-lo<.8,"idle visible breath")
+    check(x_max-x_min>1.0 and x_max-x_min<1.6,"weight transfers both ways")
+    check(heel_lifts[0]>.05 and heel_lifts[1]>.05 and heel_lifts[0]<.25 and heel_lifts[1]<.25,"both heels lift")
     print("DYNAMIC_GUARD_SHIFT ",x_max-x_min," HEEL_LIFTS ",heel_lifts)
     check(slip<.1,"idle fixed foot "+str(slip))
     # Guard stays raised through a complete loop; wrists move in the
@@ -109,8 +110,8 @@ func run():
             near_max=near_max.max(n)
             far_min=far_min.min(f)
             far_max=far_max.max(f)
-    check(near_max.distance_to(near_min)>.6,"near guard motion")
-    check(far_max.distance_to(far_min)>.6,"far guard motion")
+    check(near_max.distance_to(near_min)>.12,"near guard motion")
+    check(far_max.distance_to(far_min)>.12,"far guard motion")
     print("GUARD_WRIST_RANGE ",near_max.distance_to(near_min)," ",far_max.distance_to(far_min))
     var breathing:Dictionary=docs.walk_breathe
     check(breathing.keys[0].angles==breathing.keys[-1].angles and breathing.keys[0].root==breathing.keys[-1].root,"idle loop boundary")

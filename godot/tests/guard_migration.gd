@@ -26,8 +26,8 @@ func run():
     var idle:Dictionary=Motion.document("walk_breathe")
     var folder:String="user://motion_authoring_backup/"
     var ok:bool=stance.guard_revision==Motion.GUARD_REVISION and idle.guard_revision==Motion.GUARD_REVISION
-    ok=ok and FileAccess.get_file_as_bytes(folder+"walk_breathe_before_guard_v2.json")==before_idle
-    ok=ok and FileAccess.get_file_as_bytes(folder+"walk_idle_before_guard_v2.json")==before_stance
+    ok=ok and FileAccess.get_file_as_bytes(folder+"walk_breathe_before_guard_v"+str(Motion.GUARD_REVISION)+".json")==before_idle
+    ok=ok and FileAccess.get_file_as_bytes(folder+"walk_idle_before_guard_v"+str(Motion.GUARD_REVISION)+".json")==before_stance
     ok=ok and idle.keys[2].root!=idle.keys[0].root
     # A new edited idle remains bound and is not migrated again.
     idle.keys[1].angles.chest+=1.

@@ -10,7 +10,8 @@ const Grid=preload("res://lab/hybrid091/precision.gd")
 const STRIDE:float=32.
 const CONTACT:float=18.24/32.
 const SIDES=["near","far"]
-const GUARD_REVISION:int=2
+const GUARD_REVISION:int=4
+const IDLE_DURATION:float=2.0
 static var defaults:Dictionary={}
 
 static func key(t:float,p:Dictionary)->Dictionary:
@@ -66,38 +67,53 @@ static func default_doc(id:String)->Dictionary:
     defaults[id]=d.duplicate(true)
     return d
 
+# Continuous guard controller. The two grounded toes define the support span.
+# The phase commands a weight distribution, not simulated reaction forces.
+# All angles and root offsets are relative to the unchanged authored guard.
+static func guard_pose(base:Dictionary,phase:float)->Dictionary:
+    var u:float=fposmod(phase,1.)
+    var transfer:float=sin(TAU*u)
+    var compression:float=pow(sin(PI*u),2.)
+    var near_unload:float=pow(maxf(0.,-transfer),2.)
+    var far_unload:float=pow(maxf(0.,transfer),2.)
+    var p:Dictionary={"angles":base.angles.duplicate(true),"root":base.root.duplicate()}
+    p.root[0]+=.7*transfer
+    # Small breathing compression and barely perceptible heel unloading.
+    p.root[1]+=.30*compression+.12*transfer*transfer
+    p.angles.foot_pitch_near+=2.*near_unload
+    p.angles.foot_pitch_far+=2.*far_unload
+    p.angles.hips+=.45*transfer-.25*compression
+    p.angles.chest-=1.1*compression+.45*transfer
+    p.angles.head+=.4*compression+.15*transfer
+    p.angles.shoulder_turn-=.7*compression
+    p.angles.shoulder_near-=2.2*compression+.7*far_unload
+    p.angles.elbow_near+=2.6*compression+.7*far_unload
+    p.angles.shoulder_far+=1.8*compression+.7*near_unload
+    p.angles.elbow_far-=2.3*compression+.9*near_unload
+    return p
+
 static func breathing_doc(stance:Dictionary)->Dictionary:
-    # Five authored poses: neutral, front-loaded, compression, rear-loaded,
-    # neutral. Toes stay anchored; heel and ankle move with foot pitch.
+    # Editor key snapshots are editable. An unmodified set is evaluated
+    # continuously; intentionally edited keys use the authored sampler.
     var start:Dictionary=stance.keys[0]
     var keys:Array=[]
-    var duration:float=1.8
-    var phases:Array=[0.,.25,.50,.75,1.]
-    var lift:Array=[0.,.35,1.,.35,0.]
-    var chest:Array=[0.,.45,1.,.50,0.]
-    var arms:Array=[0.,.15,1.,.65,0.]
-    var rear:Array=[0.,.40,.85,1.,0.]
-    # Shift toward the loaded leg; pivot the unloaded foot about its toe.
-    # These are artistic support cues, not measured ground reaction forces.
-    var shift:Array=[0.,3.2,0.,-3.2,0.]
-    var near_pitch:Array=[0.,0.,0.,24.,0.]
-    var far_pitch:Array=[0.,24.,0.,0.,0.]
-    for i in phases.size():
-        var p:Dictionary={"angles":start.angles.duplicate(true),"root":start.root.duplicate()}
-        p.root[1]+=2.4*lift[i]
-        p.root[0]+=shift[i]
-        p.angles.foot_pitch_near+=near_pitch[i]
-        p.angles.foot_pitch_far+=far_pitch[i]
-        p.angles.hips-=.9*lift[i]
-        p.angles.chest-=3.6*chest[i]
-        p.angles.head+=1.5*arms[i]
-        p.angles.shoulder_turn-=2.5*chest[i]
-        p.angles.shoulder_near-=10.*arms[i]
-        p.angles.elbow_near+=12.*arms[i]
-        p.angles.shoulder_far+=8.*rear[i]
-        p.angles.elbow_far-=11.*rear[i]
-        keys.append(key(phases[i]*duration,p))
-    return {"version":2,"guard_revision":GUARD_REVISION,"id":"walk_breathe","name":"Idle · дыхание","kind":"action","walk_role":"walk_breathe","duration":duration,"fps":60,"easing":"smooth","loop":true,"keys":keys,"goals":[],"events":[]}
+    for i in 5:
+        var phase:float=float(i)/4.
+        keys.append(key(phase*IDLE_DURATION,guard_pose(start,phase)))
+    return {"version":2,"guard_revision":GUARD_REVISION,"guard_procedural":true,"id":"walk_breathe","name":"Idle · динамическая опора","kind":"action","walk_role":"walk_breathe","duration":IDLE_DURATION,"fps":60,"easing":"smooth","loop":true,"keys":keys,"goals":[],"events":[]}
+
+static func procedural_guard(d:Dictionary)->bool:
+    if not d.get("guard_procedural",false) or not d.get("loop",false) or d.keys.size()!=5 or d.easing!="smooth":return false
+    for i in 5:
+        var k:Dictionary=d.keys[i]
+        var phase:float=float(i)/4.
+        if not is_equal_approx(float(k.t),phase*float(d.duration)) or k.get("easing",d.easing)!="smooth":return false
+        var expected:Dictionary=guard_pose(d.keys[0],phase)
+        for channel in expected.angles:
+            if not is_equal_approx(float(k.angles.get(channel,INF)),float(expected.angles[channel])):return false
+        for axis in 2:
+            if not is_equal_approx(float(k.root[axis]),float(expected.root[axis])):return false
+    return true
 
 # One-time upgrade of the two bound guard slots. Retain the original bytes
 # in a separate directory; a failed archive leaves the old file untouched.
@@ -106,20 +122,24 @@ static func archive_guard(id:String)->bool:
     if not FileAccess.file_exists(source):return true
     var folder:String="user://motion_authoring_backup/"
     if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(folder))!=OK:return false
-    var target:String=folder+id+"_before_guard_v2.json"
+    var target:String=folder+id+"_before_guard_v"+str(GUARD_REVISION)+".json"
     var suffix:int=1
     while FileAccess.file_exists(target):
-        target=folder+id+"_before_guard_v2_"+str(suffix)+".json"
+        target=folder+id+"_before_guard_v"+str(GUARD_REVISION)+"_"+str(suffix)+".json"
         suffix+=1
     return DirAccess.rename_absolute(ProjectSettings.globalize_path(source),ProjectSettings.globalize_path(target))==OK
 
 static func document(id:String)->Dictionary:
     var saved:Dictionary=Asset.read(Asset.FOLDER+id+".json")
     var guard_slot:bool=id in ["walk_idle","walk_breathe"]
-    if guard_slot and FileAccess.file_exists(Asset.FOLDER+id+".json") and int(saved.get("guard_revision",0))<GUARD_REVISION:
+    if guard_slot and FileAccess.file_exists(Asset.FOLDER+id+".json") and int(saved.get("guard_revision",0))<(2 if id=="walk_idle" else GUARD_REVISION):
         if archive_guard(id):
             return default_doc(id)
-    if saved.get("id")==id and saved.get("walk_role")==id and Asset.problem(saved)=="":return Asset.normalise(saved)
+    if saved.get("id")==id and saved.get("walk_role")==id and Asset.problem(saved)=="":
+        var d:Dictionary=Asset.normalise(saved)
+        if id=="walk_idle":d.guard_revision=GUARD_REVISION
+        if id=="walk_breathe":d.loop=true
+        return d
     return default_doc(id)
 
 static func sample(d:Dictionary,phase:float)->Dictionary:
@@ -154,12 +174,12 @@ static func prepare(d:Dictionary,stance:Dictionary={})->Dictionary:
     if d.walk_role=="walk_breathe":
         var base:Dictionary=stance if not stance.is_empty() else document("walk_idle")
         fixed=toes(rig,sample(base,0.))
-    return {"doc":d,"contacts":contacts,"fixed":fixed}
+    return {"doc":d,"contacts":contacts,"fixed":fixed,"procedural":d.walk_role=="walk_breathe" and procedural_guard(d)}
 
 static func intent(program:Dictionary,phase:float,rig)->Dictionary:
     var d:Dictionary=program.doc
     phase=fposmod(phase,1.) if d.loop else 0.
-    var p:Dictionary=sample(d,phase)
+    var p:Dictionary=guard_pose(d.keys[0],phase) if program.get("procedural",false) else sample(d,phase)
     var points:Array=toes(rig,p)
     var paths:Array=[]
     for i in 2:
@@ -185,7 +205,16 @@ static func intent(program:Dictionary,phase:float,rig)->Dictionary:
                 var envelope:float=smoothstep(CONTACT,CONTACT+.06,u)*(1.-smoothstep(.94,1.,u))
                 point.y=minf(0.,point.y)*envelope
         paths.append({"toe":Grid.point(point),"pitch":Grid.scalar(pitch),"stance":stance})
-    return {"pose":p,"paths":paths}
+    var value:Dictionary={"pose":p,"paths":paths}
+    if d.walk_role in ["walk_idle","walk_breathe"]:
+        # A kinematic load proxy over the actual support span, with both toes
+        # remaining in contact. No binary switch or change of foot identity.
+        var span:float=Vector2(paths[0].toe).x-Vector2(paths[1].toe).x
+        var near_load:float=.5
+        if absf(span)>.01:
+            near_load=clampf(.5+(float(p.root[0])-float(d.keys[0].root[0]))/span,.12,.88)
+        value["support_load"]=[near_load,1.-near_load]
+    return value
 
 static func resolve(rig,support,value:Dictionary)->Dictionary:
     var p:Dictionary=value.pose.duplicate(true)
