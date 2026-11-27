@@ -503,3 +503,7 @@ A exact 089; B same legs, root, torso and schedule, restored 087 arm arc through
 
 ## Box2D — интеграционный кандидат
 Ветка feature/lab-1.0-box2d-integration от Astra 4141c63. P — отдельная физическая мастерская на риге 069 C, H/M и формат v1 сохранены. См. docs/BOX2D_INTEGRATION_RU.md. CI ожидается; Project N и исходные ветки не изменены.
+
+
+## Lab 1.0 — Astra ↔ Box2D, кандидат переходного слоя
+Ветка feature/lab-1.0-motion-handoff от проверенного de01f61b. H/V — импульс в текущую позу, две FK-позы для скоростей, Box2D, возврат после успокоения, затем Astra. См. [MOTION_HANDOFF_BRIDGE_RU.md](MOTION_HANDOFF_BRIDGE_RU.md). CI и визуальная приёмка ожидаются. Без изменений Project N.

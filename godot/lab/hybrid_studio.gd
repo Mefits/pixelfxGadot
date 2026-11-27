@@ -2,6 +2,9 @@ extends Node2D
 ## Integration workspace. The accepted kernel remains the gameplay pose source.
 ## 092 is a separate experiment in this UI, not a competing integrated runtime.
 const Asset=preload("res://lab/authoring/asset.gd")
+const Handoff=preload("res://lab/motion_handoff.gd")
+var handoff
+var pending_physics_hit:bool=false
 var user_assets:Array=[]
 var current_asset:Dictionary={}
 const Body=preload("res://lab/body_ankle_069.gd")
@@ -127,6 +130,8 @@ func build_ui()->void:
     button(panel,"J / Удар в голову",func():queue_hit("HEAD",.85,false))
     button(panel,"B / Удар в корпус",func():queue_hit("BODY",.85,false))
     button(panel,"N / Сильный удар",func():queue_hit("HEAD",1.45,true))
+    if ClassDB.class_exists("MotionPhysics099D"):
+        button(panel,"V / Физический удар",queue_physics_hit)
     var label=Label.new()
     label.text="Декоративная ткань (120 Гц)"
     panel.add_child(label)
@@ -150,7 +155,7 @@ func build_ui()->void:
         if paused:advance_tick())
     button(panel,"R / Сброс",reset)
     var hint=Label.new()
-    hint.text="1 стоп · 2 шаг · 3 бег\nF/G/K атаки · J/B/N реакции\nАтаки в Hybrid, шаг в 0.92."
+    hint.text="1 стоп · 2 шаг · 3 бег\nF/G/K атаки · J/B/N реакции\nV физический удар / автовозврат"
     hint.add_theme_font_size_override("font_size",12)
     panel.add_child(hint)
 
@@ -190,26 +195,31 @@ func reset()->void:
         else:
             player=Asset.ensemble(current_asset if current_asset.kind=="gait" else {},[current_asset] if current_asset.kind=="action" else [],60,bank)
             rig=player.rig
-        last_pose=player.final_pose
+        handoff=Handoff.new(player)
+        rig=handoff.rig
+        last_pose=handoff.pose
         reaction=null
     else:
         reaction=Reaction.new(rig,attack_clip.keys[0].pose,2)
         player=null
+        handoff=null
         last_pose=reaction.base
         rig.evaluate(last_pose)
     pending_action=""
+    pending_physics_hit=false
     pending_impulse=0.
     pending_hits.clear()
     hit_id=0
     accumulator=0.
     frame_tick=0
     target_speed=1.
-    last_travel=0.
+    last_travel=handoff.travel if handoff!=null else 0.
     cloth=null
     update_cloth(0.,false)
     render_frame()
 
 func queue_action(action:String)->void:
+    if handoff!=null and handoff.phase!=Handoff.ASTRA:return
     if mode==0:pending_action=action
     elif mode>1:pending_action=current_asset.id if action=="jab" and current_asset.kind=="action" else action
 
@@ -219,14 +229,22 @@ func queue_hit(zone:String,power:float,finisher:bool)->void:
         pending_impulse+=(-140. if zone=="HEAD" else 140.)*power
     else:pending_hits.append([zone,power,finisher])
 
+func queue_physics_hit()->void:
+    if handoff!=null and ClassDB.class_exists("MotionPhysics099D"):pending_physics_hit=true
+
 func advance_tick()->void:
     if raster==null:return
     if mode!=1:
         var cmd={"speed":(current_asset.get("speed",target_speed) if mode>1 and target_speed>1. else target_speed),"impulse":pending_impulse}
         if not pending_action.is_empty():cmd.action=pending_action
-        player.step(cmd)
-        last_pose=player.final_pose
-        last_travel=player.gait.travel
+        if pending_physics_hit:
+            handoff.hit("hips",Vector2.LEFT,1.,1)
+        if not handoff.step(cmd):
+            status.text="Ошибка передачи управления"
+            paused=true
+            return
+        last_pose=handoff.pose
+        last_travel=handoff.travel
     else:
         for event in pending_hits:
             hit_id+=1
@@ -235,6 +253,7 @@ func advance_tick()->void:
         last_pose=sample.pose
         last_travel=0.
     pending_action=""
+    pending_physics_hit=false
     pending_impulse=0.
     pending_hits.clear()
     frame_tick+=1
@@ -258,7 +277,7 @@ func update_cloth(travel:float,advance:bool)->void:
 
 func render_frame()->void:
     var parts:Array=body.make(rig.points,last_pose.angles,rig.rotations.head)
-    if mode!=1:Depth.apply(parts,player.style)
+    if mode!=1 and handoff.phase==Handoff.ASTRA:Depth.apply(parts,player.style)
     for i in [0,2,3,8,9]:parts[i].material_id=1
     for i in [5,6,7,11,12,13,15,17]:parts[i].material_id=2
     if cloth!=null:
@@ -283,6 +302,11 @@ func render_frame()->void:
         status.text="Тик %d  ·  попаданий %d  ·  шаг %s"%[frame_tick,reaction.seen.size(),"активен" if reaction.step_age>=0 else "нет"]
         details.text="0.92 C: отдельный стенд реакций с заданными импульсами.\nФинишер разрешает компенсирующий шаг, не отбрасывание."
     if mode>1:details.text="Сохранённое движение: "+str(current_asset.name)+" · 1/2/3 скорость · F исполнить"
+    if handoff!=null:
+        if handoff.phase!=Handoff.ASTRA:
+            status.text="Тик %d · %s · путь %.1f"%[frame_tick,["Astra","Box2D","Возврат в Astra"][handoff.phase],last_travel]
+            details.text="V — импульс; подъём после контакта и успокоения.\nВход FK %.4f · скорость %.4f"%[handoff.entry_error,handoff.velocity_error]
+        if handoff.message!="":details.text=handoff.message
     details.text+="\nРастеризация %d мкс · ткань %s (только визуальная)"%[last_render_us,["выкл","B","C"][cloth_mode]]
     queue_redraw()
 
@@ -315,6 +339,7 @@ func _unhandled_input(e:InputEvent)->void:
             KEY_J:queue_hit("HEAD",.85,false)
             KEY_B:queue_hit("BODY",.85,false)
             KEY_N:queue_hit("HEAD",1.45,true)
+            KEY_V:queue_physics_hit()
             KEY_SPACE:toggle_pause()
             KEY_RIGHT:
                 if paused:advance_tick()

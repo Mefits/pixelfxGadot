@@ -1,5 +1,6 @@
 extends RefCounted
 const Common=preload("res://lab/ragdoll_common_099c.gd")
+const Body=preload("res://lab/body_ankle_069.gd")
 const PROFILES=[{"accent":.55,"hold":.20,"hitstop":2,"release":.19,"motor":1.},{"accent":1.,"hold":.30,"hitstop":4,"release":.19,"motor":1.},{"accent":1.45,"hold":.40,"hitstop":6,"release":.19,"motor":1.}]
 var model
 var world
@@ -17,7 +18,14 @@ func setup(p:int=1,passes:int=8,material:int=1)->bool:
     generation+=1
     if not ClassDB.class_exists("MotionPhysics099D"):return false
     if p<0 or p>2 or not passes in [8,12,16] or not material in [0,1]:return false
-    model=Common.make_model()
+    return setup_model(Common.make_model(),p,passes,material)
+
+# Also used by the live handoff adapter; supplied model is isolated from Astra.
+func setup_model(entry_model,p:int=1,passes:int=8,material:int=1)->bool:
+    world=null
+    generation+=1
+    if not ClassDB.class_exists("MotionPhysics099D") or p<0 or p>2 or not passes in [8,12,16] or not material in [0,1]:return false
+    model=entry_model
     n=model.bodies.size()
     profile=p
     settings=PROFILES[p].duplicate(true)
@@ -27,6 +35,9 @@ func setup(p:int=1,passes:int=8,material:int=1)->bool:
     pinned=false
     var candidate=ClassDB.instantiate("MotionPhysics099D")
     if not candidate.setup(Common.specification(model),passes,1,material):return false
+    for i in n:
+        var b:Dictionary=model.bodies[i]
+        if not candidate.set_velocity(i,b.v,b.w):return false
     world=candidate
     return true
 

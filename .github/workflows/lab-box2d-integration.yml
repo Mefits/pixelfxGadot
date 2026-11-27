@@ -1,7 +1,7 @@
 name: Lab 1.0 Box2D integration
 on:
   push:
-    branches: [feature/lab-1.0-box2d-integration]
+    branches: [feature/lab-1.0-box2d-integration, feature/lab-1.0-motion-handoff]
   workflow_dispatch:
 permissions:
   contents: read
@@ -63,6 +63,11 @@ jobs:
           xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --script res://tests/workshop_ui.gd -- "$PWD/results" 2>&1 | tee results/workshop.log
           test -s results/workshop.png
           ! grep -E 'SCRIPT ERROR|ERROR:' results/workshop.log
+          mkdir -p results/handoff
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --disable-vsync --rendering-method gl_compatibility --script res://tests/motion_handoff.gd -- "$PWD/results/handoff" 2>&1 | tee results/handoff.log
+          grep -q MOTION_HANDOFF_OK results/handoff.log
+          ! grep -E 'SCRIPT ERROR|ERROR:' results/handoff.log
+          python tools/motion_handoff_gif.py results/handoff
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -76,6 +81,8 @@ jobs:
             results/capture/*.json
             results/capture/*.log
             results/capture/review.png
+            results/handoff/*.gif
+            results/handoff/*.json
             godot/addons/motionphysics/BOX2D_LICENSE.txt
             godot/addons/motionphysics/bin/
   compare:

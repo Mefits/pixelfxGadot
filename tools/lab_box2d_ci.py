@@ -35,5 +35,6 @@ def main():
     (OUT/"trace-digests.json").write_text(json.dumps({"astra":astra,"box2d":box2d[0]},indent=2))
     run("tests/lab_integration_100.gd","lab","", "LAB_100_INTEGRATION_OK")
     run("tests/motionphysics_studio.gd","studio-headless",(),"MOTIONPHYSICS_STUDIO_OK")
+    run("tests/motion_handoff.gd","motion-handoff",(),"MOTION_HANDOFF_OK")
     print("LAB_BOX2D_CI_OK")
 if __name__=="__main__":main()
