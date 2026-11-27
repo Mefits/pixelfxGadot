@@ -8,6 +8,7 @@ const VFX=preload("res://addons/pixelfx/composer/preset.gd")
 const DIR="res://lab/authoring/motions/"
 const FOLDER="user://motion_authoring/"
 const IDS=["sprint","jab","feint"]
+const WALK_IDS=["walk_idle","walk_forward","walk_backward"]
 const JOINTS=["hand_near","hand_far","elbow_near","elbow_far","foot_near","foot_far","knee_near","knee_far"]
 const CHANNELS=["chest","head","shoulder_turn","shoulder_near","elbow_near","shoulder_far","elbow_far"]
 const LEG_CHANNELS=["hips","pelvis_turn","thigh_near","knee_near","foot_pitch_near","thigh_far","knee_far","foot_pitch_far"]
@@ -46,7 +47,9 @@ static func problem(d:Dictionary)->String:
         if not g.get("clock") in (["cycle","swing_near","swing_far"] if d.get("kind")=="gait" else ["action"]):return "Фаза цели"
     if d.get("kind")=="gait":
         return "" if number(d.get("speed"),1,1.85) and number(d.get("arm_sweep",94.),70,115) and number(d.get("flight_width",5.),2,7) else "Параметры бега"
-    if d.get("kind")!="action" or not number(d.get("duration"),.05,10) or not d.get("keys") is Array or d.keys.size()<2 or d.keys.size()>600:return "Длительность или ключи"
+    var role:String=str(d.get("walk_role",""))
+    if role!="" and not role in WALK_IDS:return "Неизвестная роль ходьбы"
+    if d.get("kind")!="action" or not number(d.get("duration"),.05,10) or not d.get("keys") is Array or d.keys.size()<(1 if role=="walk_idle" else 2) or d.keys.size()>600:return "Длительность или ключи"
     if not number(d.get("fps",60),1,60) or float(d.get("fps",60))!=floorf(float(d.get("fps",60))) or not d.get("easing","linear") in EASING or not d.get("loop",false) is bool:return "Частота кадров, интерполяция или цикл"
     var last:float=-1.
     var mask:Array=[]
@@ -59,7 +62,11 @@ static func problem(d:Dictionary)->String:
         for id in mask:
             if (not id in CHANNELS and not id in LEG_CHANNELS) or not number(k.angles.get(id),-360,360):return "Канал позы"
         last=k.t
-    if d.keys[0].t!=0 or not is_equal_approx(last,d.duration):return "Границы движения"
+    if d.keys[0].t!=0 or (role!="walk_idle" and not is_equal_approx(last,d.duration)):return "Границы движения"
+    if role!="":
+        if mask.size()!=CHANNELS.size()+LEG_CHANNELS.size() or not d.goals.is_empty() or not d.get("events",[]) is Array or not d.get("events",[]).is_empty() or not d.get("release",{}).is_empty():return "Ходьба: полный скелет, без целей и событий"
+        if role=="walk_idle" and d.keys.size()!=1:return "Стойка содержит один ключ"
+        if role!="walk_idle" and not d.get("loop",false):return "Ходьба должна быть циклической"
     var release=d.get("release",{})
     if not release is Dictionary:return "Фазы опоры"
     for side in release:
@@ -183,7 +190,7 @@ static func available()->Array:
     for id in ids:
         var d:=read(FOLDER+id+".json")
         if d.get("id")!=id or problem(d)!="":d=read(DIR+id+".json")
-        if d.get("id")==id and problem(d)=="":result.append(d)
+        if d.get("id")==id and problem(d)=="" and not d.has("walk_role"):result.append(d)
     return result
 
 static func player(d:Dictionary,hz:int):

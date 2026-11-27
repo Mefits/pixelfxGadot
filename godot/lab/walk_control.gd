@@ -1,73 +1,109 @@
 extends RefCounted
-## Independent input/locomotion experiment. No changes to the accepted Astra kernel.
-## A signed distance samples the accepted walk calendar in either direction.
-## Facing is constant. Backward walk is a provisional reversed cycle, not a new authored clip.
-const Asset=preload("res://lab/authoring/asset.gd")
+const Motion=preload("res://lab/walk_motion.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
-const Gait=preload("res://lab/hybrid091/gait.gd")
+const Clips=preload("res://addons/creature/clips.gd")
 const Support=preload("res://lab/hybrid091/support.gd")
 const Grid=preload("res://lab/hybrid091/precision.gd")
-const SPEED:float=.5
 const LIMIT:float=48.
 const FACING:int=1
+const STOP_TICKS:int=16
+const START_TICKS:int=10
 var rig=Body.make_rig()
-var gait
-var support
+var support=Support.new(rig)
+var programs:Dictionary={}
 var x:float=0.
-var phase_distance:float=1.
+var phase:float=0.
 var activity:float=0.
 var direction:int=0
 var pose:Dictionary={}
 var paths:Array=[]
 var ticks:int=0
+var transition_age:int=0
+var transition_from:Dictionary={}
+var transition_toes:Array=[]
+var transition_pitch:Array=[]
+var transition_x:float=0.
+var first_foot:int=0
 
-func _init():
-    var clip:Dictionary=Asset.read(Asset.FIX+"run053a_C.json").payload.clip
-    gait=Gait.new(rig,clip)
-    support=Support.new(rig)
-    sample()
+func _init(overrides:Dictionary={}):
+    for id in ["walk_idle","walk_forward","walk_backward"]:
+        programs[id]=Motion.prepare(overrides.get(id,Motion.document(id)))
+    set_intent(Motion.intent(programs.walk_idle,0.,rig))
+
+func set_intent(value:Dictionary)->void:
+    paths=value.paths
+    pose=Motion.resolve(rig,support,value)
+
+func capture_transition()->void:
+    transition_age=0
+    transition_from=pose.duplicate(true)
+    transition_toes=Motion.toes(rig,pose)
+    transition_pitch=[pose.angles.foot_pitch_near,pose.angles.foot_pitch_far]
+    transition_x=x
+    first_foot=0 if not paths[0].stance else (1 if not paths[1].stance else 0)
+
+func choose_phase(program:Dictionary)->float:
+    var best:float=INF
+    var result:float=0.
+    for i in 32:
+        var u:float=float(i)/32.
+        var value:Dictionary=Motion.intent(program,u,rig)
+        var score:float=0.
+        for side in 2:score+=Vector2(value.paths[side].toe).distance_squared_to(transition_toes[side])
+        if score<best:
+            best=score
+            result=u
+    return result
 
 func step(command:int)->void:
-    var next:float=clampf(x+clampi(command,-1,1)*SPEED,-LIMIT,LIMIT)
-    var dx:float=next-x
-    direction=0 if is_zero_approx(dx) else (1 if dx>0. else -1)
-    x=next
-    phase_distance+=dx
-    activity=move_toward(activity,1. if direction!=0 else 0.,.125)
+    var requested:int=clampi(command,-1,1)
+    if (x>=LIMIT and requested>0) or (x<=-LIMIT and requested<0):requested=0
+    if requested!=direction:
+        capture_transition()
+        direction=requested
+        if direction!=0:phase=choose_phase(programs[action_name()])
     ticks+=1
-    sample()
+    transition_age+=1
+    if direction==0:
+        stop_step()
+        return
+    var program:Dictionary=programs[action_name()]
+    var distance:float=Motion.STRIDE/(float(program.doc.duration)*60.)
+    var next:float=clampf(x+direction*distance,-LIMIT,LIMIT)
+    phase=fposmod(phase+absf(next-x)/Motion.STRIDE,1.)
+    x=next
+    var value:Dictionary=Motion.intent(program,phase,rig)
+    activity=minf(1.,float(transition_age)/START_TICKS)
+    if transition_age<START_TICKS and not transition_from.is_empty():
+        var u:float=smoothstep(0.,float(START_TICKS),float(transition_age))
+        value.pose=Clips.blend_pose(transition_from,value.pose,u)
+        for i in 2:
+            var old:Vector2=transition_toes[i]+Vector2.RIGHT*(transition_x-x)
+            value.paths[i].toe=Grid.point(old.lerp(value.paths[i].toe,u))
+            value.paths[i].pitch=Grid.scalar(lerpf(transition_pitch[i],value.paths[i].pitch,u))
+            value.paths[i].stance=false
+    set_intent(value)
 
-func sample()->void:
-    var stride:float=Gait.WALK_STEP
-    var local:float=fposmod(phase_distance,2.*stride)
-    var q:float=floorf(local/stride)*stride
-    var side:int=int(q/stride)
-    gait.travel=local
-    gait.velocity=1.
-    gait.side=side
-    gait.queue=[q,q+stride,q+2.*stride]
-    gait.legs[side]={"start":q,"end":q+2.*stride}
-    gait.legs[1-side]={"start":q-stride,"end":q+stride}
-    var intent:Dictionary=gait.intent()
-    pose=intent.pose
-    paths=intent.paths
-    # Stop translation immediately. Lower the free toe in place and relax
-    # the torso; no negative speed is passed into the original kernel.
-    pose.angles.hips=lerpf(2.,float(pose.angles.hips),activity)
-    pose.angles.chest=lerpf(0.,float(pose.angles.chest),activity)
-    pose.angles.head=lerpf(-2.,float(pose.angles.head),activity)
-    pose.root[1]=lerpf(2.5,float(pose.root[1]),activity)
-    for side_name in ["near","far"]:
-        pose.angles["shoulder_"+side_name]=lerpf(-15.,float(pose.angles["shoulder_"+side_name]),activity)
-        pose.angles["elbow_"+side_name]=lerpf(-85.,float(pose.angles["elbow_"+side_name]),activity)
-    for path in paths:
-        path.toe.y*=activity
-        path.pitch*=activity
-        path.toe=Grid.point(path.toe)
-        path.pitch=Grid.scalar(path.pitch)
-        if activity==0.:path.stance=true
-    Grid.pose(pose)
-    support.resolve(pose,paths)
+func stop_step()->void:
+    var value:Dictionary=Motion.intent(programs.walk_idle,0.,rig)
+    if transition_from.is_empty() or transition_age>=STOP_TICKS:
+        activity=0.
+        set_intent(value)
+        return
+    var u:float=clampf(float(transition_age)/STOP_TICKS,0.,1.)
+    activity=1.-u
+    value.pose=Clips.blend_pose(transition_from,value.pose,smoothstep(0.,1.,u))
+    for i in 2:
+        var order:int=0 if i==first_foot else 1
+        var k:float=clampf(u*2.-order,0.,1.)
+        var goal:Vector2=value.paths[i].toe
+        var old:Vector2=transition_toes[i]+Vector2.RIGHT*(transition_x-x)
+        var point:Vector2=old.lerp(goal,smoothstep(0.,1.,k))
+        if old.distance_to(goal)>.1:point.y-=1.6*pow(sin(PI*k),2.)
+        value.paths[i].toe=Grid.point(point)
+        value.paths[i].pitch=Grid.scalar(lerpf(transition_pitch[i],value.paths[i].pitch,smoothstep(0.,1.,k)))
+        value.paths[i].stance=k==0. or k==1.
+    set_intent(value)
 
 func action_name()->String:
-    return "walk_forward" if direction>0 else ("walk_backward" if direction<0 else "idle")
+    return "walk_forward" if direction>0 else ("walk_backward" if direction<0 else "walk_idle")

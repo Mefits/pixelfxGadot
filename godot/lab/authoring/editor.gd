@@ -1,5 +1,7 @@
 extends Node2D
 const Asset=preload("asset.gd")
+const WalkMotion=preload("res://lab/walk_motion.gd")
+const WalkPreview=preload("res://lab/walk_preview.gd")
 const Goals=preload("goals.gd")
 const Studio=preload("res://lab/hybrid_studio.gd")
 const Depth=preload("res://lab/arm_depth_090.gd")
@@ -130,7 +132,7 @@ var gesture_phase:=0.
 var gesture_clock:=""
 var syncing:=false
 var frame:=0
-var ids:Array=Asset.IDS.duplicate()
+var ids:Array=Asset.WALK_IDS+Asset.IDS
 
 func _ready():
     panel(Rect2(0,0,960,540),"#101822")
@@ -175,7 +177,7 @@ func _ready():
             if file.ends_with(".json") and id.is_valid_identifier() and not ids.has(id):ids.append(id)
     for id in ids:
         var path:String=Asset.FOLDER+id+".json"
-        var entry:=Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
+        var entry:=WalkMotion.document(id) if id in Asset.WALK_IDS else Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
         motion.add_item(str(entry.get("name",id)))
     motion.item_selected.connect(func(i):request_open(ids[i]))
     channel_mode=OptionButton.new()
@@ -640,7 +642,7 @@ func mirror_id(id:String)->String:
     return id
 
 func mirror_action()->void:
-    if document.kind!="action":return
+    if document.kind!="action" or document.has("walk_role"):return
     remember()
     for k in document.keys:
         var mirrored:Dictionary={}
@@ -688,6 +690,7 @@ func update_play_button()->void:
 
 func key_at_frame()->int:
     if document.kind!="action":return -1
+    if document.get("walk_role","")=="walk_idle":return 0
     var index:int=-1
     var best:float=.50001
     for i in document.keys.size():
@@ -695,6 +698,7 @@ func key_at_frame()->int:
         if d<best:
             best=d
             index=i
+    if document.has("walk_role") and document.walk_role!="walk_idle" and index==document.keys.size()-1:return 0
     return index
 
 func sync_key()->void:
@@ -871,7 +875,7 @@ func side_id()->String:
     return "near" if release_side.selected==0 else "far"
 
 func sync_release()->void:
-    release_panel.visible=document.kind=="action"
+    release_panel.visible=document.kind=="action" and not document.has("walk_role")
     if not release_panel.visible:return
     var r:Dictionary=document.get("release",{})
     var enabled:bool=r.has(side_id())
@@ -881,7 +885,7 @@ func sync_release()->void:
     release_remove.disabled=not enabled
 
 func apply_release()->void:
-    if document.kind!="action":return
+    if document.kind!="action" or document.has("walk_role"):return
     var side:String=side_id()
     var knots:Array=[]
     for field in release_fields:knots.append(field.value/100.)
@@ -954,6 +958,7 @@ func select_channel_tree()->void:
 
 func edit_curve_key(index:int,value:float)->void:
     if document.kind!="action" or index<0 or index>=document.keys.size() or key_channels.selected<0:return
+    if document.has("walk_role") and document.walk_role!="walk_idle" and index==document.keys.size()-1:index=0
     var channel:String=key_channels.get_item_metadata(key_channels.selected)
     var next:float=clampf(value,-360.,360.)
     if is_equal_approx(float(document.keys[index].angles[channel]),next):return
@@ -1066,7 +1071,7 @@ func button(row:Node,title:String,fn:Callable,hint:String="")->Button:
 
 func open_motion(id:String):
     var path:=Asset.FOLDER+id+".json"
-    var d:=Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
+    var d:=WalkMotion.document(id) if id in Asset.WALK_IDS else Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
     var error:=Asset.problem(d)
     if error=="" and d.id!=id:error="Имя файла расходится с id"
     if error!="":
@@ -1076,6 +1081,7 @@ func open_motion(id:String):
     rotate_active=false
     root_drag_active=false
     if d.kind=="gait":pose_tool.select(0)
+    elif document.has("walk_role"):pose_tool.select(1)
     saved_signature=JSON.stringify(document)
     motion.select(ids.find(id))
     delete_motion_button.disabled=not can_delete_motion(id)
@@ -1083,10 +1089,14 @@ func open_motion(id:String):
     history.clear()
     redo_history.clear()
     playing=false
-    refresh(0)
-    info.text="Крест — цель, круг — результат."
+    refresh(START if document.has("walk_role") else 0)
+    if document.has("walk_role"):
+        set_pose_tool(1)
+        info.text="Сохрани движение и проверь в T. Стопы корректируются в исполнении."
+    else:info.text="Крест — цель, круг — результат."
 
 func end_frame()->int:
+    if document.has("walk_role"):return START+roundi(document.duration*60.)
     if document.kind=="gait":return 220
     return START+ceili(document.duration*60.)*(3 if document.get("loop",false) else 1)+22
 
@@ -1095,6 +1105,7 @@ func command(t:int)->Dictionary:
     return {"speed":preview_speed,"action":document.id if t==START else ""}
 
 func build_preview_player():
+    if document.has("walk_role"):return WalkPreview.new(document)
     if document.kind=="gait":return Asset.player(document,60)
     var gait_doc:Dictionary=Asset.read(Asset.DIR+"sprint.json")
     return Asset.ensemble(gait_doc,[document],60)
@@ -1118,6 +1129,11 @@ func simulate(value:int):
     show_pose()
 
 func refresh(value:int):
+    # Cycle boundary is a linked key, not an independent pose.
+    if document.has("walk_role") and document.walk_role!="walk_idle":
+        var last:Dictionary=document.keys[0].duplicate(true)
+        last.t=document.duration
+        document.keys[-1]=last
     ghost_cache.clear()
     player=null
     syncing=true
@@ -1138,10 +1154,17 @@ func refresh(value:int):
         param.value=document.duration
     pose_controls.visible=document.kind=="action"
     var is_action:bool=document.kind=="action"
-    fps_select.visible=is_action
+    var is_walk:bool=document.has("walk_role")
+    pose_tool.set_item_disabled(0,is_walk)
+    inspector.set_tab_disabled(1,is_walk)
+    inspector.set_tab_disabled(4,is_walk)
+    if is_walk and pose_tool.selected==0:pose_tool.select(1)
+    if is_walk and inspector.current_tab in [1,4]:inspector.current_tab=2
+    param.editable=not (is_walk and document.walk_role=="walk_idle")
+    fps_select.visible=is_action and not (is_walk and document.walk_role=="walk_idle")
     easing_select.visible=is_action
-    loop_toggle.visible=is_action
-    preview_speed_select.visible=is_action
+    loop_toggle.visible=is_action and not is_walk
+    preview_speed_select.visible=is_action and not is_walk
     if is_action:
         fps_select.select([24,30,60].find(int(document.get("fps",60))))
         easing_select.select(Asset.EASING.find(str(document.get("easing","linear"))))
@@ -1271,6 +1294,9 @@ func move_marker(lane:int,index:int,value:float):
 
 func seek_accent():
     if document.kind=="action":
+        if document.get("walk_role","")=="walk_idle":
+            seek(START)
+            return
         seek(START+roundi((document.events[0].t if document.events.size() else document.duration*.45)*60))
         return
     seek(65)
@@ -1339,6 +1365,7 @@ func set_pose_tool(mode:int)->void:
     if rotate_active:cancel_rotation()
     if root_drag_active:finish_root_drag()
     dragging=false
+    if mode==0 and document.has("walk_role"):mode=1
     if mode==1 and document.kind!="action":
         mode=0
         info.text="Бег редактируется целями и параметрами."
@@ -1374,11 +1401,13 @@ func sync_edit_pose()->void:
     var t:float=clampf(float(frame-START)/60.,0.,float(document.duration))
     var authored:Dictionary=sampled_pose(t)
     edit_pose=player.final_pose.duplicate(true)
-    var base:Dictionary=player.gait.intent().pose
-    edit_pose.root=base.root.duplicate()
-    edit_pose.angles.merge(authored.angles,true)
-    edit_pose.root[0]+=authored.root[0]
-    edit_pose.root[1]+=authored.root[1]
+    if document.has("walk_role"):edit_pose=authored.duplicate(true)
+    else:
+        var base:Dictionary=player.gait.intent().pose
+        edit_pose.root=base.root.duplicate()
+        edit_pose.angles.merge(authored.angles,true)
+        edit_pose.root[0]+=authored.root[0]
+        edit_pose.root[1]+=authored.root[1]
     if rotate_active:edit_pose.angles[rotate_channel]=clampf(rotate_initial+rotate_delta,-360.,360.)
     if root_drag_active:
         edit_pose.root[0]+=root_drag_delta.x
@@ -1386,6 +1415,9 @@ func sync_edit_pose()->void:
     pose_rig.evaluate(edit_pose)
 
 func sync_pose_hint()->void:
+    if document.has("walk_role") and pose_tool.selected==2:
+        pose_hint.text="Исполнение T · контакт стоп с землёй"
+        return
     match pose_tool.selected:
         0:pose_hint.text="IK: потяни точку · колесо: масштаб"
         1:pose_hint.text="FK: кость — вращение · квадрат таза — перенос · Shift — привязка"
@@ -1394,7 +1426,7 @@ func sync_pose_hint()->void:
 func editable_bone(id:String)->bool:
     if document.kind!="action" or not document.keys[0].angles.has(id):return false
     if id.begins_with("thigh_") or id.begins_with("knee_") or id.begins_with("foot_pitch_"):
-        return document.get("release",{}).has(id.get_slice("_",id.get_slice_count("_")-1))
+        return document.has("walk_role") or document.get("release",{}).has(id.get_slice("_",id.get_slice_count("_")-1))
     return id in BONE_END or id=="head"
 
 func bone_points(id:String)->Array:
@@ -1552,6 +1584,7 @@ func cancel_rotation()->void:
     info.text="Вращение отменено."
 
 func begin_drag(joint:String):
+    if document.has("walk_role"):return
     playing=false
     var phase_clock:="action"
     if document.kind=="gait":
@@ -1600,7 +1633,7 @@ func update_goal(_v:float):
     refresh(frame)
 
 func change_param(value:float):
-    if syncing:return
+    if syncing or document.get("walk_role","")=="walk_idle":return
     remember()
     if document.kind=="gait":document[param_key]=value
     else:
@@ -1617,8 +1650,14 @@ func choose_param(i:int):
 
 func key_pose():
     if document.kind!="action":return
+    if document.get("walk_role","")=="walk_idle":
+        remember()
+        document.keys[0].angles=(edit_pose if pose_tool.selected==1 else player.final_pose).angles.duplicate(true)
+        refresh(START)
+        return
     var t:=clampf((frame-START)/60.,0.,document.duration)
     t=clampf(snappedf(t,1./float(document.get("fps",60))),0.,document.duration)
+    if document.has("walk_role") and is_equal_approx(t,float(document.duration)):t=0.
     var angles:Dictionary={}
     var sampled:Dictionary=sampled_pose(t)
     for id in document.keys[0].angles:angles[id]=edit_pose.angles[id] if pose_tool.selected==1 else (player.final_pose.angles[id] if player.action!="" else sampled.angles[id])
@@ -1636,6 +1675,7 @@ func key_pose():
     refresh(frame)
 
 func toggle_contact():
+    if document.has("walk_role"):return
     if player.action=="" or document.get("loop",false):return
     var id:String=Asset.JOINTS[joints.selected]
     if not (id.begins_with("hand") or id.begins_with("foot")):return
@@ -1703,7 +1743,7 @@ func save_file():
     show_pose()
 
 func can_delete_motion(id:String)->bool:
-    return id.is_valid_identifier() and not Asset.IDS.has(id) and ids.has(id) and FileAccess.file_exists(Asset.FOLDER+id+".json")
+    return id.is_valid_identifier() and not Asset.IDS.has(id) and not Asset.WALK_IDS.has(id) and ids.has(id) and FileAccess.file_exists(Asset.FOLDER+id+".json")
 
 func ask_delete_motion()->void:
     if not can_delete_motion(str(document.id)):return
@@ -1746,7 +1786,9 @@ func _process(delta:float):
     if steps>0:
         clock-=steps/60.
         var next:int=frame+steps
-        if loop_play:simulate(next%(end_frame()+1))
+        if loop_play and document.has("walk_role"):
+            simulate(START+posmod(next-START,maxi(1,end_frame()-START)))
+        elif loop_play:simulate(next%(end_frame()+1))
         else:
             simulate(mini(next,end_frame()))
             if next>=end_frame():playing=false;update_play_button()

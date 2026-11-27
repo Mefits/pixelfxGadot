@@ -96,7 +96,7 @@ func run()->void:
     root.push_input(key)
     walk.advance()
     var stopped_x:float=walk.walker.x
-    for t in 10:walk.advance()
+    for t in 18:walk.advance()
     if walk.walker.x!=stopped_x or walk.walker.activity!=0.:
         fail("stop input")
         return
