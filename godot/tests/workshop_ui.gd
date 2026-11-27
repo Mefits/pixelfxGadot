@@ -87,6 +87,26 @@ func run():
         push_error("curve data")
         quit(1)
         return
+    var graph_index:int=5
+    var graph_old:float=editor.document.keys[graph_index].angles[channel]
+    var graph_x:float=editor.timeline.at(editor.timeline.curve_keys[graph_index].x)
+    click.position=editor.timeline.position+Vector2(graph_x,44)
+    click.pressed=true
+    root.push_input(click,true)
+    drag.position=click.position+Vector2(0,-10)
+    root.push_input(drag,true)
+    click.position=drag.position
+    click.pressed=false
+    root.push_input(click,true)
+    if absf(float(editor.document.keys[graph_index].angles[channel])-graph_old)<.5:
+        push_error("curve drag did not edit key")
+        quit(1)
+        return
+    editor.undo()
+    editor.seek_accent()
+    editor.channel_mode.select(1)
+    editor.target_list.hide()
+    editor.channel_tree.show()
     await process_frame
     await RenderingServer.frame_post_draw
     if root.get_texture().get_image().save_png(out.path_join("workshop-action.png"))!=OK:

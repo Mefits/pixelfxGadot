@@ -20,6 +20,8 @@ var status:Label
 var info:Label
 var motion:ItemList
 var target_list:ItemList
+var channel_tree:Tree
+var channel_mode:OptionButton
 var view_zoom:float=ZOOM
 var show_handles:bool=true
 var play_rate:float=1.
@@ -106,7 +108,14 @@ func _ready():
         var entry:=Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
         motion.add_item(str(entry.get("name",id)))
     motion.item_selected.connect(func(i):request_open(ids[i]))
-    caption(self,"УПРАВЛЯЕМЫЕ ТОЧКИ",Vector2(16,181),12)
+    channel_mode=OptionButton.new()
+    channel_mode.position=Vector2(14,175)
+    channel_mode.size=Vector2(162,24)
+    channel_mode.add_theme_font_size_override("font_size",12)
+    channel_mode.add_item("Точки / IK")
+    channel_mode.add_item("Каналы позы")
+    add_child(channel_mode)
+    channel_mode.item_selected.connect(func(i:int):target_list.visible=i==0;channel_tree.visible=i==1)
     target_list=ItemList.new()
     target_list.position=Vector2(14,201)
     target_list.size=Vector2(162,156)
@@ -118,6 +127,14 @@ func _ready():
         inspector.current_tab=1
         show_pose())
     target_list.select(0)
+    channel_tree=Tree.new()
+    channel_tree.position=target_list.position
+    channel_tree.size=target_list.size
+    channel_tree.hide_root=true
+    channel_tree.add_theme_font_size_override("font_size",12)
+    channel_tree.hide()
+    add_child(channel_tree)
+    channel_tree.item_selected.connect(select_channel_tree)
 
     var clip:=Control.new()
     clip.position=VIEW.position
@@ -237,7 +254,7 @@ func _ready():
     loop.toggled.connect(func(v:bool):loop_play=v)
     curve_view=CheckButton.new()
     curve_view.text="График"
-    curve_view.tooltip_text="Угол выбранного канала по ключам; клик — переход к ключу"
+    curve_view.tooltip_text="Углы исходных ключей. Потяни точку вверх/вниз для правки угла; время меняется на дорожке Позы."
     controls.add_child(curve_view)
     curve_view.toggled.connect(func(v:bool):timeline.curve_mode=v;timeline.queue_redraw())
     frame_label=caption(self,"",Vector2(745,382),12)
@@ -250,6 +267,7 @@ func _ready():
         if lane==0:inspector.current_tab=2
         else:inspector.current_tab=1)
     timeline.goal_selected.connect(func(i:int):select_goal(i);inspector.current_tab=1;show_pose())
+    timeline.curve_edited.connect(edit_curve_key)
     add_child(timeline)
     timeline.value_changed.connect(func(v):if not syncing:seek(roundi(v)))
     status=caption(self,"",Vector2(14,517),12)
@@ -372,6 +390,44 @@ func sync_key()->void:
     if not key_apply.disabled:
         var channel:String=key_channels.get_item_metadata(key_channels.selected)
         key_angle.set_value_no_signal(float(document.keys[i].angles[channel]))
+
+func refresh_channel_tree()->void:
+    channel_tree.clear()
+    var root_item:TreeItem=channel_tree.create_item()
+    for group in ["Корпус","Ближняя сторона","Дальняя сторона"]:
+        var group_item:TreeItem=channel_tree.create_item(root_item)
+        group_item.set_text(0,group)
+        group_item.set_selectable(0,false)
+        for i in key_channels.item_count:
+            var id:String=key_channels.get_item_metadata(i)
+            var category:String="Ближняя сторона" if id.ends_with("_near") else ("Дальняя сторона" if id.ends_with("_far") else "Корпус")
+            if category!=group:continue
+            var item:TreeItem=channel_tree.create_item(group_item)
+            item.set_text(0,UI.label(id))
+            item.set_metadata(0,id)
+        if group_item.get_child_count()==0:group_item.set_text(0,group+" — нет ключей")
+
+func select_channel_tree()->void:
+    var item:TreeItem=channel_tree.get_selected()
+    if item==null:return
+    var id:String=str(item.get_metadata(0))
+    for i in key_channels.item_count:
+        if key_channels.get_item_metadata(i)==id:
+            key_channels.select(i)
+            inspector.current_tab=2
+            sync_key()
+            sync_curve()
+            return
+
+func edit_curve_key(index:int,value:float)->void:
+    if document.kind!="action" or index<0 or index>=document.keys.size() or key_channels.selected<0:return
+    var channel:String=key_channels.get_item_metadata(key_channels.selected)
+    var next:float=clampf(value,-360.,360.)
+    if is_equal_approx(float(document.keys[index].angles[channel]),next):return
+    remember()
+    document.keys[index].angles[channel]=next
+    playing=false
+    refresh(START+roundi(float(document.keys[index].t)*60.))
 
 func sync_curve()->void:
     if timeline==null:return
@@ -557,6 +613,7 @@ func refresh(value:int):
     if document.kind=="action":
         for k in document.keys:timeline.clip.keys.append({"t":START+k.t*60})
         for e in document.events:timeline.clip.events.append({"t":START+e.t*60,"kind":e.kind})
+    refresh_channel_tree()
     select_goal(selected)
     syncing=false
     simulate(clampi(value,0,end_frame()))
