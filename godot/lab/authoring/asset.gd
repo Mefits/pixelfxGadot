@@ -119,10 +119,11 @@ static func build(d:Dictionary,hz:int)->Dictionary:
     return out
 
 static func legacy_clip_valid(c:Variant)->bool:
-    if not c is Dictionary or not number(c.get("duration"),.05,10) or not c.get("loop") is bool or not c.get("keys") is Array or c.keys.size()<2 or c.keys.size()>600 or not c.get("events") is Array:return false
+    if not c is Dictionary or not number(c.get("duration"),.05,10) or not c.get("loop") is bool or not c.get("keys") is Array or c.keys.size()<2 or c.keys.size()>600 or not c.get("events") is Array or not c.get("easing","smooth") in EASING:return false
     var last:float=-1.
     for k in c.keys:
         if not k is Dictionary or not number(k.get("t"),0,c.duration) or k.t<=last or not k.get("pose") is Dictionary:return false
+        if k.has("easing") and not k.easing in EASING:return false
         last=k.t
         var p:Dictionary=k.pose
         if not p.get("angles") is Dictionary or not p.get("root") is Array or p.root.size()!=2:return false
@@ -146,7 +147,7 @@ static func legacy_clip_to_action(c:Dictionary,id:String,label:String,fps:int=30
     for k in c.keys:
         var angles:Dictionary={}
         for channel in channels:angles[channel]=float(k.pose.angles.get(channel,0.))
-        keys.append({"t":float(k.t),"angles":angles,"root":[float(k.pose.root[0]),float(k.pose.root[1])]})
+        keys.append({"t":float(k.t),"angles":angles,"root":[float(k.pose.root[0]),float(k.pose.root[1])],"easing":k.get("easing",c.get("easing","smooth"))})
     var release:Dictionary={}
     for side in ["near","far"]:
         if channels.has("thigh_"+side) or channels.has("knee_"+side) or channels.has("foot_pitch_"+side):release[side]=[0.,.02,.98,1.]

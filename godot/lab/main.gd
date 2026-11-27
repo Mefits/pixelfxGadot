@@ -1,6 +1,6 @@
 extends Node2D
 const UI=preload("res://lab/ui_ru.gd")
-const VERSION="1.0 RC2"
+const VERSION="1.0 Motion Workspace"
 const SECTIONS=[
     {"label":"РАБОЧИЕ ИНСТРУМЕНТЫ","color":"#9dd5b7","items":[
         ["M","Редактор движений Astra","Создание поз, ключей и процедурных целей.","authoring/editor"],
@@ -29,7 +29,7 @@ func _ready()->void:
     root.size=Vector2(960,540)
     layer.add_child(root)
     _label(root,"CREATURE & PIXELFX",Vector2(28,18),27,Color("#e5edf4"))
-    _label(root,"LAB "+VERSION+"  /  ИНСТРУМЕНТАРИЙ РАЗРАБОТКИ",Vector2(30,52),13,Color("#91a5b9"))
+    _label(root,"LAB "+VERSION+"  /  ЕДИНАЯ МАСТЕРСКАЯ АНИМАЦИЙ И СТЕНДЫ",Vector2(30,52),13,Color("#91a5b9"))
     var help:=Button.new()
     help.text="Горячие клавиши"
     help.position=Vector2(748,23)
@@ -44,19 +44,19 @@ func _ready()->void:
             var spec:Array=section.items[row]
             var path:String="res://lab/"+str(spec[3])+".tscn"
             routes[spec[0]]=path
-            var y:float=124.+row*65.
+            var y:float=112.+row*49.
             var button:=Button.new()
             button.position=Vector2(x,y)
-            button.size=Vector2(440,58)
+            button.size=Vector2(440,46)
             button.tooltip_text=spec[2]
             button.add_theme_stylebox_override("normal",_style(Color("#1e2b39"),Color("#34465a")))
             button.add_theme_stylebox_override("hover",_style(Color("#293b4b"),Color(section.color)))
             root.add_child(button)
             buttons.append(button)
             button.pressed.connect(func():_open(path))
-            var name_label:=_label(button,spec[0]+"   "+spec[1],Vector2(13,6),17,Color("#e5edf4"))
+            var name_label:=_label(button,spec[0]+"   "+spec[1],Vector2(13,3),15,Color("#e5edf4"))
             name_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
-            var desc:=_label(button,spec[2],Vector2(14,32),13,Color("#a4b4c4"))
+            var desc:=_label(button,spec[2],Vector2(14,25),11,Color("#a4b4c4"))
             desc.mouse_filter=Control.MOUSE_FILTER_IGNORE
     var native_body:bool=ClassDB.class_exists("PixelFXBodyRaster")
     var native_physics:bool=ClassDB.class_exists("MotionPhysics099D")

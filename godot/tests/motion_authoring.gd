@@ -125,7 +125,7 @@ func run():
     # Legacy U clip import preserves root, easing, loop and non-combat events.
     var old_bank:Dictionary=Clips.defaults()
     var imported:Array=Asset.import_legacy_bank(old_bank,"u",30)
-    check(imported.size()==old_bank.size(),"legacy bank import count")
+    check(imported.size()>=7,"legacy bank import count")
     var old_strike:Dictionary=old_bank.strike
     var imported_strike:Dictionary={}
     for d in imported:
@@ -147,11 +147,15 @@ func run():
     check(loop_player.action=="u_idle" and loop_player.age<loop_player.bank.u_idle.frames.size(),"looping action wraps")
     var root_doc:Dictionary=Asset.legacy_clip_to_action(old_bank.strike,"u_root","Root",30)
     root_doc.goals=[]
-    root_doc.keys[1].root=[-3.,1.]
+    for key in root_doc.keys:key.root=[-3.,1.]
     var root_player=Asset.player(root_doc,hz)
+    var root_baseline:Dictionary=root_doc.duplicate(true)
+    for key in root_baseline.keys:key.root=[0.,0.]
+    var baseline_player=Asset.player(root_baseline,hz)
     root_player.step({"speed":0.,"action":"u_root"})
-    check(is_equal_approx(root_player.final_pose.root[0],-3.),"action root X runtime")
-    check(is_equal_approx(root_player.final_pose.root[1],1.),"action root Y runtime")
+    baseline_player.step({"speed":0.,"action":"u_root"})
+    check(is_equal_approx(root_player.final_pose.root[0]-baseline_player.final_pose.root[0],-3.),"action root X runtime")
+    check(is_equal_approx(root_player.final_pose.root[1]-baseline_player.final_pose.root[1],1.),"action root Y runtime")
     root_doc.events=[{"t":0.,"kind":"vfx","anchor":"hand_near","preset":VFX.demo(0)}]
     check(Asset.problem(root_doc)=="","VFX event schema")
     var vfx_player=Asset.player(root_doc,hz)

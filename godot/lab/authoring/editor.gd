@@ -393,6 +393,7 @@ func _ready():
     events_tab.add_child(event_kind)
     event_anchor=OptionButton.new()
     for id in Asset.EVENT_ANCHORS:event_anchor.add_item(joint_name(id))
+    event_anchor.select(Asset.EVENT_ANCHORS.find("hand_near"))
     events_tab.add_child(event_anchor)
     event_list=ItemList.new()
     event_list.custom_minimum_size.y=84
@@ -631,7 +632,10 @@ func mirror_action()->void:
         g.xy[0]=-float(g.xy[0])
     for event in document.events:event.anchor=mirror_id(str(event.anchor))
     var release:Dictionary=document.get("release",{})
-    document.release={"near":release.far,"far":release.near} if release.has("far") and release.has("near") else ({"near":release.far} if release.has("far") else ({"far":release.near} if release.has("near") else {}))
+    var mirrored_release:Dictionary={}
+    if release.has("near"):mirrored_release.far=release.near.duplicate()
+    if release.has("far"):mirrored_release.near=release.far.duplicate()
+    document.release=mirrored_release
     refresh(frame)
     info.text="Движение зеркально отражено."
 
@@ -1352,7 +1356,8 @@ func sync_edit_pose()->void:
 func sync_pose_hint()->void:
     match pose_tool.selected:
         0:pose_hint.text="IK: потяни точку · колесо: масштаб"
-        1:pose_hint.text="FK: потяни кость · Shift: шаг 5° · автоключ"
+        1:pose_hint.text="FK: кость — вращение · квадрат таза — перенос · Shift — привязка"
+        2:pose_hint.text="Исполнение Astra · контекст стойка / ходьба / бег"
         2:pose_hint.text="Результат Astra · редактирование отключено"
 
 func editable_bone(id:String)->bool:
