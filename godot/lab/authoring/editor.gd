@@ -9,6 +9,10 @@ const VIEW=Rect2(190,78,510,286)
 const UI=preload("res://lab/ui_ru.gd")
 const ZOOM=5.
 const Clips=preload("res://addons/creature/clips.gd")
+const VFX=preload("res://addons/pixelfx/composer/preset.gd")
+const FXPreview=preload("res://addons/creature/vfx_preview.gd")
+const FXSurface=preload("res://addons/pixelfx/native/surface.gd")
+const QuickVFX=preload("res://lab/vfx_quick_dialog.gd")
 const BONE_END={"hips":"chest","chest":"head","shoulder_near":"elbow_near","elbow_near":"hand_near","shoulder_far":"elbow_far","elbow_far":"hand_far","thigh_near":"knee_near","knee_near":"foot_near","thigh_far":"knee_far","knee_far":"foot_far"}
 const START=30
 var document:Dictionary
@@ -38,6 +42,13 @@ var rotate_changed:bool=false
 var rotate_key:int=-1
 var rotate_time:float=0.
 var rotate_angles:Dictionary={}
+var root_drag_active:bool=false
+var root_drag_start:=Vector2.ZERO
+var root_drag_initial:=Vector2.ZERO
+var root_drag_delta:=Vector2.ZERO
+var root_drag_time:=0.
+var root_drag_key:int=-1
+var root_drag_changed:bool=false
 var reference_sprite:Sprite2D
 var reference_file:FileDialog
 var reference_scale:SpinBox
@@ -46,6 +57,23 @@ var reference_x:SpinBox
 var reference_y:SpinBox
 var reference_visible:CheckButton
 var reference_name:Label
+var fx_surface
+var fx_preview=FXPreview.new()
+var fx_visible:CheckButton
+var event_list:ItemList
+var event_kind:OptionButton
+var event_anchor:OptionButton
+var vfx_select:OptionButton
+var vfx_choices:Array=[]
+var quick_dialog
+var import_dialog:FileDialog
+var fps_select:OptionButton
+var easing_select:OptionButton
+var loop_toggle:CheckButton
+var root_x:SpinBox
+var root_y:SpinBox
+var preview_speed_select:OptionButton
+var preview_speed:float=0.
 var release_panel:VBoxContainer
 var release_side:OptionButton
 var release_fields:Array[SpinBox]=[]
@@ -117,6 +145,7 @@ func _ready():
     button(top,"Копия",duplicate_motion,"Создать независимую копию JSON")
     button(top,"Сохранить",save_file,"Ctrl+S")
     button(top,"Загрузить",func():request_open(document.id),"Вернуться к сохранённому документу")
+    button(top,"Импорт U…",func():import_dialog.popup_centered_ratio(.75),"Перенести клипы из старого редактора U в формат Astra")
     undo_button=button(top,"↶",undo,"Отмена · Ctrl+Z")
     redo_button=button(top,"↷",redo,"Повтор · Ctrl+Shift+Z")
     button(top,"Меню",request_exit,"Esc")
@@ -188,7 +217,22 @@ func _ready():
     sprite.centered=false
     sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
     clip.add_child(sprite)
+    fx_surface=FXSurface.new()
+    clip.add_child(fx_surface)
+    fx_surface.configure(480,270)
+    fx_preview.rig=Body.make_rig()
+    fx_surface.hide()
     position_sprite()
+    quick_dialog=QuickVFX.new()
+    add_child(quick_dialog)
+    quick_dialog.applied.connect(apply_quick_vfx)
+    import_dialog=FileDialog.new()
+    import_dialog.title="Импорт клипов старого редактора U"
+    import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
+    import_dialog.access=FileDialog.ACCESS_FILESYSTEM
+    import_dialog.filters=PackedStringArray(["*.json ; Банк анимаций U (JSON)"])
+    import_dialog.file_selected.connect(import_legacy_file)
+    add_child(import_dialog)
     if ClassDB.class_exists("PixelFXBodyRaster"):
         raster=ClassDB.instantiate("PixelFXBodyRaster")
         ghost_raster=ClassDB.instantiate("PixelFXBodyRaster")
@@ -240,7 +284,19 @@ func _ready():
     param.step=.01
     movement.add_child(param)
     param.value_changed.connect(change_param)
-    var note:=caption(movement,"Параметры меняют документ, а не частоту симуляции (60 Гц).",Vector2.ZERO,12)
+    fps_select=OptionButton.new()
+    for value in [24,30,60]:fps_select.add_item("%d кадров/с"%value)
+    movement.add_child(fps_select)
+    fps_select.item_selected.connect(set_fps)
+    easing_select=OptionButton.new()
+    for label in ["Линейно","Плавно","Ускорение","Ступень"]:easing_select.add_item(label)
+    movement.add_child(easing_select)
+    easing_select.item_selected.connect(set_easing)
+    loop_toggle=CheckButton.new()
+    loop_toggle.text="Циклическое движение"
+    movement.add_child(loop_toggle)
+    loop_toggle.toggled.connect(set_loop)
+    var note:=caption(movement,"Сетка ключей: выбранный FPS. Симуляция Astra остаётся 60 Гц; FPS не меняет физику.",Vector2.ZERO,12)
     note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     release_panel=VBoxContainer.new()
     movement.add_child(release_panel)
@@ -293,6 +349,13 @@ func _ready():
     button(pose_controls,"+ Ключ",key_pose)
     button(pose_controls,"− Ключ",delete_key)
     button(keys_tab,"± Контакт",toggle_contact,"Маркер удара выбранной кисти или стопы")
+    var mirror_row:=HBoxContainer.new()
+    keys_tab.add_child(mirror_row)
+    button(mirror_row,"Зеркало движения",mirror_action,"Отразить ключи, корень, цели, события и фазы ног")
+    root_x=field(keys_tab,"Смещение X",-40.,40.,.1,0.)
+    root_y=field(keys_tab,"Смещение Y",-40.,40.,.1,0.)
+    root_x.value_changed.connect(func(_v:float):apply_key_root())
+    root_y.value_changed.connect(func(_v:float):apply_key_root())
     var refs:=tab("Реф.")
     reference_name=caption(refs,"Нет изображения",Vector2.ZERO,12)
     reference_name.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -321,6 +384,39 @@ func _ready():
     reference_file.filters=PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Изображения"])
     reference_file.file_selected.connect(load_reference)
     add_child(reference_file)
+    var events_tab:=tab("События")
+    caption(events_tab,"Маркеры действия",Vector2.ZERO,12)
+    event_kind=OptionButton.new()
+    for label in ["Удар","Заряд","Каст","VFX"]:event_kind.add_item(label)
+    events_tab.add_child(event_kind)
+    event_anchor=OptionButton.new()
+    for id in Asset.EVENT_ANCHORS:event_anchor.add_item(joint_name(id))
+    events_tab.add_child(event_anchor)
+    event_list=ItemList.new()
+    event_list.custom_minimum_size.y=84
+    events_tab.add_child(event_list)
+    event_list.item_selected.connect(select_event)
+    var event_actions:=HBoxContainer.new()
+    events_tab.add_child(event_actions)
+    button(event_actions,"+ Маркер",add_event)
+    button(event_actions,"Удалить",delete_event)
+    vfx_select=OptionButton.new()
+    vfx_select.fit_to_longest_item=false
+    vfx_select.clip_text=true
+    vfx_select.tooltip_text="Пресет для VFX-маркера"
+    events_tab.add_child(vfx_select)
+    var vfx_actions:=HBoxContainer.new()
+    events_tab.add_child(vfx_actions)
+    button(vfx_actions,"+ VFX",add_vfx_event)
+    button(vfx_actions,"Заменить",replace_vfx_event)
+    button(events_tab,"Быстрая настройка VFX",open_quick_vfx)
+    fx_visible=CheckButton.new()
+    fx_visible.text="Показывать VFX в просмотре"
+    fx_visible.button_pressed=true
+    events_tab.add_child(fx_visible)
+    fx_visible.toggled.connect(func(_v:bool):render_vfx())
+    var event_note:=caption(events_tab,"Strike — игровой контакт. Charge/Cast/VFX — визуальные события; сами по себе не наносят урон.",Vector2.ZERO,11)
+    event_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 
     var controls:=HBoxContainer.new()
     controls.position=Vector2(15,375)
@@ -341,6 +437,11 @@ func _ready():
     loop.button_pressed=true
     controls.add_child(loop)
     loop.toggled.connect(func(v:bool):loop_play=v)
+    preview_speed_select=OptionButton.new()
+    for label in ["Стойка","Ходьба","Бег"]:preview_speed_select.add_item(label)
+    preview_speed_select.select(0)
+    controls.add_child(preview_speed_select)
+    preview_speed_select.item_selected.connect(set_preview_speed)
     curve_view=CheckButton.new()
     curve_view.text="График"
     curve_view.tooltip_text="Углы исходных ключей. Потяни точку вверх/вниз для правки угла; время меняется на дорожке Позы."
@@ -354,7 +455,7 @@ func _ready():
     timeline.marker_moved.connect(move_marker)
     timeline.marker_selected.connect(func(lane:int,_i:int):
         if lane==0:inspector.current_tab=2
-        else:inspector.current_tab=1)
+        else:inspector.current_tab=4)
     timeline.goal_selected.connect(func(i:int):select_goal(i);inspector.current_tab=1;show_pose())
     timeline.curve_edited.connect(edit_curve_key)
     add_child(timeline)
@@ -427,6 +528,9 @@ func joint_name(id:String)->String:
 func position_sprite()->void:
     sprite.position=ORIGIN-VIEW.position-Vector2(240,219)*view_zoom/3.
     sprite.scale=Vector2.ONE*view_zoom/3.
+    if fx_surface:
+        fx_surface.position=sprite.position
+        fx_surface.scale=sprite.scale
     for ghost in ghost_sprites:
         ghost.position=sprite.position
         ghost.scale=sprite.scale
