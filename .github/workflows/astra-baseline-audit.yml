@@ -21,6 +21,10 @@ jobs:
         with:
           ref: 5418363c41f1ce14e9e513b63b09d2d09354b051
           path: candidate
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: fixed
       - name: Install Godot Linux
         if: runner.os == 'Linux'
         shell: bash

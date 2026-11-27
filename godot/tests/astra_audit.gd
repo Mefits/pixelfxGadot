@@ -142,6 +142,13 @@ func run():
             foot_marker=kicker.events.size()==1 and kicker.events[0][3]=="foot_far"
             check(kicker.released.has("far") and not kicker.paths[1].stance,"authored swing")
     check(foot_marker,"foot event")
+    var interrupted=Asset.ensemble(g,[kick,j],hz)
+    for t in range(90*scale):
+        var cmd:Dictionary={"speed":0.}
+        if t==20*scale:cmd.action="released_kick"
+        if t==34*scale:cmd.action="jab"
+        interrupted.step(cmd)
+        record("kick_interrupt",interrupted)
     # An impossible planted toe cannot move the support; a hand outside
     # the reach disk must report the clamp while preserving bone lengths.
     g.goals=[{"joint":"foot_near","xy":[100,-90],"clock":"cycle","center":0.,"width":1.,"priority":9,"weight":1.},
