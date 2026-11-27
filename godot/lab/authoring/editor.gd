@@ -8,6 +8,8 @@ const ORIGIN=Vector2(445,334)
 const VIEW=Rect2(190,78,510,286)
 const UI=preload("res://lab/ui_ru.gd")
 const ZOOM=5.
+const Clips=preload("res://addons/creature/clips.gd")
+const BONE_END={"hips":"chest","chest":"head","shoulder_near":"elbow_near","elbow_near":"hand_near","shoulder_far":"elbow_far","elbow_far":"hand_far","thigh_near":"knee_near","knee_near":"foot_near","thigh_far":"knee_far","knee_far":"foot_far"}
 const START=30
 var document:Dictionary
 var player
@@ -22,6 +24,20 @@ var motion:ItemList
 var target_list:ItemList
 var channel_tree:Tree
 var channel_mode:OptionButton
+var pose_tool:OptionButton
+var pose_hint:Label
+var pose_rig=Body.make_rig()
+var edit_pose:Dictionary={}
+var rotate_channel:String=""
+var rotate_pivot:=Vector2.ZERO
+var rotate_last:float=0.
+var rotate_delta:float=0.
+var rotate_initial:float=0.
+var rotate_active:bool=false
+var rotate_changed:bool=false
+var rotate_key:int=-1
+var rotate_time:float=0.
+var rotate_angles:Dictionary={}
 var reference_sprite:Sprite2D
 var reference_file:FileDialog
 var reference_scale:SpinBox
@@ -194,8 +210,20 @@ func _ready():
     onion.tooltip_text="Синий: 4 кадра назад; оранжевый: 4 кадра вперёд. Только просмотр."
     view_tools.add_child(onion)
     onion.toggled.connect(func(v:bool):onion_enabled=v;update_ghosts())
-    var help:=caption(self,"ЛКМ — потяни точку · колесо — масштаб",Vector2(202,346),12)
-    help.mouse_filter=Control.MOUSE_FILTER_IGNORE
+    pose_tool=OptionButton.new()
+    pose_tool.position=Vector2(195,338)
+    pose_tool.size=Vector2(130,24)
+    pose_tool.add_theme_font_size_override("font_size",12)
+    pose_tool.add_item("Цели / IK")
+    pose_tool.add_item("Поза / FK")
+    pose_tool.add_item("Исполнение")
+    pose_tool.tooltip_text="IK: цели Astra. FK: исходные углы. Исполнение: результат без редактирования."
+    add_child(pose_tool)
+    pose_tool.item_selected.connect(set_pose_tool)
+    pose_hint=caption(self,"",Vector2(333,345),12)
+    pose_hint.size=Vector2(360,17)
+    pose_hint.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+    pose_hint.mouse_filter=Control.MOUSE_FILTER_IGNORE
 
     inspector=TabContainer.new()
     inspector.position=Vector2(714,54)
@@ -257,7 +285,7 @@ func _ready():
     key_channels=OptionButton.new()
     key_channels.fit_to_longest_item=false
     keys_tab.add_child(key_channels)
-    key_channels.item_selected.connect(func(_i:int):sync_key();sync_curve())
+    key_channels.item_selected.connect(func(_i:int):sync_key();sync_curve();queue_redraw())
     key_angle=field(keys_tab,"Угол, °",-360,360,.001,0.)
     key_apply=button(keys_tab,"Применить угол",apply_key_angle,"Изменить выбранный канал существующего ключа")
     pose_controls=HBoxContainer.new()
@@ -424,10 +452,11 @@ func request_open(id:String)->void:
     open_motion(id)
 
 func toggle_play()->void:
+    if rotate_active:cancel_rotation()
+    if pose_tool.selected==1:pose_tool.select(2)
     playing=not playing
     clock=0.
-    update_play_button()
-    update_ghosts()
+    show_pose()
 
 func update_play_button()->void:
     play_button.text="Ⅱ Пауза" if playing else "▶ Пуск"
@@ -637,7 +666,7 @@ func remember()->void:
 
 func update_ghosts()->void:
     for ghost in ghost_sprites:ghost.hide()
-    if not onion_enabled or playing or player==null or ghost_raster==null:return
+    if not onion_enabled or playing or player==null or ghost_raster==null or pose_tool.selected==1:return
     for i in 2:
         var t:int=clampi(frame+[-4,4][i],0,end_frame())
         if t==frame:continue
@@ -704,6 +733,8 @@ func open_motion(id:String):
         info.text="Загрузка: "+error
         return
     document=d
+    rotate_active=false
+    if d.kind=="gait":pose_tool.select(0)
     saved_signature=JSON.stringify(d)
     motion.select(ids.find(id))
     selected=-1
@@ -726,6 +757,7 @@ func seek(value:int):
     simulate(value)
 
 func simulate(value:int):
+    rotate_active=false
     if not player or value<=frame:
         player=Asset.player(document,60)
         frame=-1
@@ -798,10 +830,12 @@ func select_goal(i:int):
     syncing=was
 
 func show_pose():
+    sync_edit_pose()
     var rendered:bool=false
     if raster:
-        var p:Dictionary=player.final_pose
-        var parts:Array=body.make(player.rig.points,p.angles,player.rig.rotations.head)
+        var p:Dictionary=edit_pose if pose_tool.selected==1 and not edit_pose.is_empty() else player.final_pose
+        var rig=pose_rig if pose_tool.selected==1 and not edit_pose.is_empty() else player.rig
+        var parts:Array=body.make(rig.points,p.angles,rig.rotations.head)
         Depth.apply(parts,player.style)
         for i in [0,2,3,8,9]:parts[i].material_id=1
         for i in [5,6,7,11,12,13,15,17]:parts[i].material_id=2
@@ -827,6 +861,7 @@ func show_pose():
     dirty_label.text="● Не сохранено" if JSON.stringify(document)!=saved_signature else "Сохранено"
     sync_key()
     sync_curve()
+    sync_pose_hint()
     update_play_button()
     undo_button.disabled=history.is_empty()
     redo_button.disabled=redo_history.is_empty()
@@ -843,7 +878,10 @@ func at_joint(joint:String)->Vector2:
 func _draw():
     if not player:return
     draw_line(Vector2(VIEW.position.x,ORIGIN.y),Vector2(VIEW.end.x,ORIGIN.y),Color("#73858e"))
-    if not show_handles:return
+    if not show_handles or pose_tool.selected==2:return
+    if pose_tool.selected==1:
+        draw_pose_bones()
+        return
     for j in Asset.JOINTS:
         var p:Vector2=ORIGIN+at_joint(j)*view_zoom
         if VIEW.has_point(p):
@@ -874,10 +912,22 @@ func seek_accent():
     while frame<130 and not airborne():simulate(frame+1)
 
 func _unhandled_input(event):
+    if rotate_active and event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and not event.pressed:
+        finish_rotation()
+        return
+    if rotate_active and event is InputEventMouseMotion:
+        rotate_to(event.position,event.shift_pressed)
+        return
     if event is InputEventKey and UI.editor_shortcut(self,event):
         match UI.physical_key(event):
-            KEY_SPACE:toggle_play()
-            KEY_ESCAPE:request_exit()
+            KEY_ESCAPE:
+                if rotate_active:cancel_rotation()
+                else:request_exit()
+            KEY_1:set_pose_tool(0)
+            KEY_2:set_pose_tool(1)
+            KEY_3:set_pose_tool(2)
+            KEY_SPACE:
+                if not rotate_active:toggle_play()
             KEY_Z:
                 if event.ctrl_pressed:
                     if event.shift_pressed:redo()
@@ -893,6 +943,10 @@ func _unhandled_input(event):
         if not event.pressed:
             dragging=false
         elif show_handles and VIEW.has_point(event.position):
+            if pose_tool.selected==1:
+                start_rotation(event.position)
+                return
+            if pose_tool.selected!=0:return
             var preferred:String=Asset.JOINTS[joints.selected]
             if event.position.distance_to(ORIGIN+at_joint(preferred)*view_zoom)<=6.:
                 begin_drag(preferred)
@@ -906,6 +960,160 @@ func _unhandled_input(event):
                     id=j
             if id!="":begin_drag(id)
     if event is InputEventMouseMotion and dragging:drag_to((event.position-ORIGIN)/view_zoom)
+
+func set_pose_tool(mode:int)->void:
+    if rotate_active:cancel_rotation()
+    dragging=false
+    if mode==1 and document.kind!="action":
+        mode=0
+        info.text="Бег редактируется целями и параметрами."
+    pose_tool.select(mode)
+    playing=false
+    if mode==1:
+        channel_mode.select(1)
+        target_list.hide()
+        channel_tree.show()
+        inspector.current_tab=2
+        if frame<START or frame>START+roundi(float(document.duration)*60.):
+            seek(START)
+            return
+    elif mode==0:
+        channel_mode.select(0)
+        target_list.show()
+        channel_tree.hide()
+    show_pose()
+
+func sampled_angles(t:float)->Dictionary:
+    var keys:Array=[]
+    for k in document.keys:
+        keys.append({"t":k.t,"pose":{"angles":k.angles,"root":[0.,0.]}})
+    return Clips.sample({"duration":document.duration,"loop":false,"easing":"linear","keys":keys},t,false).angles
+
+func sync_edit_pose()->void:
+    if document.kind!="action" or pose_tool.selected!=1:
+        edit_pose={}
+        return
+    edit_pose=player.final_pose.duplicate(true)
+    var t:float=clampf(float(frame-START)/60.,0.,float(document.duration))
+    var angles:Dictionary=sampled_angles(t)
+    edit_pose.angles.merge(angles,true)
+    if rotate_active:edit_pose.angles[rotate_channel]=clampf(rotate_initial+rotate_delta,-360.,360.)
+    pose_rig.evaluate(edit_pose)
+
+func sync_pose_hint()->void:
+    match pose_tool.selected:
+        0:pose_hint.text="IK: потяни точку · колесо: масштаб"
+        1:pose_hint.text="FK: потяни кость · Shift: шаг 5° · автоключ"
+        2:pose_hint.text="Результат Astra · редактирование отключено"
+
+func editable_bone(id:String)->bool:
+    if document.kind!="action" or not document.keys[0].angles.has(id):return false
+    if id.begins_with("thigh_") or id.begins_with("knee_") or id.begins_with("foot_pitch_"):
+        return document.get("release",{}).has(id.get_slice("_",id.get_slice_count("_")-1))
+    return id in BONE_END or id=="head"
+
+func bone_points(id:String)->Array:
+    var joint:String=id
+    if id.begins_with("foot_pitch_"):
+        joint="foot_"+id.get_slice("_",2)
+        var p:Vector2=pose_rig.point(joint)
+        var toe:Vector2=p+Vector2.RIGHT.rotated(deg_to_rad(float(edit_pose.angles.get(id,0.))))*6.
+        return [ORIGIN+p*view_zoom,ORIGIN+toe*view_zoom]
+    var a:Vector2=pose_rig.point(joint)
+    var b:Vector2=pose_rig.point(BONE_END[id]) if BONE_END.has(id) else a+Vector2(0,-5).rotated(float(pose_rig.rotations[joint]))
+    return [ORIGIN+a*view_zoom,ORIGIN+b*view_zoom]
+
+func selected_channel()->String:
+    return str(key_channels.get_item_metadata(key_channels.selected)) if key_channels.selected>=0 else ""
+
+func draw_pose_bones()->void:
+    if edit_pose.is_empty():return
+    var selected_id:String=selected_channel()
+    for id in document.keys[0].angles:
+        if not editable_bone(id):continue
+        var pts:Array=bone_points(id)
+        var a:Vector2=pts[0]
+        var b:Vector2=pts[1]
+        if not VIEW.has_point(a) or not VIEW.has_point(b):continue
+        var active:bool=id==selected_id
+        var c:Color=Color("#ffcf62") if active else Color("#91c6d5")
+        draw_line(a,b,c,3. if active else 1.5,true)
+        draw_circle(a,5. if active else 3.,c)
+        draw_circle(b,3.,c)
+        if active:
+            draw_arc(a,18.,0.,TAU,48,Color("#ffcf62"),1.5,true)
+            if rotate_active:
+                draw_string(ThemeDB.fallback_font,a+Vector2(20,-9),"%.1f°"%clampf(rotate_initial+rotate_delta,-360.,360.),HORIZONTAL_ALIGNMENT_LEFT,-1,12,c)
+
+func start_rotation(mouse:Vector2)->void:
+    if document.kind!="action" or frame<START or frame>START+roundi(float(document.duration)*60.):return
+    var chosen:String=""
+    var best:float=12.
+    var preferred:String=selected_channel()
+    for id in document.keys[0].angles:
+        if not editable_bone(id):continue
+        var pts:Array=bone_points(id)
+        var p:Vector2=Geometry2D.get_closest_point_to_segment(mouse,pts[0],pts[1])
+        var d:float=mouse.distance_to(p)
+        if mouse.distance_to(pts[0])<7.:continue
+        if id==preferred:d-=3.
+        if d<best:
+            best=d
+            chosen=id
+    if chosen=="":
+        info.text="Выбери доступную кость за линию, не за центр вращения."
+        return
+    playing=false
+    rotate_channel=chosen
+    rotate_key=key_at_frame()
+    rotate_time=float(document.keys[rotate_key].t) if rotate_key>=0 else clampf(float(frame-START)/60.,0.,float(document.duration))
+    if rotate_key<0 and document.keys.size()>=256:
+        info.text="Лимит 256 ключей."
+        return
+    rotate_angles=document.keys[rotate_key].angles.duplicate(true) if rotate_key>=0 else sampled_angles(rotate_time)
+    rotate_initial=float(rotate_angles[chosen])
+    rotate_delta=0.
+    rotate_changed=false
+    rotate_pivot=bone_points(chosen)[0]
+    rotate_last=(mouse-rotate_pivot).angle()
+    rotate_active=true
+    for i in key_channels.item_count:
+        if key_channels.get_item_metadata(i)==chosen:key_channels.select(i)
+    inspector.current_tab=2
+    sync_key()
+    sync_curve()
+    queue_redraw()
+
+func rotate_to(mouse:Vector2,snap:bool=false)->void:
+    if not rotate_active or mouse.distance_to(rotate_pivot)<5.:return
+    var a:float=(mouse-rotate_pivot).angle()
+    rotate_delta+=rad_to_deg(wrapf(a-rotate_last,-PI,PI))
+    rotate_last=a
+    var raw:float=rotate_delta
+    if snap:rotate_delta=snappedf(rotate_initial+raw,5.)-rotate_initial
+    rotate_changed=absf(rotate_delta)>.05
+    show_pose()
+    rotate_delta=raw
+
+func finish_rotation()->void:
+    if not rotate_active:return
+    var angle:float=float(edit_pose.angles.get(rotate_channel,rotate_initial))
+    rotate_active=false
+    if rotate_changed and absf(angle-rotate_initial)>.05:
+        remember()
+        rotate_angles[rotate_channel]=angle
+        if rotate_key>=0:document.keys[rotate_key].angles=rotate_angles
+        else:
+            document.keys.append({"t":rotate_time,"angles":rotate_angles})
+            document.keys.sort_custom(func(a,b):return a.t<b.t)
+        refresh(frame)
+        info.text="Ключ записан. 3 — проверить исполнение."
+    else:show_pose()
+
+func cancel_rotation()->void:
+    rotate_active=false
+    show_pose()
+    info.text="Вращение отменено."
 
 func begin_drag(joint:String):
     playing=false
@@ -975,7 +1183,7 @@ func key_pose():
     if player.action=="":return
     var t:=clampf((frame-START)/60.,0.,document.duration)
     var angles:Dictionary={}
-    for id in document.keys[0].angles:angles[id]=player.final_pose.angles[id]
+    for id in document.keys[0].angles:angles[id]=edit_pose.angles[id] if pose_tool.selected==1 else player.final_pose.angles[id]
     remember()
     for k in document.keys:
         if absf(t-k.t)<.00001:

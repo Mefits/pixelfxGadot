@@ -177,6 +177,59 @@ func run():
         push_error("leg return")
         quit(1)
         return
+    # FK editing is a transaction: live preview, one commit, no changes to IK goals.
+    editor.seek(editor.START+11)
+    editor.set_pose_tool(1)
+    editor.onion_enabled=false
+    for i in editor.key_channels.item_count:
+        if editor.key_channels.get_item_metadata(i)=="shoulder_near":editor.key_channels.select(i)
+    var source:Dictionary=editor.document.duplicate(true)
+    var count:int=editor.history.size()
+    var pts:Array=editor.bone_points("shoulder_near")
+    var pivot:Vector2=pts[0]
+    var handle:Vector2=pivot.lerp(pts[1],.7)
+    press.position=handle
+    press.pressed=true
+    root.push_input(press,true)
+    if not editor.rotate_active or editor.rotate_channel!="shoulder_near":
+        push_error("FK bone selection "+editor.rotate_channel)
+        quit(1)
+        return
+    drag.position=pivot+(handle-pivot).rotated(deg_to_rad(30.))
+    root.push_input(drag,true)
+    if editor.document!=source:
+        push_error("FK preview mutated document")
+        quit(1)
+        return
+    press.position=drag.position
+    press.pressed=false
+    root.push_input(press,true)
+    var new_key:int=editor.key_at_frame()
+    if new_key<0 or editor.document.keys.size()!=source.keys.size()+1 or editor.document.goals!=source.goals or editor.history.size()!=count+1:
+        push_error("FK auto key transaction")
+        quit(1)
+        return
+    var base_angle:float=editor.rotate_initial
+    if absf(float(editor.document.keys[new_key].angles.shoulder_near)-base_angle-30.)>.2:
+        push_error("FK angle")
+        quit(1)
+        return
+    await process_frame
+    await RenderingServer.frame_post_draw
+    if root.get_texture().get_image().save_png(out.path_join("workshop-fk.png"))!=OK:
+        quit(1)
+        return
+    editor.undo()
+    if editor.document!=source:
+        push_error("FK undo")
+        quit(1)
+        return
+    editor.redo()
+    editor.set_pose_tool(2)
+    if editor.edit_pose.size()!=0 or editor.last_image==null:
+        push_error("resolved preview")
+        quit(1)
+        return
     DirAccess.remove_absolute(editor.Asset.FOLDER+id+".json")
     print("MOTION_WORKSPACE_UI_OK")
     quit()
