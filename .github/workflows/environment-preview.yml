@@ -1,4 +1,4 @@
-name: Environment Lab v0.01 preview
+name: Environment Lab v0.02 preview
 on:
   push:
     branches: ['feature/environment-lab-v001']
@@ -29,7 +29,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           mkdir -p "$ENV_CAPTURE_DIR"
-          xvfb-run -a godot --path godot --rendering-method gl_compatibility --disable-vsync --script res://tests/environment_preview.gd
+          xvfb-run -a godot --path godot --rendering-method gl_compatibility --disable-vsync --audio-driver Dummy --script res://tests/environment_preview.gd
       - name: Encode 60 fps preview and 30 fps GIF
         run: |
           mkdir -p environment-preview
@@ -39,13 +39,13 @@ jobs:
           ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames -of json environment-preview/cosmic_ruins_60fps.mp4
       - uses: actions/upload-artifact@v4
         with:
-          name: Environment-Lab-v001-preview
+          name: Environment-Lab-v002-preview
           path: environment-preview/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Environment-Lab-v001-project
+          name: Environment-Lab-v002-project
           path: |
             godot/project.godot
             godot/addons/pixelfx/native/

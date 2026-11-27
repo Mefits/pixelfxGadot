@@ -8,7 +8,7 @@ void fragment() {
     float harmonic = max(1.0, floor(data.g * 5.0 + 0.5));
     float a = 6.28318530718 * (harmonic * cycle_phase + data.r);
     float wave = 0.5 + 0.5 * sin(a);
-    float strength = 0.28 + 0.58 * data.b;
+    float strength = 0.22 + 0.44 * data.b;
     float brightness = 1.0 - strength * (1.0 - wave);
     COLOR = vec4(base.rgb * brightness, base.a);
 }

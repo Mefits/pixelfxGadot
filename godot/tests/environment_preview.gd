@@ -29,7 +29,23 @@ func _run() -> void:
     scene.animate = false
     root.add_child(scene)
     print("Startup generation us=",scene.generation_us," layers=",scene.layers.size())
-    _check(scene.layers.size()==10,"ten independently generated scene layers")
+    _check(scene.layers.size()==21 and scene.shrubs.size()==6 and scene.leaves.size()==5,"ten original layers, six rooted shrubs and five leaves")
+    var roots: Array[Vector2] = []
+    for shrub in scene.shrubs:
+        roots.append(shrub.position)
+    var calm: bool = true
+    var rooted: bool = true
+    for i in range(121):
+        scene.set_time(float(i)/10.0)
+        for cloud in scene.cloud_layers:
+            calm = calm and absf(cloud.position.x)<=1.56 and absf(cloud.position.y)<=0.19
+        for j in range(roots.size()):
+            rooted = rooted and roots[j]==scene.shrubs[j].position
+    _check(calm,"cloud motion amplitude capped")
+    _check(rooted,"shrub roots never translate")
+    # A leaf is fully transparent at its own wrap, avoiding a visible teleport.
+    scene.set_time(0.0)
+    _check(scene.leaves[0].modulate.a<0.001,"leaf wrap is invisible")
     var first: Image = await _frame(0.0)
     var middle: Image = await _frame(3.0)
     var loop: Image = await _frame(12.0)
@@ -42,6 +58,22 @@ func _run() -> void:
         if first.get_pixel(x,y)!=middle.get_pixel(x,y):
             stable = false
     _check(stable,"foreground stays fixed")
+    var vegetation_changed: bool = false
+    for yy in range(int(first.get_height()*0.85),int(first.get_height()*0.914)):
+        for xx in range(int(first.get_width()*0.1),int(first.get_width()*0.38)):
+            if first.get_pixel(xx,yy)!=middle.get_pixel(xx,yy):
+                vegetation_changed = true
+                break
+        if vegetation_changed:
+            break
+    _check(vegetation_changed,"visible wind animation beside the ruins")
+    # Compare scanline coverage with unmodified Painter.poly on a small polygon.
+    var a = scene._p()
+    var b = scene._p()
+    var points: Array = [[12,13],[43,18],[28,38],[17,25]]
+    scene._poly(a,points,"2468ac")
+    b.poly(points,scene._c("2468ac"))
+    _check(a.color==b.color,"scanline optimization matches Painter polygon at 640")
     var ids: Array[int] = []
     for sprite in scene.layers:
         ids.append(sprite.texture.get_instance_id())

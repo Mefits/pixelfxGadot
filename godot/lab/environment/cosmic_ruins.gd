@@ -1,5 +1,5 @@
 extends Node2D
-## Environment Lab v0.01. Original authored composition using the native PixelFX Painter.
+## Environment Lab v0.02. Original authored composition using the native PixelFX Painter.
 ## PixelFX primitives and deterministic RNG: MIT, Patch/Hugo Duprez; see toolkit notices.
 const P = preload("res://addons/pixelfx/native/painter.gd")
 const PAL = preload("res://addons/pixelfx/native/palette.gd")
@@ -15,6 +15,10 @@ var generation_us: int = 0
 var star_material: ShaderMaterial
 var moon_light: Sprite2D
 var cloud_layers: Array[Sprite2D] = []
+var shrubs: Array[Sprite2D] = []
+var leaves: Array[Sprite2D] = []
+var leaf_anchors: Array[Vector2] = []
+const SHRUB_SHADER = preload("res://lab/environment/shrub_wind.gdshader")
 var layers: Array[Sprite2D] = []
 var factor: float = 1.0
 var raster_width: int
@@ -50,10 +54,20 @@ func set_time(seconds: float) -> void:
     star_material.set_shader_parameter("cycle_phase", phase / PERIOD)
     moon_light.modulate.a = 0.72 + 0.12 * cos(a)
     # Fixed authored silhouettes, gently drifting by different amounts. No regeneration.
-    cloud_layers[0].position = Vector2(2.6 * sin(a), 0.5 * sin(a + 0.5))
-    cloud_layers[1].position = Vector2(3.5 * sin(a + 0.6), 0.8 * cos(a))
-    cloud_layers[2].position = Vector2(5.2 * sin(a + 1.1), 1.0 * sin(a + 0.2))
-    cloud_layers[3].position = Vector2(6.3 * sin(a + 1.7), 0.8 * cos(a + 0.4))
+    cloud_layers[0].position = Vector2(0.65 * sin(a), 0.12 * sin(a + 0.5))
+    cloud_layers[1].position = Vector2(0.9 * sin(a + 0.6), 0.15 * cos(a))
+    cloud_layers[2].position = Vector2(1.25 * sin(a + 1.1), 0.18 * sin(a + 0.2))
+    cloud_layers[3].position = Vector2(1.55 * sin(a + 1.7), 0.15 * cos(a + 0.4))
+    for i in range(shrubs.size()):
+        var mat := shrubs[i].material as ShaderMaterial
+        mat.set_shader_parameter("wind", 0.52 * sin(2.0*a + i*0.8) + 0.28 * sin(3.0*a + i*1.3))
+    for i in range(leaves.size()):
+        # Each leaf travels once per cycle; zero alpha and zero alpha derivative at the reset.
+        var u := fposmod(phase/PERIOD + i*0.173, 1.0)
+        var leaf := leaves[i]
+        leaf.position = leaf_anchors[i] + Vector2(50.0*u, -8.0*sin(PI*u) + 2.0*sin(TAU*u + i))
+        leaf.rotation = 0.55*sin(TAU*u + i) + 0.18*sin(2.0*TAU*u)
+        leaf.modulate.a = 0.58 * pow(sin(PI*u), 2.0)
 
 func _p():
     return P.new(raster_width, raster_height)
@@ -65,10 +79,33 @@ func _r(i: int, j: int) -> float:
     return M.rand_hash([seed, i, j])
 
 func _poly(p, pts: Array, color: String) -> void:
-    var q: Array = []
+    # Same even-odd pixel-center fill as PixelFX Painter.poly, but scanline intersections
+    # are calculated once per row. Use Painter.line for spans, not a per-pixel polygon test.
+    var q: Array[Vector2] = []
+    var low: float = INF
+    var high: float = -INF
     for pt in pts:
-        q.append([float(pt[0]) * factor, float(pt[1]) * factor])
-    p.poly(q, _c(color))
+        var v := Vector2(float(pt[0]),float(pt[1])) * factor
+        q.append(v)
+        low = minf(low,v.y)
+        high = maxf(high,v.y)
+    if q.size()<3:
+        return
+    var ink := _c(color)
+    for y in range(maxi(0,int(ceil(low-0.5))),mini(raster_height,int(ceil(high-0.5)))):
+        var py: float = y+0.5
+        var xs: Array[float] = []
+        for i in range(q.size()):
+            var a: Vector2 = q[i]
+            var b: Vector2 = q[(i+1)%q.size()]
+            if (a.y>py)!=(b.y>py):
+                xs.append(a.x + (py-a.y)*(b.x-a.x)/(b.y-a.y))
+        xs.sort()
+        for j in range(0,xs.size()-1,2):
+            var x0: int = maxi(0,int(ceil(xs[j]-0.5)))
+            var x1: int = mini(raster_width-1,int(ceil(xs[j+1]-0.5))-1)
+            if x1>=x0:
+                p.line(x0,y,x1,y,ink)
 
 func _ellipse(p, x: float, y: float, rx: float, ry: float, color: String) -> void:
     p.ellipse(x * factor, y * factor, rx * factor, ry * factor, _c(color))
@@ -100,7 +137,8 @@ func _sprite(p, label_name: String, moving: bool = false, is_light: bool = false
 
 func _build() -> void:
     var sky = _p()
-    _rect(sky, 0, 0, 640, 360, "020306")
+    # Opaque full-frame clear, same packed RGBA as Painter.rect.
+    sky.color.fill(_c("020306") - 0x100000000)
     # Sweeping night bands, laid out explicitly to preserve the reference's open sky.
     _ribbon(sky, [Vector2(-30, 49), Vector2(170, -31), Vector2(443, -23), Vector2(680, 61)], 16, "0a101a")
     _ribbon(sky, [Vector2(-38, 90), Vector2(145, 11), Vector2(380, 3), Vector2(660, 77)], 12, "080e18")
@@ -116,14 +154,15 @@ func _build() -> void:
     _ribbon(distant, [Vector2(85,220),Vector2(176,143),Vector2(397,142),Vector2(551,217)], 13, "0a182c")
     cloud_layers.append(_sprite(distant, "DistantAtmosphere", true))
     var moon = _p()
-    _ellipse(moon, 318, 151, 14.5, 14.5, "e6f7ff")
-    _ellipse(moon, 316, 149, 12.0, 12.0, "f9fdff")
-    moon.glow(318 * factor, 151 * factor, 40 * factor, _c("2d85db"), 0.38)
-    moon.glow(318 * factor, 151 * factor, 21 * factor, _c("a3e6ff"), 0.22)
+    _ellipse(moon, 316, 125, 15.5, 15.5, "d7efff")
+    _ellipse(moon, 315, 123, 13.0, 13.0, "f9fdff")
+    moon.glow(316 * factor, 125 * factor, 39 * factor, _c("2d85db"), 0.34)
+    moon.glow(316 * factor, 125 * factor, 21 * factor, _c("a3e6ff"), 0.20)
     moon_light = _sprite(moon, "MoonHalo", false, true)
     _sprite(moon, "Moon")
     _clouds()
     _terrain()
+    _foliage()
 
 func _ribbon(p, control: Array, width: float, color: String) -> void:
     var upper: Array = []
@@ -176,8 +215,8 @@ func _bank(p, lobes: Array, color: String, belly: float) -> void:
 func _clouds() -> void:
     var back = _p()
     _ribbon(back, [Vector2(115,213),Vector2(205,140),Vector2(382,135),Vector2(500,214)], 14, "0a2445")
-    _bank(back, [[172,173,29,17],[199,151,30,29],[230,137,27,24],[260,145,37,19],[307,141,32,22],[350,128,37,17],[381,144,37,26],[418,158,30,22],[453,176,22,12]], "103c68", 2.0)
-    _bank(back, [[176,170,20,14],[198,151,25,23],[227,137,23,20],[250,143,22,15],[340,130,28,13],[367,130,23,14],[400,151,27,22],[430,165,20,17]], "185c92", 0.0)
+    _bank(back, [[172,173,29,17],[199,151,30,29],[230,137,27,24],[260,145,37,19],[307,151,32,16],[350,139,37,16],[381,144,37,26],[418,158,30,22],[453,176,22,12]], "103c68", 2.0)
+    _bank(back, [[176,170,20,14],[198,151,25,23],[227,137,23,20],[250,143,22,15],[340,140,28,10],[367,135,23,13],[400,151,27,22],[430,165,20,17]], "185c92", 0.0)
     cloud_layers.append(_sprite(back, "CloudBack", true))
     var mass = _p()
     _bank(mass, [[159,182,15,10],[176,172,21,17],[200,166,20,24],[220,147,22,18],[252,140,29,24],[270,157,23,19],[292,169,32,19]], "0b467a", 4.0)
@@ -187,6 +226,11 @@ func _clouds() -> void:
     _bank(mass, [[322,162,24,15],[345,144,28,20],[371,138,26,20],[396,149,27,19],[421,160,29,18],[452,180,20,12],[468,192,10,9]], "10639e", 3.0)
     _bank(mass, [[327,152,23,13],[350,137,23,11],[373,134,24,15],[391,145,24,15],[418,160,17,12]], "218ac0", 0.0)
     _bank(mass, [[339,159,18,14],[366,158,23,20],[391,171,25,16],[425,180,30,14],[450,193,20,9]], "0b4278", 1.0)
+    # More varied overlapping lobes and restrained moonlit rim, not global brightening.
+    _bank(mass, [[190,159,11,9],[208,153,12,11],[225,143,14,10]], "42b0d6", 0.0)
+    _bank(mass, [[233,154,14,9],[250,150,15,11],[269,159,13,7]], "2282b5", 0.0)
+    _bank(mass, [[354,148,13,11],[374,143,16,11],[393,153,13,8]], "37a4d1", 0.0)
+    _bank(mass, [[385,168,14,9],[404,174,18,11],[425,183,15,7]], "145586", 0.0)
     _ribbon(mass, [Vector2(145,193),Vector2(199,173),Vector2(244,170),Vector2(290,173)], 4.7, "299ac9")
     _ribbon(mass, [Vector2(160,203),Vector2(222,172),Vector2(277,170),Vector2(313,169)], 4.0, "0b294c")
     _ribbon(mass, [Vector2(177,207),Vector2(230,182),Vector2(272,180),Vector2(311,174)], 2.7, "1b75a6")
@@ -218,7 +262,7 @@ func _stars() -> void:
     var occupied: Array[Vector2] = []
     var count: int = 0
     for i in range(1600):
-        if count >= 420:
+        if count >= 570:
             break
         var x: float = 3.0 + _r(i,1)*634.0
         var y: float = 2.0 + _r(i,2)*328.0
@@ -232,11 +276,11 @@ func _stars() -> void:
             continue
         occupied.append(v)
         var pick: float = _r(i,3)
-        var radius: int = 0 if pick < 0.72 else (1 if pick < 0.94 else 2)
-        var bright: float = 0.44 + 0.56*_r(i,4)
+        var radius: int = 0 if pick < 0.59 else (1 if pick < 0.89 else 2)
+        var bright: float = 0.61 + 0.39*_r(i,4)
         var cool: bool = _r(i,5) < 0.56
         var core: int = PAL.scale_color(_c("d9f6ff" if cool else "f3f5ff"),bright)
-        var arms: int = PAL.scale_color(_c("55c6ee" if cool else "9aafc8"),bright*0.75)
+        var arms: int = PAL.scale_color(_c("55c6ee" if cool else "9aafc8"),bright*0.88)
         var harmonic: int = 1 + int(_r(i,6)*4.0)
         var packed: int = PAL.rgb(_r(i,7)*255.0, harmonic*51, 75+_r(i,8)*160.0)
         _star_mark(stars,x,y,radius,core,arms)
@@ -306,7 +350,12 @@ func _terrain() -> void:
     _slab(p,454,264,48,69,-17,22)
     _slab(p,485,290,28,43,8,23)
     _slab(p,510,308,24,25,6,24)
-    for i in range(75):
+    # Irregular fractured blocks break up the repetitive column silhouettes.
+    _poly(p,[[173,303],[189,281],[204,278],[213,299],[206,313],[179,319]],"15395e")
+    _poly(p,[[173,303],[189,281],[204,278],[197,286],[182,309]],"23567e")
+    _poly(p,[[433,312],[447,293],[466,290],[475,309],[464,321],[438,322]],"123252")
+    _poly(p,[[433,312],[447,293],[466,290],[457,297],[440,315]],"1c5078")
+    for i in range(45):
         var side: bool = i%2==0
         var x: float = (110+_r(i,201)*166) if side else (390+_r(i,201)*155)
         var y: float = 325.0-_r(i,202)*8.0
@@ -316,21 +365,75 @@ func _terrain() -> void:
     _rect(floor,0,330,640,30,"080e18")
     _poly(floor,[[107,330],[535,330],[514,342],[470,353],[458,360],[192,360],[170,351],[135,348]],"0a2442")
     # Deterministic stone mosaic; bright only at the combat plane.
-    for row in range(5):
-        for i in range(55):
-            var id: int = row*55+i
-            var x: float = 110.0+i*8.0+_r(id,211)*4.0+(row%2)*3.0
-            var y: float = 333.0+row*6.4+_r(id,212)*2.0
+    for row in range(4):
+        for i in range(38):
+            var id: int = row*38+i
+            var x: float = 110.0+i*11.5+_r(id,211)*3.0+(row%2)*5.0
+            var y: float = 334.0+row*8.0+_r(id,212)*1.4
             if x<110+row*11 or x>535-row*13:
                 continue
-            var w: float = 3.5+_r(id,213)*4.2
-            var h: float = 2.4+_r(id,214)*3.3
-            var col: String = ["123457","15416e","1a5689","0d2b4c"][int(_r(id,215)*4.0)]
+            var w: float = 5.0+_r(id,213)*2.8
+            var h: float = 3.0+_r(id,214)*2.6
+            var col: String = ["102e4e","123654","164066","0d2947"][int(_r(id,215)*4.0)]
             if row==0:
-                col=["1a74ac","2396c9","40b2db","155c90"][id%4]
+                col=["16517c","226e95","3386aa","174b71"][id%4]
             _poly(floor,[[x-w,y],[x-1,y-h],[x+w,y-h*0.4],[x+w*0.45,y+h],[x-w*0.5,y+h*0.7]],col)
-            if row<2:
-                _line(floor,x-w*0.65,y-1,x-1,y-h,col if row==1 else "5cc9e4")
+            if row==0 and _r(id,216)>0.4:
+                _line(floor,x-w*0.65,y-1,x-1,y-h,"408eae")
     _rect(floor,0,330,640,1,"32677e")
     _rect(floor,107,330,428,1,"76d8ed")
     _sprite(floor,"CombatPlane")
+
+
+# Small textures use the actual PixelFX Painter; no full-screen allocations for vegetation.
+func _local_texture(p) -> ImageTexture:
+    return ImageTexture.create_from_image(Image.create_from_data(p.width,p.height,false,Image.FORMAT_RGBA8,p.rgba_bytes()))
+
+func _local_sprite(tex: Texture2D, anchor: Vector2, label_name: String, offset_px: Vector2) -> Sprite2D:
+    var sp := Sprite2D.new()
+    sp.name = label_name
+    sp.texture = tex
+    sp.centered = false
+    sp.offset = offset_px * factor
+    sp.scale = Vector2.ONE / factor
+    sp.position = anchor
+    sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+    world.add_child(sp)
+    layers.append(sp)
+    return sp
+
+func _twig(p, a: Vector2, b: Vector2, c: String) -> void:
+    p.line(a.x*factor,a.y*factor,b.x*factor,b.y*factor,_c(c))
+
+func _foliage() -> void:
+    # Blue-teal silhouettes, kept within the side ruins and below the main focal point.
+    var anchors := [Vector2(96,329),Vector2(143,329),Vector2(235,329),Vector2(412,329),Vector2(500,329),Vector2(548,329)]
+    for i in range(anchors.size()):
+        var p = P.new(int(36*factor),int(24*factor))
+        # Grounded branching fan inspired by weather/fireflies.js; individual leaf clusters.
+        for j in range(8):
+            var x: float = 5.0+j*3.5+_r(i*10+j,501)*2.0
+            var y: float = 8.0+_r(i*10+j,502)*8.0 - 5.0*sin(PI*j/7.0)
+            var mid := Vector2(18.0+(x-18.0)*0.55,17.0)
+            _twig(p,Vector2(18,22),mid,"102d3c")
+            _twig(p,mid,Vector2(x,y),"1c4252")
+            for k in range(3):
+                var lx: float = lerpf(mid.x,x,0.42+k*0.27)+(1.5 if k%2==0 else -1.5)
+                var ly: float = lerpf(mid.y,y,0.42+k*0.27)
+                p.ellipse(lx*factor,ly*factor,2.5*factor,1.7*factor,_c("123744"))
+                p.ellipse((lx-0.8)*factor,(ly-0.7)*factor,1.6*factor,0.9*factor,_c(["26576a","1c4858","367184"][(i+j+k)%3]))
+        var shrub := _local_sprite(_local_texture(p),anchors[i],"Shrub_%d"%i,Vector2(-18,-22))
+        var mat := ShaderMaterial.new()
+        mat.shader = SHRUB_SHADER
+        shrub.material = mat
+        shrubs.append(shrub)
+    var leaf_p = P.new(int(8*factor),int(6*factor))
+    leaf_p.poly([[1*factor,3*factor],[4*factor,1*factor],[7*factor,2*factor],[5*factor,5*factor],[2*factor,4*factor]],_c("4d8b99"))
+    leaf_p.line(2*factor,3*factor,5*factor,2*factor,_c("85b7b7"))
+    var tex := _local_texture(leaf_p)
+    # Sparse wind trails stay beside ruins, away from the central fighting space.
+    for i in range(5):
+        var anchor := Vector2(90.0+_r(i,600)*105.0 if i<3 else 426.0+_r(i,600)*100.0, 308.0+_r(i,601)*13.0)
+        var leaf := _local_sprite(tex,anchor,"WindLeaf_%d"%i,Vector2(-4,-3))
+        leaves.append(leaf)
+        leaf_anchors.append(anchor)
