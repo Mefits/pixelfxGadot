@@ -1,5 +1,6 @@
 extends SceneTree
 const Studio=preload("res://lab/hybrid_studio.gd")
+const Asset=preload("res://lab/authoring/asset.gd")
 func _initialize():call_deferred("run")
 func fail(reason:String)->void:
     push_error(reason)
@@ -113,10 +114,20 @@ func run()->void:
         await process_frame
         await RenderingServer.frame_post_draw
         root.get_texture().get_image().save_png(args[0].path_join("combat.png"))
-    fight.select_action("feint")
+    # Use the same persistence path as M, then discover the document in T.
+    var probe:Dictionary=Asset.read(Asset.DIR+"feint.json")
+    probe.id="integration_probe_"+str(Time.get_ticks_usec())
+    probe.name="Integration probe"
+    if Asset.persist(probe)!=OK:
+        fail("saved action persistence")
+        return
+    fight.reset()
+    fight.select_action(probe.id)
     fight.queue_attack(0)
     fight.advance()
-    if fight.players[0].action!="feint":
+    var selected_ok:bool=fight.players[0].action==probe.id
+    DirAccess.remove_absolute(ProjectSettings.globalize_path(Asset.FOLDER+probe.id+".json"))
+    if not selected_ok:
         fail("saved-action combat selection")
         return
     print("LAB_100_INTEGRATION_OK")
