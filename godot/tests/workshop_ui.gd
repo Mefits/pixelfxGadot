@@ -130,6 +130,53 @@ func run():
         push_error("new action persistence")
         quit(1)
         return
+    # Reference view is independent of document and current simulation.
+    var ref_path:String="user://workspace_test_reference.png"
+    editor.last_image.save_png(ref_path)
+    var before:Dictionary=editor.document.duplicate(true)
+    var state:PackedByteArray=editor.player.save()
+    editor.load_reference(ref_path)
+    editor.reference_scale.value=1.5
+    editor.reference_x.value=35.
+    if editor.reference_sprite.texture==null or not editor.reference_sprite.visible or editor.document!=before or editor.player.save()!=state:
+        push_error("reference isolation")
+        quit(1)
+        return
+    editor.inspector.current_tab=3
+    await process_frame
+    await RenderingServer.frame_post_draw
+    if root.get_texture().get_image().save_png(out.path_join("workshop-reference.png"))!=OK:
+        quit(1)
+        return
+    editor.clear_reference()
+    DirAccess.remove_absolute(ref_path)
+    editor.apply_release()
+    if not editor.document.get("release",{}).has("near") or editor.Asset.problem(editor.document)!="":
+        push_error("leg release")
+        quit(1)
+        return
+    for k in editor.document.keys:
+        for channel_id in ["thigh_near","knee_near","foot_pitch_near"]:
+            if not k.angles.has(channel_id):
+                push_error("leg channels")
+                quit(1)
+                return
+    editor.seek(editor.START+15)
+    if not editor.player.released.has("near"):
+        push_error("authored leg not released in kernel")
+        quit(1)
+        return
+    editor.undo()
+    if editor.document!=before:
+        push_error("leg undo")
+        quit(1)
+        return
+    editor.redo()
+    editor.remove_release()
+    if editor.document.get("release",{}).has("near"):
+        push_error("leg return")
+        quit(1)
+        return
     DirAccess.remove_absolute(editor.Asset.FOLDER+id+".json")
     print("MOTION_WORKSPACE_UI_OK")
     quit()

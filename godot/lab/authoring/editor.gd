@@ -22,6 +22,19 @@ var motion:ItemList
 var target_list:ItemList
 var channel_tree:Tree
 var channel_mode:OptionButton
+var reference_sprite:Sprite2D
+var reference_file:FileDialog
+var reference_scale:SpinBox
+var reference_opacity:SpinBox
+var reference_x:SpinBox
+var reference_y:SpinBox
+var reference_visible:CheckButton
+var reference_name:Label
+var release_panel:VBoxContainer
+var release_side:OptionButton
+var release_fields:Array[SpinBox]=[]
+var release_state:Label
+var release_remove:Button
 var view_zoom:float=ZOOM
 var show_handles:bool=true
 var play_rate:float=1.
@@ -143,6 +156,10 @@ func _ready():
     clip.mouse_filter=Control.MOUSE_FILTER_IGNORE
     clip.z_index=-1
     add_child(clip)
+    reference_sprite=Sprite2D.new()
+    reference_sprite.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR
+    reference_sprite.hide()
+    clip.add_child(reference_sprite)
     for color in [Color(.35,.75,1.,.33),Color(1.,.58,.28,.33)]:
         var ghost:=Sprite2D.new()
         ghost.centered=false
@@ -197,6 +214,22 @@ func _ready():
     param.value_changed.connect(change_param)
     var note:=caption(movement,"Параметры меняют документ, а не частоту симуляции (60 Гц).",Vector2.ZERO,12)
     note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    release_panel=VBoxContainer.new()
+    movement.add_child(release_panel)
+    caption(release_panel,"ОПОРА / АВТОРСКАЯ НОГА",Vector2.ZERO,12)
+    release_side=OptionButton.new()
+    release_side.add_item("Ближняя нога")
+    release_side.add_item("Дальняя нога")
+    release_panel.add_child(release_side)
+    release_side.item_selected.connect(func(_i:int):sync_release())
+    release_state=caption(release_panel,"",Vector2.ZERO,12)
+    release_state.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    for pair in [["Начало, %",0.],["Полная, %",18.],["Возврат, %",75.],["Опора, %",100.]]:
+        release_fields.append(field(release_panel,pair[0],0.,100.,1.,pair[1]))
+    button(release_panel,"Применить фазы",apply_release,"Добавить каналы ноги и задать окно авторского контроля")
+    release_remove=button(release_panel,"Вернуть опору Astra",remove_release)
+    var leg_note:=caption(release_panel,"Опора вне окна процедурная. Физика Box2D не используется.",Vector2.ZERO,12)
+    leg_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
     var goals:=tab("Цели")
     caption(goals,"Точка / сохранённая цель",Vector2.ZERO,12)
     joints=OptionButton.new()
@@ -232,6 +265,34 @@ func _ready():
     button(pose_controls,"+ Ключ",key_pose)
     button(pose_controls,"− Ключ",delete_key)
     button(keys_tab,"± Контакт",toggle_contact,"Маркер удара выбранной кисти или стопы")
+    var refs:=tab("Реф.")
+    reference_name=caption(refs,"Нет изображения",Vector2.ZERO,12)
+    reference_name.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+    var ref_row:=HBoxContainer.new()
+    refs.add_child(ref_row)
+    button(ref_row,"Открыть…",func():reference_file.popup_centered_ratio(.75))
+    button(ref_row,"Удалить",clear_reference)
+    reference_visible=CheckButton.new()
+    reference_visible.text="Показывать"
+    reference_visible.button_pressed=true
+    refs.add_child(reference_visible)
+    reference_visible.toggled.connect(func(_v:bool):update_reference())
+    reference_opacity=field(refs,"Прозрачн.",0.,1.,.05,.35)
+    reference_scale=field(refs,"Масштаб",.1,3.,.05,1.)
+    reference_x=field(refs,"Сдвиг X",-500.,500.,1.,0.)
+    reference_y=field(refs,"Сдвиг Y",-300.,300.,1.,0.)
+    for spin in [reference_opacity,reference_scale,reference_x,reference_y]:
+        spin.value_changed.connect(func(_v:float):update_reference())
+    button(refs,"Сброс вида",reset_reference_view)
+    var ref_note:=caption(refs,"Локальный PNG/JPG/WebP. Не входит в JSON движения.",Vector2.ZERO,12)
+    ref_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    reference_file=FileDialog.new()
+    reference_file.title="Выбрать референс"
+    reference_file.file_mode=FileDialog.FILE_MODE_OPEN_FILE
+    reference_file.access=FileDialog.ACCESS_FILESYSTEM
+    reference_file.filters=PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Изображения"])
+    reference_file.file_selected.connect(load_reference)
+    add_child(reference_file)
 
     var controls:=HBoxContainer.new()
     controls.position=Vector2(15,375)
@@ -390,6 +451,109 @@ func sync_key()->void:
     if not key_apply.disabled:
         var channel:String=key_channels.get_item_metadata(key_channels.selected)
         key_angle.set_value_no_signal(float(document.keys[i].angles[channel]))
+
+func load_reference(path:String)->void:
+    var file:=FileAccess.open(path,FileAccess.READ)
+    if file==null:
+        info.text="Не удалось открыть референс."
+        return
+    var length:int=file.get_length()
+    file.close()
+    if length>32*1024*1024:
+        info.text="Референс больше 32 МБ."
+        return
+    var im:=Image.new()
+    if im.load(path)!=OK or im.is_empty():
+        info.text="Не удалось прочитать изображение."
+        return
+    if maxi(im.get_width(),im.get_height())>4096:
+        var ratio:float=4096./maxi(im.get_width(),im.get_height())
+        im.resize(maxi(1,roundi(im.get_width()*ratio)),maxi(1,roundi(im.get_height()*ratio)),Image.INTERPOLATE_LANCZOS)
+    reference_sprite.texture=ImageTexture.create_from_image(im)
+    reference_name.text=path.get_file()
+    reference_name.tooltip_text=path
+    reference_visible.set_pressed_no_signal(true)
+    reset_reference_view()
+    info.text="Референс загружен (только просмотр)."
+
+func clear_reference()->void:
+    reference_sprite.texture=null
+    reference_name.text="Нет изображения"
+    reference_name.tooltip_text=""
+    update_reference()
+
+func reset_reference_view()->void:
+    reference_opacity.set_value_no_signal(.35)
+    reference_scale.set_value_no_signal(1.)
+    reference_x.set_value_no_signal(0.)
+    reference_y.set_value_no_signal(0.)
+    update_reference()
+
+func update_reference()->void:
+    var texture:Texture2D=reference_sprite.texture
+    reference_sprite.visible=texture!=null and reference_visible.button_pressed
+    if texture==null:return
+    var fit:float=minf(VIEW.size.x/texture.get_width(),VIEW.size.y/texture.get_height())
+    reference_sprite.scale=Vector2.ONE*fit*reference_scale.value
+    reference_sprite.position=VIEW.size*.5+Vector2(reference_x.value,reference_y.value)
+    reference_sprite.modulate.a=reference_opacity.value
+
+func side_id()->String:
+    return "near" if release_side.selected==0 else "far"
+
+func sync_release()->void:
+    release_panel.visible=document.kind=="action"
+    if not release_panel.visible:return
+    var r:Dictionary=document.get("release",{})
+    var enabled:bool=r.has(side_id())
+    var knots:Array=r.get(side_id(),[0.,.18,.75,1.])
+    for i in 4:release_fields[i].set_value_no_signal(float(knots[i])*100.)
+    release_state.text="Авторская нога в заданном окне" if enabled else "Сейчас опора полностью под Astra"
+    release_remove.disabled=not enabled
+
+func apply_release()->void:
+    if document.kind!="action":return
+    var side:String=side_id()
+    var knots:Array=[]
+    for field in release_fields:knots.append(field.value/100.)
+    for i in range(1,4):
+        if knots[i]<=knots[i-1]:
+            info.text="Четыре фазы должны возрастать строго."
+            return
+    var d:Dictionary=document.duplicate(true)
+    var channels:Array=["thigh_"+side,"knee_"+side,"foot_pitch_"+side]
+    if not channels.all(func(id):return d.keys[0].angles.has(id)):
+        # Sample the currently executed action only once, in increasing time.
+        # Preserve all pre-existing authored angles. Add only absent leg channels.
+        var probe=Asset.player(document,60)
+        var tick:int=-1
+        for k in d.keys:
+            var target:int=START+roundi(float(k.t)*60.)
+            while tick<target:
+                tick+=1
+                probe.step(command(tick))
+            for id in channels:
+                if not k.angles.has(id):k.angles[id]=clampf(float(probe.final_pose.angles.get(id,0.)),-360.,360.)
+    var release:Dictionary=d.get("release",{})
+    release[side]=knots
+    d.release=release
+    var error:String=Asset.problem(d)
+    if error!="":
+        info.text=error
+        return
+    remember()
+    document=d
+    refresh(frame)
+    info.text="Нога под авторским контролем в заданном окне."
+
+func remove_release()->void:
+    var release:Dictionary=document.get("release",{})
+    if not release.has(side_id()):return
+    remember()
+    release.erase(side_id())
+    document.release=release
+    refresh(frame)
+    info.text="Опора возвращена Astra. Ключи ноги сохранены."
 
 func refresh_channel_tree()->void:
     channel_tree.clear()
@@ -614,6 +778,7 @@ func refresh(value:int):
         for k in document.keys:timeline.clip.keys.append({"t":START+k.t*60})
         for e in document.events:timeline.clip.events.append({"t":START+e.t*60,"kind":e.kind})
     refresh_channel_tree()
+    sync_release()
     select_goal(selected)
     syncing=false
     simulate(clampi(value,0,end_frame()))
