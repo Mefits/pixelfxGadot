@@ -226,6 +226,7 @@ func run():
         return
     editor.redo()
     # Root handle drag creates an authored XY key as a single undoable edit.
+    editor.seek(editor.START+12)
     editor.set_pose_tool(1)
     var root_before:int=editor.document.keys.size()
     var root_pos:Vector2=editor.root_handle_position()
@@ -291,6 +292,7 @@ func run():
         quit(1)
         return
     editor.quick_dialog.hide()
+    editor.save_file()
     var bank_path:String="user://workspace_legacy_bank.json"
     var bank_file:=FileAccess.open(bank_path,FileAccess.WRITE)
     bank_file.store_string(JSON.stringify(editor.Clips.defaults()))
@@ -306,7 +308,7 @@ func run():
     exported_file.store_string(JSON.stringify({"name":"Exported Strike","payload":{"slot":"strike","clip":editor.Clips.defaults().strike}}))
     exported_file.close()
     editor.import_legacy_file(ProjectSettings.globalize_path(exported_path))
-    if not FileAccess.file_exists(editor.Asset.FOLDER+"u_strike_1.json") and not FileAccess.file_exists(editor.Asset.FOLDER+"u_strike.json"):
+    if not FileAccess.file_exists(editor.Asset.FOLDER+"u_strike_1.json") :
         push_error("legacy catalog export import")
         quit(1)
         return

@@ -28,6 +28,9 @@ var status:Label
 var distance_label:Label
 var distance_slider:HSlider
 var reaction_select:OptionButton
+var attack_select:OptionButton
+var action_docs:Array=[]
+var selected_action:String="jab"
 
 func _ready()->void:
     var header:=Label.new()
@@ -37,13 +40,13 @@ func _ready()->void:
     add_child(header)
     var hint:=Label.new()
     hint.position=Vector2(24,48)
-    hint.text="F / K — джеб слева / справа · Space — пауза · R — сброс · Esc — меню"
+    hint.text="F / K — выбранное действие слева / справа · Space — пауза · R — сброс · Esc — меню"
     add_child(hint)
     var tools:=HBoxContainer.new()
     tools.position=Vector2(24,85)
     add_child(tools)
-    button(tools,"F · Джеб A",func():queue_attack(0))
-    button(tools,"K · Джеб B",func():queue_attack(1))
+    button(tools,"F · Атака A",func():queue_attack(0))
+    button(tools,"K · Атака B",func():queue_attack(1))
     button(tools,"Пауза",func():paused=not paused)
     button(tools,"Кадр",advance)
     button(tools,"Сброс",reset)
@@ -68,6 +71,12 @@ func _ready()->void:
     reaction_select.add_item("Эталон без попаданий")
     controls.add_child(reaction_select)
     reaction_select.item_selected.connect(func(i:int):hit_enabled=i!=2;strength=1. if i==0 else 2.)
+    attack_select=OptionButton.new()
+    attack_select.position=Vector2(24,168)
+    attack_select.size=Vector2(300,30)
+    attack_select.fit_to_longest_item=false
+    add_child(attack_select)
+    attack_select.item_selected.connect(func(i:int):select_action(str(attack_select.get_item_metadata(i))))
     status=Label.new()
     status.position=Vector2(24,470)
     add_child(status)
@@ -100,12 +109,20 @@ func button(parent:Control,title:String,fn:Callable)->void:
 func reset()->void:
     if raster==null:return
     players.clear()
-    var jab:Dictionary=Asset.read(Asset.DIR+"jab.json")
-    if FileAccess.file_exists(Asset.FOLDER+"jab.json"):
-        var saved:Dictionary=Asset.read(Asset.FOLDER+"jab.json")
-        if Asset.problem(saved)=="" and saved.id=="jab":jab=saved
+    action_docs=[]
+    attack_select.clear()
+    for doc in Asset.available():
+        if doc.kind!="action" or doc.get("loop",false):continue
+        action_docs.append(doc)
+        attack_select.add_item(str(doc.name))
+        attack_select.set_item_metadata(attack_select.item_count-1,doc.id)
+        if doc.id==selected_action:attack_select.select(attack_select.item_count-1)
+    if action_docs.is_empty():return
+    if not action_docs.any(func(d):return d.id==selected_action):selected_action=action_docs[0].id
+    for i in attack_select.item_count:
+        if attack_select.get_item_metadata(i)==selected_action:attack_select.select(i)
     for i in 2:
-        var p=Asset.ensemble({},[jab],60)
+        var p=Asset.ensemble({},action_docs,60)
         for t in 30:p.step({"speed":0.})
         players.append(p)
     hits=[0,0]
@@ -116,8 +133,14 @@ func reset()->void:
     clock=0.
     render_frame()
 
+func select_action(id:String)->void:
+    if not action_docs.any(func(d):return d.id==id):return
+    selected_action=id
+    for i in attack_select.item_count:
+        if attack_select.get_item_metadata(i)==id:attack_select.select(i)
+
 func queue_attack(i:int)->void:
-    pending[i]="jab"
+    pending[i]=selected_action
 
 func advance()->void:
     if players.size()!=2:return

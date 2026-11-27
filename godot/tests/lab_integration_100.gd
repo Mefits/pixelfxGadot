@@ -10,10 +10,10 @@ func run()->void:
     var menu=load("res://lab/main.tscn").instantiate()
     root.add_child(menu)
     await process_frame
-    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 RC2" or menu.routes.size()!=10 or menu.routes.get("T")!="res://lab/combat_astra.tscn" or menu.routes.get("P")!="res://lab/motionphysics_studio.tscn" or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
+    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 Motion Workspace" or menu.routes.size()!=10 or menu.routes.get("T")!="res://lab/combat_astra.tscn" or menu.routes.get("P")!="res://lab/motionphysics_studio.tscn" or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
         fail("launcher routing")
         return
-    if menu.SECTIONS[0].items.map(func(x):return x[0])!=["M","H","T","P","Y"] or menu.SECTIONS[1].items.map(func(x):return x[0])!=["J","U","I","A","L"]:
+    if menu.SECTIONS[0].items.map(func(x):return x[0])!=["M","T","P","Y"] or menu.SECTIONS[1].items.map(func(x):return x[0])!=["H","J","U","I","A","L"]:
         fail("launcher categories")
         return
     for route in menu.routes.values():
@@ -113,5 +113,11 @@ func run()->void:
         await process_frame
         await RenderingServer.frame_post_draw
         root.get_texture().get_image().save_png(args[0].path_join("combat.png"))
+    fight.select_action("feint")
+    fight.queue_attack(0)
+    fight.advance()
+    if fight.players[0].action!="feint":
+        fail("saved-action combat selection")
+        return
     print("LAB_100_INTEGRATION_OK")
     quit()

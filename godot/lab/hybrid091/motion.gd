@@ -14,7 +14,7 @@ static func compile(clip:Dictionary,first:int,last:int,channels:Array,hz:int,rig
         var angles:Dictionary={}
         for channel in channels:angles[channel]=Grid.scalar(pose.angles.get(channel,0.))
         frames.append(angles)
-        roots.append([Grid.scalar(pose.root[0]),Grid.scalar(pose.root[1])])
+        roots.append([Grid.scalar(pose.root[0]),Grid.scalar(pose.root[1])] if clip.get("authored_root",false) else [0.,0.])
         var overrides:Dictionary={}
         if not release.is_empty():
             rig.evaluate(pose)

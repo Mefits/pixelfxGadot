@@ -12,7 +12,7 @@ const JOINTS=["hand_near","hand_far","elbow_near","elbow_far","foot_near","foot_
 const CHANNELS=["chest","head","shoulder_turn","shoulder_near","elbow_near","shoulder_far","elbow_far"]
 const LEG_CHANNELS=["hips","pelvis_turn","thigh_near","knee_near","foot_pitch_near","thigh_far","knee_far","foot_pitch_far"]
 const EVENT_ANCHORS=["hips","chest","head","shoulder_near","elbow_near","hand_near","shoulder_far","elbow_far","hand_far","thigh_near","knee_near","foot_near","thigh_far","knee_far","foot_far"]
-const EASING=["linear","smooth","accelerate","hold"]
+const EASING=["linear","smooth","accelerate","hold","snap"]
 const FIX="res://tests/fixtures/body_raster/full_058/"
 static var run_clip:Dictionary
 static var guard:Dictionary
@@ -110,7 +110,7 @@ static func build(d:Dictionary,hz:int)->Dictionary:
     if d.kind=="action":
         var keys:Array=[]
         for k in d.keys:keys.append({"t":k.t,"pose":{"angles":k.angles,"root":k.get("root",[0.,0.])},"easing":k.get("easing",d.get("easing","linear"))})
-        var clip={"keys":keys,"easing":d.get("easing","linear"),"events":d.events,"duration":d.duration,"loop":d.get("loop",false)}
+        var clip={"keys":keys,"easing":d.get("easing","linear"),"events":d.events,"duration":d.duration,"loop":d.get("loop",false),"authored_root":d.get("version",1)==2}
         var release:Dictionary={}
         for side in d.get("release",{}):
             release[side]=[]
@@ -170,6 +170,20 @@ static func import_legacy_bank(bank:Dictionary,prefix:String="u",fps:int=30)->Ar
         var id:String=prefix+"_"+str(name)
         var d:Dictionary=legacy_clip_to_action(c,id,str(name),fps)
         if not d.is_empty():result.append(d)
+    return result
+
+static func available()->Array:
+    var ids:Array=IDS.duplicate()
+    var folder:=DirAccess.open(FOLDER)
+    if folder:
+        for file in folder.get_files():
+            var id:String=file.get_basename()
+            if file.ends_with(".json") and id.is_valid_identifier() and not ids.has(id):ids.append(id)
+    var result:Array=[]
+    for id in ids:
+        var d:=read(FOLDER+id+".json")
+        if d.get("id")!=id or problem(d)!="":d=read(DIR+id+".json")
+        if d.get("id")==id and problem(d)=="":result.append(d)
     return result
 
 static func player(d:Dictionary,hz:int):

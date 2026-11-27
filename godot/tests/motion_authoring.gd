@@ -154,8 +154,8 @@ func run():
     var baseline_player=Asset.player(root_baseline,hz)
     root_player.step({"speed":0.,"action":"u_root"})
     baseline_player.step({"speed":0.,"action":"u_root"})
-    check(is_equal_approx(root_player.final_pose.root[0]-baseline_player.final_pose.root[0],-3.),"action root X runtime")
-    check(is_equal_approx(root_player.final_pose.root[1]-baseline_player.final_pose.root[1],1.),"action root Y runtime")
+    check(is_equal_approx(root_player.pose.root[0]-baseline_player.pose.root[0],-3.),"action root X runtime")
+    check(is_equal_approx(root_player.pose.root[1]-baseline_player.pose.root[1],1.),"action root Y authored layer")
     root_doc.events=[{"t":0.,"kind":"vfx","anchor":"hand_near","preset":VFX.demo(0)}]
     check(Asset.problem(root_doc)=="","VFX event schema")
     var vfx_player=Asset.player(root_doc,hz)

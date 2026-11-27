@@ -140,13 +140,13 @@ func _ready():
     dirty_label=caption(self,"",Vector2(278,14),13)
     dirty_label.size=Vector2(130,22)
     var top:=HBoxContainer.new()
-    top.position=Vector2(280,7)
+    top.position=Vector2(400,7)
     add_child(top)
     button(top,"+ Действие",ask_new_action,"Создать новое ключевое действие Astra")
     button(top,"Копия",duplicate_motion,"Создать независимую копию JSON")
     button(top,"Сохранить",save_file,"Ctrl+S")
-    button(top,"Загрузить",func():request_open(document.id),"Вернуться к сохранённому документу")
-    button(top,"Импорт U…",func():import_dialog.popup_centered_ratio(.75),"Перенести клипы из старого редактора U в формат Astra")
+    button(top,"Открыть",func():request_open(document.id),"Вернуться к сохранённому документу")
+    button(top,"Импорт U",func():import_dialog.popup_centered_ratio(.75),"Перенести клипы из старого редактора U в формат Astra")
     undo_button=button(top,"↶",undo,"Отмена · Ctrl+Z")
     redo_button=button(top,"↷",redo,"Повтор · Ctrl+Shift+Z")
     button(top,"Меню",request_exit,"Esc")
@@ -547,6 +547,9 @@ func set_zoom(value:float)->void:
     queue_redraw()
 
 func import_legacy_file(path:String)->void:
+    if JSON.stringify(document)!=saved_signature:
+        info.text="Сначала сохрани или отмени текущие правки."
+        return
     var parsed=JSON.parse_string(FileAccess.get_file_as_string(path))
     if not parsed is Dictionary:
         info.text="Файл U не является JSON-банком."
@@ -563,6 +566,7 @@ func import_legacy_file(path:String)->void:
     else:imported=Asset.import_legacy_bank(parsed,"u",30)
     var count:int=0
     for source in imported:
+        if source.is_empty():continue
         var d:Dictionary=source.duplicate(true)
         var stem:String=d.id
         var suffix:int=1
@@ -574,9 +578,9 @@ func import_legacy_file(path:String)->void:
         motion.add_item(d.name)
         count+=1
     if count>0:
-        info.text="Импортировано клипов U: %d. Исходный банк не изменён."%count
         motion.select(ids.size()-1)
         open_motion(ids[-1])
+        info.text="Импортировано клипов U: %d. Исходный банк не изменён."%count
     else:info.text="В файле не найдено поддерживаемых клипов U."
 
 func set_fps(index:int)->void:
@@ -589,6 +593,7 @@ func set_easing(index:int)->void:
     if syncing or document.kind!="action":return
     remember()
     document.easing=Asset.EASING[index]
+    for key in document.keys:key.erase("easing")
     refresh(frame)
 
 func set_loop(value:bool)->void:
@@ -673,7 +678,7 @@ func update_play_button()->void:
 func key_at_frame()->int:
     if document.kind!="action":return -1
     var index:int=-1
-    var best:float=30./float(document.get("fps",60))+.0001
+    var best:float=.50001
     for i in document.keys.size():
         var d:float=absf(document.keys[i].t*60.-(frame-START))
         if d<best:
@@ -747,7 +752,7 @@ func add_event()->void:
         return
     remember()
     var t:=clampf(float(frame-START)/60.,0.,document.duration)
-    t=snappedf(t,1./float(document.get("fps",60)))
+    t=clampf(snappedf(t,1./float(document.get("fps",60))),0.,document.duration)
     var marker:Dictionary={"t":t,"kind":["strike","charge","cast","vfx"][event_kind.selected],"anchor":Asset.EVENT_ANCHORS[event_anchor.selected]}
     document.events.append(marker)
     document.events.sort_custom(func(a,b):return float(a.t)<float(b.t))
@@ -758,7 +763,7 @@ func add_vfx_event()->void:
     if document.kind!="action" or document.events.size()>=32 or vfx_select.selected<0:return
     remember()
     var t:=clampf(float(frame-START)/60.,0.,document.duration)
-    t=snappedf(t,1./float(document.get("fps",60)))
+    t=clampf(snappedf(t,1./float(document.get("fps",60))),0.,document.duration)
     var marker:Dictionary={"t":t,"kind":"vfx","anchor":Asset.EVENT_ANCHORS[event_anchor.selected],"preset":vfx_choices[vfx_select.selected].duplicate(true)}
     document.events.append(marker)
     document.events.sort_custom(func(a,b):return float(a.t)<float(b.t))
@@ -1117,7 +1122,7 @@ func refresh(value:int):
     else:
         param_choice.add_item("Длительность, с")
         param.min_value=.05
-        param.max_value=5.
+        param.max_value=10.
         param.value=document.duration
     pose_controls.visible=document.kind=="action"
     var is_action:bool=document.kind=="action"
@@ -1276,7 +1281,9 @@ func _unhandled_input(event):
         match UI.physical_key(event):
             KEY_ESCAPE:
                 if rotate_active:cancel_rotation()
-                elif root_drag_active:finish_root_drag()
+                elif root_drag_active:
+                    root_drag_active=false
+                    show_pose()
                 else:request_exit()
             KEY_1:set_pose_tool(0)
             KEY_2:set_pose_tool(1)
@@ -1354,8 +1361,9 @@ func sync_edit_pose()->void:
         return
     var t:float=clampf(float(frame-START)/60.,0.,float(document.duration))
     var authored:Dictionary=sampled_pose(t)
+    edit_pose=player.final_pose.duplicate(true)
     var base:Dictionary=player.gait.intent().pose
-    edit_pose=base.duplicate(true)
+    edit_pose.root=base.root.duplicate()
     edit_pose.angles.merge(authored.angles,true)
     edit_pose.root[0]+=authored.root[0]
     edit_pose.root[1]+=authored.root[1]
@@ -1370,7 +1378,6 @@ func sync_pose_hint()->void:
         0:pose_hint.text="IK: потяни точку · колесо: масштаб"
         1:pose_hint.text="FK: кость — вращение · квадрат таза — перенос · Shift — привязка"
         2:pose_hint.text="Исполнение Astra · контекст стойка / ходьба / бег"
-        2:pose_hint.text="Результат Astra · редактирование отключено"
 
 func editable_bone(id:String)->bool:
     if document.kind!="action" or not document.keys[0].angles.has(id):return false
@@ -1623,7 +1630,7 @@ func toggle_contact():
     var t:=clampf((frame-START)/60.,0.,document.duration)
     remember()
     for i in document.events.size():
-        if roundi(document.events[i].t*60)==roundi(t*60) and document.events[i].anchor==id:
+        if document.events[i].kind=="strike" and roundi(document.events[i].t*60)==roundi(t*60) and document.events[i].anchor==id:
             document.events.remove_at(i)
             refresh(frame)
             return

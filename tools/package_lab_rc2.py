@@ -22,7 +22,7 @@ for filename in ("LICENSE.txt","COPYRIGHT.txt"):
     urllib.request.urlretrieve("https://raw.githubusercontent.com/godotengine/godot/4.4.1-stable/"+filename,dst/("Godot-"+filename))
 shutil.copy2(root/"docs"/"LAB_100_RU.md",dst/"LAB_100_RU.md")
 shutil.copy2(root/"docs"/"MOTION_AUTHORING_RU.md",dst/"MOTION_AUTHORING_RU.md")
-(dst/"START_LAB.bat").write_text('@echo off\ncd /d "%~dp0"\nstart "" "%~dp0Godot.exe" --path "%~dp0godot"\n',encoding="ascii")
+shutil.copy2(root/"tools"/"START_LAB.bat",dst/"START_LAB.bat")
 required=["addons/pixelfx/bin/pixelfx.windows.x86_64.dll","addons/motionphysics/bin/motionphysics_099d.windows.x86_64.dll","generated/original_bundle.txt","generated/original_catalog.json","project.godot"]
 for f in required:
     assert (target/f).is_file(),f
@@ -38,3 +38,12 @@ log=proc.stdout.decode("utf-8","replace")
 print(log)
 assert proc.returncode==0 and "RC2_SMOKE_OK" in log and "SCRIPT ERROR" not in log and "ERROR:" not in log
 print("LAB_RC2_PORTABLE_OK")
+
+# Reproduce the default artifact uploader stripping the entire hidden cache.
+shutil.rmtree(target/".godot")
+check=subprocess.run(["cmd.exe","/d","/c","START_LAB.bat","--check"],cwd=dst,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=240)
+log=check.stdout.decode("utf-8","replace")
+print(log)
+assert check.returncode==0 and "RC2_SMOKE_OK" in log
+assert (target/".godot"/"lab_bootstrap_ok").is_file()
+print("LAB_COLD_LAUNCH_OK")
