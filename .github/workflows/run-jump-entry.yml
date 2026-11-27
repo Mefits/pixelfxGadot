@@ -82,14 +82,17 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item godot/addons/pixelfx/bin baseline/godot/addons/pixelfx/ -Recurse -Force
+          Copy-Item godot/addons/pixelfx/pixelfx.gdextension baseline/godot/addons/pixelfx/
           New-Item -ItemType Directory -Force baseline/godot/.godot
           Set-Content -Encoding ascii baseline/godot/.godot/extension_list.cfg "res://addons/pixelfx/pixelfx.gdextension"
-          $probe=(Resolve-Path godot/tests/capture_run_jump.gd).Path
+          Copy-Item godot/tests/capture_run_jump.gd baseline/godot/tests/
           foreach ($take in @("base","new")) {
             $project=if ($take -eq "base") { "baseline/godot" } else { "godot" }
-            & $env:GODOT --headless --path $project --script $probe -- "$pwd/frames/$take"
+            & $env:GODOT --headless --path $project --script res://tests/capture_run_jump.gd -- "$pwd/frames/$take"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+          & $env:GODOT --headless --path godot --script res://tests/jump_polish_v12.gd
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/run_jump_gifs.py frames/base frames/new previews
       - uses: actions/upload-artifact@v4
         with:
