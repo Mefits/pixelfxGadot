@@ -37,6 +37,10 @@ class MotionPhysics099D:public RefCounted {
 protected:
     static void _bind_methods(){
         ClassDB::bind_method(D_METHOD("setup","specification","substeps","copies","physical_profile"),&MotionPhysics099D::setup);
+        ClassDB::bind_method(D_METHOD("setup_pair","specification","substeps","physical_profile"),&MotionPhysics099D::setup_pair);
+        ClassDB::bind_method(D_METHOD("initialize_segment","body","position","angle","velocity","angular_velocity"),&MotionPhysics099D::initialize_segment);
+        ClassDB::bind_method(D_METHOD("drive_segment","body","position","angle"),&MotionPhysics099D::drive_segment);
+        ClassDB::bind_method(D_METHOD("fighter_contacts"),&MotionPhysics099D::fighter_contacts);
         ClassDB::bind_method(D_METHOD("state"),&MotionPhysics099D::state);
         ClassDB::bind_method(D_METHOD("step","weights"),&MotionPhysics099D::step);
         ClassDB::bind_method(D_METHOD("step_art","weights","targets"),&MotionPhysics099D::step_art);
@@ -50,6 +54,10 @@ protected:
 public:
     ~MotionPhysics099D(){clear();}
     bool setup(String specification,int passes,int copies,int physical_profile){
+        return setup_internal(specification,passes,copies,physical_profile,false);
+    }
+    bool setup_pair(String specification,int passes,int physical_profile){return setup_internal(specification,passes,2,physical_profile,true);}
+    bool setup_internal(String specification,int passes,int copies,int physical_profile,bool inter){
         clear();
         if(passes<1||passes>24||copies<1||copies>2||physical_profile<0||physical_profile>1)return false;
         std::istringstream in(specification.utf8().get_data());
@@ -70,14 +78,14 @@ public:
         auto sd=b2DefaultShapeDef();sd.material.friction=physical_profile==1?.16f:.22f;sd.material.restitution=physical_profile==1?.18f:0.f;sd.material.rollingResistance=physical_profile==1?.03f:0.f;
         auto groundDef=b2DefaultBodyDef();groundDef.position={0,(floor+50)*S};
         auto ground=b2CreateBody(world,&groundDef);
-        sd.filter.categoryBits=1;sd.filter.maskBits=2;
+        sd.filter.categoryBits=1;sd.filter.maskBits=inter?6:2;
         auto box=b2MakeBox(10000*S,50*S);b2CreatePolygonShape(ground,&sd,&box);
         for(int c=0;c<copies;c++){
             for(const auto& b:specs){
                 auto bd=b2DefaultBodyDef();bd.type=b2_dynamicBody;bd.position={(b.x+200*c)*S,b.y*S};bd.rotation=b2MakeRot(b.a);
                 bd.linearDamping=physical_profile==1?.65f:.9f;bd.angularDamping=.9f;bd.enableSleep=false;
                 auto id=b2CreateBody(world,&bd);ids.push_back(id);
-                sd.filter.categoryBits=2;sd.filter.maskBits=1;sd.density=1;
+                sd.filter.categoryBits=inter?(c==0?2:4):2;sd.filter.maskBits=inter?(c==0?5:3):1;sd.density=1;
                 for(auto q:b.circles){b2Circle circle={{(q.x-b.cx)*S,(q.y-b.cy)*S},q.r*S};b2CreateCircleShape(id,&sd,&circle);}
                 mass(id,b);
             }
@@ -97,6 +105,47 @@ public:
             }
         }
         return live();
+    }
+    // Initialization only: use before stepping the world. Never call on a live dynamic segment.
+    bool initialize_segment(int i,Vector2 p,double a,Vector2 v,double w){
+        if(!live()||i<0||i>=int(ids.size())||!p.is_finite()||!v.is_finite()||!std::isfinite(a)||!std::isfinite(w)||v.length()>1000||std::abs(w)>100)return false;
+        b2Body_SetTransform(ids[i],{float(p.x)*S,float(p.y)*S},b2MakeRot(float(a)));
+        return set_velocity(i,v,w);
+    }
+    // Continuous prescribed motion, not teleportation: integrate a kinematic body to its next FK sample.
+    bool drive_segment(int i,Vector2 p,double a){
+        if(!live()||i<0||i>=int(ids.size())||!p.is_finite()||!std::isfinite(a)||b2Body_GetType(ids[i])!=b2_kinematicBody)return false;
+        auto q=b2Body_GetPosition(ids[i]);
+        Vector2 v((p.x-q.x/S)/H,(p.y-q.y/S)/H);
+        return set_velocity(i,v,wrap(float(a)-angle(ids[i]))/H);
+    }
+    // Report only cross-fighter contact impulses, once per contact (query fighter 0).
+    Array fighter_contacts()const{
+        Array result;
+        const int n=int(specs.size());
+        if(!live()||ids.size()!=size_t(2*n))return result;
+        for(int i=0;i<n;i++){
+            int cap=b2Body_GetContactCapacity(ids[i]);
+            if(cap<=0)continue;
+            std::vector<b2ContactData> data(cap);
+            int count=b2Body_GetContactData(ids[i],data.data(),cap);
+            for(int k=0;k<count;k++){
+                auto &c=data[k];
+                auto aa=b2Shape_GetBody(c.shapeIdA),bb=b2Shape_GetBody(c.shapeIdB);
+                bool first=B2_ID_EQUALS(aa,ids[i]);
+                auto other=first?bb:aa;
+                int j=n;for(;j<2*n;j++)if(B2_ID_EQUALS(other,ids[j]))break;
+                if(j==2*n)continue;
+                for(int z=0;z<c.manifold.pointCount;z++){
+                    auto &p=c.manifold.points[z];
+                    if(p.totalNormalImpulse<=0)continue;
+                    Array row;row.append(i);row.append(j-n);row.append(p.totalNormalImpulse/S);
+                    row.append(Vector2(c.manifold.normal.x*(first?1:-1),c.manifold.normal.y*(first?1:-1)));
+                    row.append(p.separation/S);result.append(row);
+                }
+            }
+        }
+        return result;
     }
     Array state()const{
         Array rows;
@@ -122,7 +171,8 @@ public:
         if(!k)mass(id,specs[i%specs.size()]);
         b2Body_SetLinearVelocity(id,v);b2Body_SetAngularVelocity(id,w);return true;
     }
-    bool step(PackedFloat64Array weights){
+    bool step(PackedFloat64Array weights){return step_impl(weights,PackedFloat64Array());}
+    bool step_impl(PackedFloat64Array weights,PackedFloat64Array targets){
         if(!live()||weights.size()!=int64_t(ids.size()))return false;
         for(int i=0;i<weights.size();i++)if(!std::isfinite(weights[i])||weights[i]<0||weights[i]>1)return false;
         const int n=int(specs.size());
@@ -133,7 +183,8 @@ public:
             if(!da&&!db)continue;
             const auto& a=specs[b.parent];float eff=1/((da?1/a.I:0)+(db?1/b.I:0));
             float rel=wrap(angle(ib)-angle(ia)),speed=b2Body_GetAngularVelocity(ib)-b2Body_GetAngularVelocity(ia);
-            float act=std::clamp((360*wrap(b.goal-rel)-24*speed)*eff,-480.f,480.f);
+            float goal=targets.is_empty()?b.goal:std::clamp(float(targets[targets.size()==n?i%n:i]),b.lo,b.hi);
+            float act=std::clamp((360*wrap(goal-rel)-24*speed)*eff,-480.f,480.f);
             float residual=std::clamp(-b.k*(rel-std::clamp(rel,b.bl,b.bh))-b.damp*eff*speed,-b.cap,b.cap);
             float outside=rel-std::clamp(rel,b.lo,b.hi);
             float stop=std::abs(outside)>.00001f?std::clamp(-2400*outside-28*eff*speed,-1800.f,1800.f):0;
@@ -145,13 +196,9 @@ public:
     }
     // Targets are pure inputs for this tick, not persistent snapshot state.
     bool step_art(PackedFloat64Array weights,PackedFloat64Array targets){
-        if(!live()||targets.size()!=int64_t(specs.size()))return false;
+        if(!live()||(targets.size()!=int64_t(specs.size())&&targets.size()!=int64_t(ids.size())))return false;
         for(int i=0;i<targets.size();i++)if(!std::isfinite(targets[i]))return false;
-        std::vector<float> old;old.reserve(specs.size());
-        for(int i=0;i<targets.size();i++){auto& b=specs[i];old.push_back(b.goal);b.goal=std::clamp(float(targets[i]),b.lo,b.hi);}
-        bool ok=step(weights);
-        for(int i=0;i<targets.size();i++)specs[i].goal=old[i];
-        return ok;
+        return step_impl(weights,targets);
     }
     PackedByteArray snapshot()const{
         PackedByteArray data;if(!live())return data;

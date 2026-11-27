@@ -1,0 +1,95 @@
+name: Astra Box2D live authority handoff
+on:
+  push:
+    branches: [experiment/astra-box2d-handoff]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-${{ runner.os }}
+      - run: pip install scons numpy scipy pillow
+      - name: Build PixelFX renderer
+        run: python native_cpp/build.py
+      - name: Build pinned Box2D
+        run: python native_cpp/build_motionphysics.py
+      - name: Install Godot 4.4.1
+        shell: python
+        run: |
+          import os, pathlib, urllib.request, zipfile
+          windows = os.name == "nt"
+          name = "Godot_v4.4.1-stable_" + ("win64.exe" if windows else "linux.x86_64")
+          urllib.request.urlretrieve("https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/" + name + ".zip", "engine.zip")
+          with zipfile.ZipFile("engine.zip") as z:
+              z.extractall("engine")
+          exe = next(p for p in pathlib.Path("engine").rglob("*") if p.name == name)
+          exe.chmod(0o755)
+          if windows:
+              exe = exe.with_name(exe.stem + "_console.exe")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              print("GODOT=" + str(exe.resolve()), file=f)
+      - name: Register native modules
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("godot/.godot")
+          p.mkdir(exist_ok=True)
+          (p/"extension_list.cfg").write_text("res://addons/pixelfx/pixelfx.gdextension\nres://addons/motionphysics/motionphysics_099d.gdextension\n")
+      - name: Existing Lab regressions
+        run: python tools/lab_box2d_ci.py
+      - name: Live handoff and contact replay
+        shell: python
+        run: |
+          import os, pathlib, subprocess, json
+          base=[os.environ["GODOT"],"--headless","--path","godot","--audio-driver","Dummy","--script","res://tests/astra_box2d_handoff.gd"]
+          reports=[]
+          traces=[]
+          for label in ("handoff-a","handoff-b"):
+              p=pathlib.Path("results",label).resolve()
+              p.mkdir(parents=True,exist_ok=True)
+              r=subprocess.run(base+["--",str(p)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+              log=r.stdout.decode("utf-8","replace")
+              (p/"test.log").write_text(log,encoding="utf-8")
+              print(log,flush=True)
+              if r.returncode or "SCRIPT ERROR" in log or "ERROR:" in log or "ASTRA_BOX2D_CAPTURE_DONE" not in log:
+                  raise RuntimeError("handoff test failed")
+              reports.append(json.loads((p/"report.json").read_text()))
+              traces.append(json.loads((p/"trace.json").read_text()))
+          assert traces[0]==traces[1], "fresh process divergence"
+      - name: Actual native preview
+        if: runner.os == 'Linux' && always()
+        shell: bash
+        run: |
+          mkdir -p results/handoff-capture
+          set +e
+          xvfb-run -a "$GODOT" --path godot --audio-driver Dummy --rendering-method gl_compatibility --disable-vsync --script res://tests/astra_box2d_handoff.gd -- "$PWD/results/handoff-capture" capture 2>&1 | tee results/handoff-capture/render.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          python tools/astra_box2d_preview.py results/handoff-capture
+          test "$STATUS" = 0
+          ! grep -E 'SCRIPT ERROR|ERROR:' results/handoff-capture/render.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: astra-box2d-${{ matrix.os }}
+          path: |
+            results/*.json
+            results/*.log
+            results/handoff-*/*.json
+            results/handoff-*/*.log
+            results/handoff-capture/*.gif
+            results/handoff-capture/review.png
