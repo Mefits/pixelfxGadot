@@ -1,6 +1,8 @@
 config_version=5
 [application]
 config/name="PixelFX Toolkit Lab"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="PixelFX Lab Dynamic Guard"
 run/main_scene="res://lab/main.tscn"
 [display]
 window/size/viewport_width=960
@@ -9,3 +11,6 @@ window/stretch/mode="canvas_items"
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+
+[physics]
+common/physics_ticks_per_second=60

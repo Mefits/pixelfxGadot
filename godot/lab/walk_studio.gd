@@ -16,7 +16,6 @@ var raster
 var sprite:Sprite2D
 var status:Label
 var state_label:Label
-var accumulator:float=0.
 var manual:bool=false
 var last_ok:bool=false
 var last_image:Image
@@ -39,7 +38,7 @@ func _ready()->void:
     add_child(sprite)
     state_label=label("",Vector2(24,454),18)
     status=label("",Vector2(24,486),13)
-    label("M: Комбо 1 / 2 / 3 и Idle.   Стойка v2 · широкая опора.",Vector2(24,514),12)
+    label("M: Комбо 1 / 2 / 3 и Idle.   Стойка · перенос веса.",Vector2(24,514),12)
     if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
     reset()
 
@@ -57,7 +56,6 @@ func reset()->void:
     attack_held.clear()
     training=Training.new()
     walker=training.walker
-    accumulator=0.
     render_frame()
 
 func command()->int:
@@ -73,6 +71,11 @@ func render_frame()->void:
     state_label.text="Действие: "+("Остановка" if walker.direction==0 and walker.activity>0. else ("Idle" if walker.action_name()=="walk_breathe" else ["Ходьба назад","Стойка","Ходьба вперёд"][walker.direction+1]))
     if walker.action_name()=="walk_breathe" and training.active==0:
         state_label.text="Действие: Idle · %.2f с / %.1f с"%[fposmod(float(maxi(0,walker.transition_age-walker.STOP_TICKS-2))/60.,float(walker.programs.walk_breathe.doc.duration)),walker.programs.walk_breathe.doc.duration]
+        var near_pitch:float=walker.pose.angles.foot_pitch_near
+        var far_pitch:float=walker.pose.angles.foot_pitch_far
+        if far_pitch>5.:state_label.text+="  ·  передняя опора"
+        elif near_pitch>5.:state_label.text+="  ·  задняя опора"
+        else:state_label.text+="  ·  обе стопы"
     if training.active!=0:state_label.text="Удар %d  ·  комбо %d  ·  %s"%[training.active,training.chain,"В буфере: "+str(training.queued) if training.queued else ""]
     status.text="Попадания: %d   Промахи: %d   Последнее комбо: %d   ·   %s"%[training.hits,training.misses,training.last_chain,training.result]
     queue_redraw()
@@ -90,20 +93,15 @@ func render_frame()->void:
         return
     var im:=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
     last_image=im
-    if sprite.texture==null:sprite.texture=ImageTexture.create_from_image(im)
-    else:sprite.texture.update(im)
+    # Publish a fresh image for T (also avoids relying on in-place texture
+    # uploads on the affected compatibility-renderer setup).
+    sprite.texture=ImageTexture.create_from_image(im)
     sprite.position=ORIGIN+Vector2.RIGHT*walker.x*SCALE-Vector2(240,219)*SCALE/3.
     last_ok=true
 
-func _process(delta:float)->void:
+func _physics_process(_delta:float)->void:
     if manual or walker==null:return
-    accumulator+=minf(delta,.1)
-    var changed:bool=false
-    while accumulator>=1./60.:
-        training.step(command())
-        changed=true
-        accumulator-=1./60.
-    if changed:render_frame()
+    advance()
 
 func _input(event:InputEvent)->void:
     if not event is InputEventKey:return

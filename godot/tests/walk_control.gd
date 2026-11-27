@@ -64,14 +64,24 @@ func run():
     var lo:float=INF
     var hi:float=-INF
     var slip:float=0.
+    var x_min:float=INF
+    var x_max:float=-INF
+    var heel_lifts:Array=[0.,0.]
     for tick in 320:
         still.step(0)
         lo=minf(lo,float(still.pose.root[1]))
         hi=maxf(hi,float(still.pose.root[1]))
+        x_min=minf(x_min,float(still.pose.root[0]))
+        x_max=maxf(x_max,float(still.pose.root[0]))
+        for side in 2:
+            heel_lifts[side]=maxf(float(heel_lifts[side]),-float(still.rig.point("foot_"+Motion.SIDES[side]).y))
         for side in 2:
             slip=maxf(slip,Motion.toe(still.rig,still.pose,Motion.SIDES[side]).distance_to(foot_targets[side]))
         check(still.x==origin,"idle no travel")
     check(hi-lo>1.5,"idle visible breath")
+    check(x_max-x_min>5.5,"weight transfers both ways")
+    check(heel_lifts[0]>1.2 and heel_lifts[1]>1.2,"both heels lift")
+    print("DYNAMIC_GUARD_SHIFT ",x_max-x_min," HEEL_LIFTS ",heel_lifts)
     check(slip<.1,"idle fixed foot "+str(slip))
     # Guard stays raised through a complete loop; wrists move in the
     # torso frame (not merely because of root bobbing).

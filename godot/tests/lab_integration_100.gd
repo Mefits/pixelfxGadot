@@ -84,12 +84,23 @@ func run()->void:
     if not walk.last_ok:
         fail("walk native render")
         return
+    # Exercise real engine callbacks (not manual advance), with no inputs.
     var hashes:Dictionary={}
-    for tick in 144:
-        walk.advance()
-        if tick%6==0 and walk.last_image!=null:hashes[walk.last_image.get_data().hex_encode().sha256_text()]=true
-    print("T_IDLE_NATIVE_UNIQUE ",hashes.size())
-    if hashes.size()<8 or walk.walker.action_name()!="walk_breathe":
+    var presented:Dictionary={}
+    var start_ticks:int=walk.training.ticks
+    walk.manual=false
+    for tick in 120:
+        await physics_frame
+        if tick%6==0 and walk.last_image!=null:
+            hashes[walk.last_image.get_data().hex_encode().sha256_text()]=true
+            if DisplayServer.get_name()!="headless":
+                await RenderingServer.frame_post_draw
+                var screen:Image=root.get_texture().get_image()
+                if screen!=null and not screen.is_empty():
+                    presented[screen.get_region(Rect2i(320,130,280,280)).get_data().hex_encode().sha256_text()]=true
+    walk.manual=true
+    print("T_IDLE_NATIVE_UNIQUE ",hashes.size()," LIVE_TICKS ",walk.training.ticks-start_ticks," PRESENTED ",presented.size())
+    if hashes.size()<8 or walk.training.ticks-start_ticks<100 or walk.walker.action_name()!="walk_breathe" or (DisplayServer.get_name()!="headless" and presented.size()<8):
         fail("visible idle raster")
         return
     var key:=InputEventKey.new()

@@ -67,20 +67,27 @@ static func default_doc(id:String)->Dictionary:
     return d
 
 static func breathing_doc(stance:Dictionary)->Dictionary:
-    # Five sparse, smoothly interpolated poses. The compression starts
-    # at the pelvis; chest and arms peak slightly later. Same foot anchors.
+    # Five authored poses: neutral, front-loaded, compression, rear-loaded,
+    # neutral. Toes stay anchored; heel and ankle move with foot pitch.
     var start:Dictionary=stance.keys[0]
     var keys:Array=[]
     var duration:float=1.8
-    var phases:Array=[0.,.30,.58,.80,1.]
-    var lift:Array=[0.,.65,1.,.30,0.]
+    var phases:Array=[0.,.25,.50,.75,1.]
+    var lift:Array=[0.,.35,1.,.35,0.]
     var chest:Array=[0.,.45,1.,.50,0.]
     var arms:Array=[0.,.15,1.,.65,0.]
     var rear:Array=[0.,.40,.85,1.,0.]
+    # Shift toward the loaded leg; pivot the unloaded foot about its toe.
+    # These are artistic support cues, not measured ground reaction forces.
+    var shift:Array=[0.,3.2,0.,-3.2,0.]
+    var near_pitch:Array=[0.,0.,0.,24.,0.]
+    var far_pitch:Array=[0.,24.,0.,0.,0.]
     for i in phases.size():
         var p:Dictionary={"angles":start.angles.duplicate(true),"root":start.root.duplicate()}
         p.root[1]+=2.4*lift[i]
-        p.root[0]+=.65*chest[i]
+        p.root[0]+=shift[i]
+        p.angles.foot_pitch_near+=near_pitch[i]
+        p.angles.foot_pitch_far+=far_pitch[i]
         p.angles.hips-=.9*lift[i]
         p.angles.chest-=3.6*chest[i]
         p.angles.head+=1.5*arms[i]

@@ -1,4 +1,4 @@
-name: Original combo lightweight patch verification
+name: Dynamic guard complete project verification
 on:
   push:
     branches: [feature/lab-walk-control]
@@ -6,51 +6,27 @@ permissions:
   contents: read
   actions: read
 jobs:
-  patch:
+  project:
     runs-on: windows-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: Lab-Walk-Control-Windows-portable
           path: native
-          run-id: 46001744668
+          run-id: 46016403387
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: Lab-original-combo-small-update
-          path: prior_patch
-          run-id: 46014848377
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build small guard update and overlay
+      - name: Overlay current project sources without rebuilding unchanged native modules
         shell: python
         run: |
+          import shutil
           from pathlib import Path
-          import shutil,zipfile
-          with zipfile.ZipFile("prior_patch/Lab-original-combo-update.zip") as previous:
-              previous.extractall("native")
-          shutil.copy2("godot/tests/guard_migration.gd","native/godot/tests/guard_migration.gd")
-          paths=["godot/lab/walk_motion.gd","godot/lab/walk_studio.gd","godot/tests/walk_control.gd"]
-          with zipfile.ZipFile("Lab-guard-stance-v2-update.zip","w",zipfile.ZIP_DEFLATED,compresslevel=9) as z:
-              for f in paths:
-                  z.write(f,f)
-                  dst=Path("native")/f
-                  dst.parent.mkdir(parents=True,exist_ok=True)
-                  shutil.copy2(f,dst)
-              z.writestr("README-TRAINING.txt","Close Godot. Extract into the folder containing godot/project.godot. Reopen project. T: A/D movement, 1 repeated up to three times for original combo. M: edit three original stages and idle. Requires original combo patch. Old stance/idle files are archived under user://motion_authoring_backup; other saved motions untouched.")
-          print("PATCH_BYTES",Path("Lab-guard-stance-v2-update.zip").stat().st_size)
-      - name: Verify actual patched Windows project
-        shell: pwsh
-        run: |
-          Set-Location native
-          cmd.exe /d /c START_LAB.bat --check
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          foreach ($test in @("guard_migration","training_control","walk_control","lab_integration_100")) {
-            & .\Godot_console.exe --headless --path godot --audio-driver Dummy --script "res://tests/$test.gd"
-            if ($LASTEXITCODE -ne 0) { exit 1 }
-          }
+          for p in ["godot/lab/walk_motion.gd","godot/lab/walk_studio.gd","godot/tests/walk_control.gd","godot/tests/lab_integration_100.gd","godot/project.godot"]:
+              shutil.copy2(p,Path("native")/p)
+      - name: Build and cold-test complete engine-free project ZIP
+        run: python tools/package_dynamic_guard.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Lab-guard-stance-v2-small-update
-          path: Lab-guard-stance-v2-update.zip
+          name: Lab-Dynamic-Guard-Project
+          path: Lab-Dynamic-Guard-Project.zip
