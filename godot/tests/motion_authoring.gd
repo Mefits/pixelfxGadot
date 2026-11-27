@@ -6,6 +6,8 @@ const Body=preload("res://lab/body_ankle_069.gd")
 const Editor=preload("res://lab/authoring/editor.gd")
 const Motion=preload("res://lab/hybrid091/motion.gd")
 const Kernel=preload("res://lab/hybrid091/kernel.gd")
+const Clips=preload("res://addons/creature/clips.gd")
+const VFX=preload("res://addons/pixelfx/composer/preset.gd")
 var failed:=false
 func check(ok:bool,msg:String):
     if not ok:
@@ -120,6 +122,41 @@ func run():
             foot_marker=kicker.events.size()==1 and kicker.events[0][3]=="foot_far"
             check(kicker.released.has("far") and not kicker.paths[1].stance,"authored swing")
     check(foot_marker,"foot event")
+    # Legacy U clip import preserves root, easing, loop and non-combat events.
+    var old_bank:Dictionary=Clips.defaults()
+    var imported:Array=Asset.import_legacy_bank(old_bank,"u",30)
+    check(imported.size()==old_bank.size(),"legacy bank import count")
+    var old_strike:Dictionary=old_bank.strike
+    var imported_strike:Dictionary={}
+    for d in imported:
+        if d.id=="u_strike":imported_strike=d
+    check(not imported_strike.is_empty(),"legacy strike imported")
+    if not imported_strike.is_empty():
+        check(imported_strike.fps==30 and imported_strike.easing=="smooth" and imported_strike.loop==false,"legacy clip metadata")
+        check(imported_strike.keys[1].root==old_strike.keys[1].pose.root,"legacy root preserved")
+        check(imported_strike.events[0].kind=="strike","legacy strike event preserved")
+    var old_cast:Dictionary={}
+    for d in imported:
+        if d.id=="u_cast":old_cast=d
+    check(not old_cast.is_empty() and old_cast.events.size()==2,"charge/cast events imported")
+    var loop_doc:Dictionary=Asset.legacy_clip_to_action(old_bank.idle,"u_idle","Idle",30)
+    check(not loop_doc.is_empty() and loop_doc.loop,"legacy loop imported")
+    var loop_player=Asset.player(loop_doc,hz)
+    for t in range(loop_player.bank.u_idle.frames.size()*2+2):
+        loop_player.step({"speed":0.,"action":"u_idle" if t==0 else ""})
+    check(loop_player.action=="u_idle" and loop_player.age<loop_player.bank.u_idle.frames.size(),"looping action wraps")
+    var root_doc:Dictionary=Asset.legacy_clip_to_action(old_bank.strike,"u_root","Root",30)
+    root_doc.goals=[]
+    root_doc.keys[1].root=[-3.,1.]
+    var root_player=Asset.player(root_doc,hz)
+    root_player.step({"speed":0.,"action":"u_root"})
+    check(is_equal_approx(root_player.final_pose.root[0],-3.),"action root X runtime")
+    check(is_equal_approx(root_player.final_pose.root[1],1.),"action root Y runtime")
+    root_doc.events=[{"t":0.,"kind":"vfx","anchor":"hand_near","preset":VFX.demo(0)}]
+    check(Asset.problem(root_doc)=="","VFX event schema")
+    var vfx_player=Asset.player(root_doc,hz)
+    vfx_player.step({"speed":0.,"action":"u_root"})
+    check(vfx_player.events.size()==1 and vfx_player.events[0][5]=="vfx" and vfx_player.health==100,"VFX event does not cause damage")
     # An impossible planted toe cannot move the support; a hand outside
     # the reach disk must report the clamp while preserving bone lengths.
     g.goals=[{"joint":"foot_near","xy":[100,-90],"clock":"cycle","center":0.,"width":1.,"priority":9,"weight":1.},

@@ -5,6 +5,7 @@ const Clips=preload("res://addons/creature/clips.gd")
 const IK=preload("res://lab/support_adaptation_077.gd")
 static func compile(clip:Dictionary,first:int,last:int,channels:Array,hz:int,rig=null,release:Dictionary={})->Dictionary:
     var frames:Array=[]
+    var roots:Array=[]
     var markers:Dictionary={}
     var feet:Array=[]
     var scale:int=hz/60
@@ -13,6 +14,7 @@ static func compile(clip:Dictionary,first:int,last:int,channels:Array,hz:int,rig
         var angles:Dictionary={}
         for channel in channels:angles[channel]=Grid.scalar(pose.angles.get(channel,0.))
         frames.append(angles)
+        roots.append([Grid.scalar(pose.root[0]),Grid.scalar(pose.root[1])])
         var overrides:Dictionary={}
         if not release.is_empty():
             rig.evaluate(pose)
@@ -30,4 +32,4 @@ static func compile(clip:Dictionary,first:int,last:int,channels:Array,hz:int,rig
         if local>=0 and local<frames.size():
             if not markers.has(local):markers[local]=[]
             markers[local].append(marker.duplicate(true))
-    return {"frames":frames,"markers":markers,"feet":feet}
+    return {"frames":frames,"roots":roots,"markers":markers,"feet":feet,"loop":bool(clip.get("loop",false))}

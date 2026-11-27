@@ -91,6 +91,7 @@ func step(cmd:Dictionary)->void:
     dest.root[1]=lerpf(dest.root[1],2.5,settle)
     prepare_geometry(paths)
     var next:String=cmd.get("action","")
+    if action!="" and bank[action].get("loop",false) and age>=bank[action].frames.size():age=0
     var change:bool=bank.has(next) or (action!="" and age>=bank[action].frames.size())
     if change:
         landing.clear()
@@ -103,6 +104,9 @@ func step(cmd:Dictionary)->void:
         age=0
     if action!="":
         dest.angles.merge(bank[action].frames[age],true)
+        if bank[action].has("roots") and age<bank[action].roots.size():
+            dest.root[0]+=bank[action].roots[age][0]
+            dest.root[1]+=bank[action].roots[age][1]
     goal_report.clear()
     var active_goals:Array=[] if art.is_empty() else art.programs.get(action,[])
     if not active_goals.is_empty():Goals.resolve(self,dest,paths,false,active_goals)
