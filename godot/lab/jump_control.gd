@@ -132,32 +132,34 @@ func step(w,command:int)->void:
                 age=0
                 vx=launch_vx
             return
-        # Dynamic prep: brief sink, then explosive extension into takeoff.
+        # Preparation now behaves like a compressed spring: brief sink with a
+        # slight forward body lean, then uninterrupted extension into takeoff.
         var u:float=float(age)/PREP_TICKS
-        var settle:float=_phase(0.,0.35,u)
-        var crouch:float=_phase(0.02,0.34,u)*(1.-_phase(0.42,0.72,u))*power_scale
-        var drive:float=_phase(0.46,1.,u)*power_scale
+        var settle:float=_phase(0.,0.22,u)
+        var crouch:float=_phase(0.0,0.34,u)*(1.-_phase(0.40,0.68,u))*power_scale
+        var drive:float=_phase(0.30,1.0,u)*power_scale
+        var carry_mix:float=_phase(0.18,0.92,u)
         # A running takeoff carries the root forward through a short planted
         # push instead of visually freezing for all six preparation ticks.
         if absf(inherited_speed)>MAX_SPEED:
-            var carry:float=inherited_speed*.35*(1.-.5*u)/60.
+            var carry:float=inherited_speed*(0.22+0.10*carry_mix)/60.
             w.x=clampf(w.x+carry,-w.travel_limit,w.travel_limit)
-        var twist:float=launch_direction*(0.55*crouch+0.9*drive)
+        var twist:float=launch_direction*(0.40*crouch+0.95*drive)
         var p:Dictionary=Clips.blend_pose(entry,guard.pose,settle)
-        p.root[1]+=4.2*crouch-1.1*drive
-        p.root[0]+=0.9*launch_direction*drive
-        p.angles.hips+=11.*twist-6.5*crouch
-        p.angles.chest+=8.*twist-4.0*crouch
-        p.angles.head+=2.2*crouch-8.0*drive
-        p.angles.shoulder_turn+=5.*launch_direction*crouch+9.*launch_direction*drive
-        p.angles.shoulder_near+=18.*crouch+4.*drive
-        p.angles.elbow_near+=16.*crouch+14.*drive
-        p.angles.shoulder_far+=13.*crouch-12.*drive
-        p.angles.elbow_far+=8.*crouch+10.*drive
-        p.angles.thigh_near+=7.5*crouch-9.5*drive
-        p.angles.knee_near+=17.0*crouch-14.0*drive
-        p.angles.thigh_far+=9.5*crouch-12.0*drive
-        p.angles.knee_far+=19.0*crouch-16.0*drive
+        p.root[1]+=4.8*crouch-2.6*drive
+        p.root[0]+=1.1*launch_direction*drive
+        p.angles.hips+=10.*twist-2.5*crouch
+        p.angles.chest+=7.*twist+8.5*crouch-2.0*drive
+        p.angles.head+=2.0*crouch-2.5*drive
+        p.angles.shoulder_turn+=4.*launch_direction*crouch+10.*launch_direction*drive
+        p.angles.shoulder_near+=15.*crouch-7.*drive
+        p.angles.elbow_near+=12.*crouch+9.*drive
+        p.angles.shoulder_far+=11.*crouch-16.*drive
+        p.angles.elbow_far+=9.*crouch+8.*drive
+        p.angles.thigh_near+=9.0*crouch-14.5*drive
+        p.angles.knee_near+=18.0*crouch-17.0*drive
+        p.angles.thigh_far+=11.0*crouch-16.0*drive
+        p.angles.knee_far+=20.0*crouch-18.0*drive
         var paths:Array=[]
         for i in 2:
             var toe:Vector2=entry_toes[i]
@@ -165,8 +167,8 @@ func step(w,command:int)->void:
             if absf(inherited_speed)>MAX_SPEED:
                 toe.x-=w.x-prep_origin # keep planted targets in world space
             else:
-                toe.x+=launch_direction*(0.45 if i==w.guard_lead else -0.25)*crouch
-            paths.append({"toe":toe,"pitch":lerpf(float(entry.angles["foot_pitch_"+Motion.SIDES[i]]),-2.5*drive,settle),"stance":absf(toe.y)<.02})
+                toe.x+=launch_direction*(0.30 if i==w.guard_lead else -0.14)*crouch
+            paths.append({"toe":toe,"pitch":lerpf(float(entry.angles["foot_pitch_"+Motion.SIDES[i]]),-5.5*drive,settle),"stance":absf(toe.y)<.02})
         w.set_intent({"pose":p,"paths":paths})
         if age>=PREP_TICKS:
             launch_pose=w.pose.duplicate(true)
@@ -188,37 +190,44 @@ func step(w,command:int)->void:
     w.x=next
     var lean:float=clampf(vx/MAX_SPEED,-1.4,1.4)
     var movement_lead:int=w.guard_lead if launch_direction>=0 else (1-w.guard_lead if launch_direction<0 else w.guard_lead)
-    var stretch:float=_phase(0.0,0.16,u)*(1.-_phase(0.18,0.38,u))*power_scale
-    var apex_tuck:float=_phase(0.16,0.42,u)*(1.-_phase(0.56,0.82,u))*tuck_scale
-    var descent:float=_phase(0.62,1.0,u)
-    var airborne:float=maxf(maxf(stretch,apex_tuck),descent)
-    var launch_mix:float=_phase(0.0,0.22,u)
+    # Reworked first-jump flight: extended legs up to the apex, only a mild
+    # post-apex gather, then preparation for landing.
+    var rise:float=_phase(0.0,0.26,u)*(1.-_phase(0.46,0.56,u))*power_scale
+    var hang:float=_phase(0.34,0.54,u)*(1.-_phase(0.56,0.66,u))
+    var tuck:float=_phase(0.56,0.74,u)*(1.-_phase(0.82,0.94,u))*(0.55+0.45*tuck_scale)
+    var descent:float=_phase(0.78,1.0,u)
+    var airborne:float=maxf(maxf(rise,hang),maxf(tuck,descent))
+    var launch_mix:float=_phase(0.12,0.36,u)
     var p:Dictionary=Clips.blend_pose(launch_pose,guard.pose,launch_mix)
     # Introduce flight accents from zero at lift-off, including foot pitch.
     var onset:float=_phase(0.,.14,u) if moving_entry!=null else 1.
-    p.root[0]+=onset*2.2*lean*(0.25+0.75*airborne)
-    p.root[1]-=.8*stretch
-    p.angles.hips+=15.*lean*(0.5*stretch+.55*apex_tuck)-10.0*lean*descent
-    p.angles.chest+=11.*lean*(0.45*stretch+.35*apex_tuck)-8.0*lean*descent
-    p.angles.head+=3.0*apex_tuck-7.5*stretch+5.5*descent
-    p.angles.shoulder_turn+=onset*11.*lean*(0.35+0.65*airborne)
-    p.angles.shoulder_near+=12.*stretch+19.*apex_tuck-9.*descent+onset*6.*lean
-    p.angles.elbow_near+=8.*stretch+24.*apex_tuck+10.*descent
-    p.angles.shoulder_far+=19.*stretch+11.*apex_tuck-6.*descent+onset*4.*lean
-    p.angles.elbow_far+=10.*stretch+18.*apex_tuck+8.*descent
+    p.root[0]+=onset*2.4*lean*(0.18+0.82*airborne)
+    p.root[1]-=0.9*rise+0.25*hang
+    p.angles.hips+=14.*lean*(0.55*rise+0.28*hang+0.32*tuck)-9.0*lean*descent
+    p.angles.chest+=6.5*rise+9.0*lean*(0.42*rise+0.18*hang)-5.0*tuck-7.0*lean*descent
+    p.angles.head+=1.8*rise+2.0*hang+1.5*tuck+4.5*descent
+    p.angles.shoulder_turn+=onset*10.*lean*(0.28+0.72*airborne)
+    p.angles.shoulder_near+=6.*rise+8.*hang+10.*tuck-8.*descent+onset*5.*lean
+    p.angles.elbow_near+=3.*rise+7.*hang+10.*tuck+8.*descent
+    p.angles.shoulder_far+=8.*rise+7.*hang+6.*tuck-5.*descent+onset*3.5*lean
+    p.angles.elbow_far+=4.*rise+6.*hang+9.*tuck+6.*descent
     var paths:Array=[]
     for i in 2:
         var goal:Vector2=guard.paths[i].toe
         var toe:Vector2=Vector2(launch_toes[i]).lerp(goal,launch_mix)
         var front:bool=i==movement_lead
-        toe.x+=2.8*lean*stretch+2.2*lean*apex_tuck+1.5*lean*descent
-        toe.x+=(2.8 if front else -2.4)*stretch
-        toe.x+=(3.9 if front else -1.6)*apex_tuck
-        toe.x+=(5.2 if front else -2.1)*descent
-        toe.y-=(5.2 if front else 3.6)*stretch
-        toe.y-=(11.5 if front else 8.3)*apex_tuck
-        toe.y-=(3.2 if front else 2.4)*descent
-        var pitch:float=10.*stretch+7.*apex_tuck-4.5*descent
+        toe.x+=2.6*lean*rise+1.8*lean*tuck+1.5*lean*descent
+        toe.x+=(2.1 if front else -1.7)*rise
+        toe.x+=(1.2 if front else -0.8)*hang
+        toe.x+=(2.1 if front else -1.0)*tuck
+        toe.x+=(4.6 if front else -1.9)*descent
+        # Up to the apex the feet stay visually lower relative to the body,
+        # then gather modestly after the apex.
+        toe.y-=(1.7 if front else 1.2)*rise
+        toe.y-=(1.0 if front else 0.8)*hang
+        toe.y-=(5.4 if front else 4.2)*tuck
+        toe.y-=(3.0 if front else 2.2)*descent
+        var pitch:float=4.*rise+1.5*hang+5.5*tuck-4.5*descent
         if moving_entry!=null:
             pitch=lerpf(launch_pose.angles["foot_pitch_"+Motion.SIDES[i]],pitch,onset)
         paths.append({"toe":toe,"pitch":pitch,"stance":false})

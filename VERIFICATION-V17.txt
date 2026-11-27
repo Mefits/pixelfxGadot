@@ -1,0 +1,11 @@
+STRIKE_SIDE=1 REACH 22.734->36.926 (+62.4%) PEAK_FORWARD_SPEED 411.430->979.132 (+138.0%)
+STRIKE_SIDE=0 REACH 28.084->36.926 (+31.5%) PEAK_FORWARD_SPEED 364.347->979.132 (+168.7%)
+TARGET_GEOMETRY_OK samples=630 anchor_error=0.000000000 peak_knee=4.937..4.937 max_air_toe_y=-15.487
+BRAKING_MODEL_OK cases=1338 samples=37464
+MOTION_ENTRY_HORIZON_OK
+Analytic model only; native Godot 4.4.1 and visual rendering unavailable in this environment. No new CI run. Existing v15 MotionEntry, jump and ground controllers retained. The reported reach and speed compare the horizontal striking toe relative to the pinned support toe across the authored chamber-to-hit segment, not full-animation world velocity, physical force or measured hitbox reach.
+V16 archive comparison: 677 unchanged files, 5 modified, 3 added, 0 removed.
+godot/lab/motion_entry.gd unchanged SHA256 cb8e4db55c3079815bb4f8152e74652086cfd9da2f7519fa287289b3a1bf927c
+godot/lab/jump_control.gd unchanged SHA256 239b7c1dc845b4fd95df3e2a150418a3ea900a8b829bb3bc805a32491b01aef2
+godot/lab/walk_control.gd unchanged SHA256 7870c7d20a3a0cce7591c6945ae19a7aad30f8741da23a1046c63a85c6b3c543
+godot/lab/training_control.gd unchanged SHA256 b392e049b9d70cc09b6ca142d25b4e45937f957916e112c8fad1817c8c0d9a62

@@ -1,0 +1,21 @@
+LAB v16 — verification record
+
+Source: v14 portable archive + v15 commit 2f66008026e90b928c1cbd8e717b06a53d7ce584.
+Eight v15 files copied/reconstructed and SHA-1 Git blob checked (8/8). GitHub workflow is not part of the portable package.
+Original v14 files: 670; byte-identical: 665; modified: 5; missing: 0.
+Changed from v14:
+README-RU.txt
+godot/lab/jump_control.gd
+godot/lab/training_control.gd
+godot/lab/walk_control.gd
+godot/lab/walk_studio.gd
+
+Math probe (not actual Godot):
+TARGET_GEOMETRY_OK samples=630; support anchor residual <1e-8 in analytic model; peak knee bend=8.576 deg (both sides).
+BRAKING_MODEL_OK cases=1338 samples=37464.
+MOTION_ENTRY_HORIZON_OK.
+Direct preload paths and lexical delimiter matching checked in 10 changed/new GDScript files.
+Original combo source fixtures and hybrid091 files unchanged.
+Actual Godot 4.4.1 execution and visual acceptance: NOT RUN (binary unavailable).
+New native acceptance test is godot/tests/sparse_kick_v16.gd; v15 probe preserved.
+GitHub repository not modified.

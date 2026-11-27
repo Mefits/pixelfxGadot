@@ -1,0 +1,3 @@
+v20 — verification scope
+Arithmetic models executed: attack repeat 348 combinations, shoulder scaling 364 combinations, attack timing 216 combinations (9036 samples), target scaling 648, heel targets 742, roundhouse targets 910, braking 1338.
+The GDScript test scripts attack_compare_v20.gd and attack_repeat_v20.gd are included but not executed: no Godot executable in the build environment. No claim of native rendering or visual UI validation. Existing K/L authoring keys, MotionEntry and hybrid core unchanged.

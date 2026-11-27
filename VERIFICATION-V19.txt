@@ -1,0 +1,15 @@
+v19 local verification
+STRIKE_SIDE=1 HEEL_REACH=33.701 HEEL_LEAD=1.800 HEEL_PEAK_SPEED=1060.255
+STRIKE_SIDE=0 HEEL_REACH=33.701 HEEL_LEAD=1.800 HEEL_PEAK_SPEED=1060.255
+TARGET_GEOMETRY_OK samples=742 anchor_error=0.000000000 peak_knee=4.937..4.937 max_air_toe_y=-15.487
+BRAKING_MODEL_OK cases=1338 samples=42816
+MOTION_ENTRY_HORIZON_OK
+ROUND_SIDE=1 SHIN_REACH=28.723 SHIN_HEIGHT=34.677 PEAK_SPEED=1137.161 FOLLOW_THROUGH_DY=-3.728
+ROUND_SIDE=0 SHIN_REACH=28.723 SHIN_HEIGHT=34.677 PEAK_SPEED=1137.161 FOLLOW_THROUGH_DY=-3.728
+ROUND_TARGETS_OK samples=910 anchor_error=0.000000000 max_free_toe_y=-16.426
+ATTACK_TUNING_MATH_OK timing_cases=216 samples=9036 shape_cases=648
+Unchanged v18 files: 687
+Changed: 7
+New: 6 (including this report)
+Resource references in changed/new scripts checked: 33
+No native Godot or GDScript parser available; native test and visual UI verification pending. No GitHub changes.

@@ -1,0 +1,7 @@
+STRIKE_SIDE=1 HEEL_REACH=33.701 HEEL_LEAD=1.800 HEEL_PEAK_SPEED=1060.255
+STRIKE_SIDE=0 HEEL_REACH=33.701 HEEL_LEAD=1.800 HEEL_PEAK_SPEED=1060.255
+TARGET_GEOMETRY_OK samples=742 anchor_error=0.000000000 peak_knee=4.937..4.937 max_air_toe_y=-15.487
+BRAKING_MODEL_OK cases=1338 samples=42816
+MOTION_ENTRY_HORIZON_OK
+
+Analytic model only; native Godot unavailable. Updated native acceptance probe not executed.
