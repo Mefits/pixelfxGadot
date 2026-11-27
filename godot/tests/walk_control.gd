@@ -69,6 +69,35 @@ func run():
         check(still.x==origin,"idle no travel")
     check(hi-lo>.15,"idle visible breath")
     check(slip<.1,"idle fixed foot "+str(slip))
+    # Guard stays raised through a complete loop; wrists move in the
+    # torso frame (not merely because of root bobbing).
+    var guard=Walk.new(docs)
+    var near_min:=Vector2(INF,INF)
+    var near_max:=Vector2(-INF,-INF)
+    var far_min:=Vector2(INF,INF)
+    var far_max:=Vector2(-INF,-INF)
+    for tick in 320:
+        guard.step(0)
+        var r=guard.rig
+        for side in Motion.SIDES:
+            var wrist:Vector2=r.point("hand_"+side)
+            var elbow:Vector2=r.point("elbow_"+side)
+            var shoulder:Vector2=r.point("shoulder_"+side)
+            check(wrist.y<elbow.y-3.,"guard wrist above elbow "+side)
+            check(wrist.y<shoulder.y+3.,"guard wrist near shoulder "+side)
+            var bend:float=absf((elbow-shoulder).angle_to(wrist-elbow))
+            check(bend>deg_to_rad(85.) and bend<deg_to_rad(165.),"guard elbow bend "+side)
+        check(r.point("hand_near").x>r.point("hand_far").x+2.,"asymmetric guard")
+        if tick>32:
+            var n:Vector2=r.point("hand_near")-r.point("chest")
+            var f:Vector2=r.point("hand_far")-r.point("chest")
+            near_min=near_min.min(n)
+            near_max=near_max.max(n)
+            far_min=far_min.min(f)
+            far_max=far_max.max(f)
+    check(near_max.distance_to(near_min)>.6,"near guard motion")
+    check(far_max.distance_to(far_min)>.6,"far guard motion")
+    print("GUARD_WRIST_RANGE ",near_max.distance_to(near_min)," ",far_max.distance_to(far_min))
     var breathing:Dictionary=docs.walk_breathe
     check(breathing.keys[0].angles==breathing.keys[-1].angles and breathing.keys[0].root==breathing.keys[-1].root,"idle loop boundary")
     print("IDLE_BREATH_RANGE ",hi-lo," FOOT_ERROR ",slip)

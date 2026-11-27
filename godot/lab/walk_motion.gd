@@ -34,11 +34,13 @@ static func default_doc(id:String)->Dictionary:
         p.angles.chest=0.
         p.angles.head=-2.
         p.angles.pelvis_turn=45.
-        p.angles.shoulder_turn=45.
-        p.angles.shoulder_near=-15.
-        p.angles.shoulder_far=-15.
-        p.angles.elbow_near=-65.
-        p.angles.elbow_far=-65.
+        # Side-on asymmetric guard. Both forearms point upwards, with the
+        # near fist forward and the far fist close to the chin.
+        p.angles.shoulder_turn=32.
+        p.angles.shoulder_near=-17.
+        p.angles.shoulder_far=-53.
+        p.angles.elbow_near=-134.
+        p.angles.elbow_far=-124.
         support.resolve(p,[{"toe":Vector2(5.,0.),"pitch":0.,"stance":true},{"toe":Vector2(-3.,0.),"pitch":0.,"stance":true}])
         keys.append(key(0.,p))
     else:
@@ -72,16 +74,18 @@ static func breathing_doc(stance:Dictionary)->Dictionary:
     var lift:Array=[0.,.65,1.,.30,0.]
     var chest:Array=[0.,.45,1.,.50,0.]
     var arms:Array=[0.,.15,1.,.65,0.]
+    var rear:Array=[0.,.40,.85,1.,0.]
     for i in phases.size():
         var p:Dictionary={"angles":start.angles.duplicate(true),"root":start.root.duplicate()}
         p.root[1]+=.9*lift[i]
         p.angles.hips-=.9*lift[i]
         p.angles.chest-=2.2*chest[i]
         p.angles.head+=1.5*arms[i]
-        p.angles.shoulder_near+=2.8*arms[i]
-        p.angles.shoulder_far+=2.2*arms[i]
-        p.angles.elbow_near-=2.5*arms[i]
-        p.angles.elbow_far-=1.8*arms[i]
+        p.angles.shoulder_turn-=2.5*chest[i]
+        p.angles.shoulder_near-=5.5*arms[i]
+        p.angles.elbow_near+=7.5*arms[i]
+        p.angles.shoulder_far+=4.5*rear[i]
+        p.angles.elbow_far-=7.*rear[i]
         keys.append(key(phases[i]*duration,p))
     return {"version":2,"id":"walk_breathe","name":"Idle · дыхание","kind":"action","walk_role":"walk_breathe","duration":duration,"fps":60,"easing":"smooth","loop":true,"keys":keys,"goals":[],"events":[]}
 
