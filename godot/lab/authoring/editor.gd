@@ -140,7 +140,7 @@ func _ready():
     dirty_label=caption(self,"",Vector2(278,14),13)
     dirty_label.size=Vector2(130,22)
     var top:=HBoxContainer.new()
-    top.position=Vector2(414,7)
+    top.position=Vector2(280,7)
     add_child(top)
     button(top,"+ Действие",ask_new_action,"Создать новое ключевое действие Astra")
     button(top,"Копия",duplicate_motion,"Создать независимую копию JSON")
@@ -227,6 +227,7 @@ func _ready():
     quick_dialog=QuickVFX.new()
     add_child(quick_dialog)
     quick_dialog.applied.connect(apply_quick_vfx)
+    load_vfx_library()
     import_dialog=FileDialog.new()
     import_dialog.title="Импорт клипов старого редактора U"
     import_dialog.file_mode=FileDialog.FILE_MODE_OPEN_FILE
@@ -454,9 +455,12 @@ func _ready():
     timeline.size=Vector2(930,99)
     timeline.step=1
     timeline.marker_moved.connect(move_marker)
-    timeline.marker_selected.connect(func(lane:int,_i:int):
+    timeline.marker_selected.connect(func(lane:int,i:int):
         if lane==0:inspector.current_tab=2
-        else:inspector.current_tab=4)
+        else:
+            inspector.current_tab=4
+            event_list.select(i)
+            select_event(i)
     timeline.goal_selected.connect(func(i:int):select_goal(i);inspector.current_tab=1;show_pose())
     timeline.curve_edited.connect(edit_curve_key)
     add_child(timeline)
@@ -648,6 +652,7 @@ func request_open(id:String)->void:
 
 func toggle_play()->void:
     if rotate_active:cancel_rotation()
+    if root_drag_active:finish_root_drag()
     if pose_tool.selected==1:pose_tool.select(2)
     playing=not playing
     clock=0.
@@ -975,7 +980,7 @@ func update_ghosts()->void:
         var t:int=clampi(frame+[-4,4][i],0,end_frame())
         if t==frame:continue
         if not ghost_cache.has(t):
-            var probe=Asset.player(document,60)
+            var probe=build_preview_player()
             for f in range(t+1):probe.step(command(f))
             var parts:Array=body.make(probe.rig.points,probe.final_pose.angles,probe.rig.rotations.head)
             Depth.apply(parts,probe.style)
@@ -1397,7 +1402,7 @@ func start_root_drag(mouse:Vector2)->void:
     playing=false
     root_drag_key=key_at_frame()
     root_drag_time=float(document.keys[root_drag_key].t) if root_drag_key>=0 else clampf(snappedf(float(frame-START)/60.,1./float(document.get("fps",60))),0.,float(document.duration))
-    root_drag_initial=sampled_pose(root_drag_time).root
+    root_drag_initial=Vector2(sampled_pose(root_drag_time).root)
     root_drag_start=mouse
     root_drag_delta=Vector2.ZERO
     root_drag_changed=false
@@ -1407,7 +1412,7 @@ func start_root_drag(mouse:Vector2)->void:
 
 func update_root_drag(mouse:Vector2,snap:bool=false)->void:
     if not root_drag_active:return
-    root_drag_delta=(mouse-root_drag_start)/view_zoom
+    root_drag_delta=root_drag_initial+(mouse-root_drag_start)/view_zoom-root_drag_initial
     if snap:root_drag_delta=root_drag_delta.snapped(Vector2(.5,.5))
     root_drag_changed=root_drag_delta.length()>.02
     show_pose()

@@ -88,7 +88,7 @@ func _gui_input(e: InputEvent) -> void:
             if absf(e.position.x-press_x)>4:moving_marker=true
             if moving_marker:
                 var t: float=_time_at(e.position.x)
-                drag_time=clampf(snappedf(t,.01),0,max_value)
+                drag_time=clampf(snappedf(t,maxf(step,.0001)),0,max_value)
                 if e.shift_pressed:drag_time=t
                 queue_redraw()
         else:_seek(e.position.x)
@@ -98,4 +98,4 @@ func _time_at(x: float) -> float:
     return clampf((x-LEFT)/maxf(1,size.x-LEFT-10),0,1)*max_value
 
 func _seek(x: float) -> void:
-    value_changed.emit(_time_at(x))
+    value_changed.emit(clampf(snappedf(_time_at(x),maxf(step,.0001)),0,max_value))
