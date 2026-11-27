@@ -2,7 +2,7 @@ extends SceneTree
 const Bridge=preload("res://lab/astra_box2d_handoff.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
 const Common=preload("res://lab/ragdoll_common_099c.gd")
-const CFG={"width":1200,"height":420,"origin":[100,310],"density":3,"ink":0xff000000,"outline":3,"light":[-.48,-.64,.6],"seams":false,"materials":[[0xffe6ded7,0xffbdb3a8,0xff9e9081,0xff746759],[0xffa09d74,0xff827d50,0xff656139,0xff4a4628],[0xff655a4c,0xff50473b,0xff3c342c,0xff29231e],[0xffd8b2a0,0xffab8173,0xff7d574a,0xff523b32]]}
+const CFG={"width":1024,"height":420,"origin":[100,310],"density":2.5,"ink":0xff000000,"outline":3,"light":[-.48,-.64,.6],"seams":false,"materials":[[0xffe6ded7,0xffbdb3a8,0xff9e9081,0xff746759],[0xffa09d74,0xff827d50,0xff656139,0xff4a4628],[0xff655a4c,0xff50473b,0xff3c342c,0xff29231e],[0xffd8b2a0,0xffab8173,0xff7d574a,0xff523b32]]}
 var failures:Array=[]
 func _initialize():call_deferred("run")
 func check(ok:bool,msg:String)->void:
@@ -50,16 +50,16 @@ func run()->void:
         push_error("pair setup")
         quit(1)
         return
-    root.size=Vector2i(1200,450)
+    root.size=Vector2i(1024,450)
     root.content_scale_size=root.size
     var bg:=ColorRect.new()
     bg.color=Color("#34424d")
-    bg.size=Vector2(1200,450)
+    bg.size=Vector2(1024,450)
     root.add_child(bg)
     var floor_line:=Line2D.new()
     floor_line.default_color=Color("#8ca1aa")
     floor_line.width=1.
-    floor_line.points=PackedVector2Array([Vector2(0,310.+b.floor_y*3.+22),Vector2(1200,310.+b.floor_y*3.+22)])
+    floor_line.points=PackedVector2Array([Vector2(0,310.+b.floor_y*2.5+22),Vector2(1024,310.+b.floor_y*2.5+22)])
     root.add_child(floor_line)
     var sp:=Sprite2D.new()
     sp.centered=false
@@ -111,7 +111,7 @@ func run()->void:
                 break
             var im:=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
             var bounds:Rect2i=im.get_used_rect()
-            if bounds.size.x==0 or bounds.position.x<=0 or bounds.position.y<=0 or bounds.end.x>=1200 or bounds.end.y>=420:
+            if bounds.size.x==0 or bounds.position.x<=0 or bounds.position.y<=0 or bounds.end.x>=1024 or bounds.end.y>=420:
                 failures.append("capture bounds "+str(t)+" "+str(bounds))
             if sp.texture==null:sp.texture=ImageTexture.create_from_image(im)
             else:sp.texture.update(im)

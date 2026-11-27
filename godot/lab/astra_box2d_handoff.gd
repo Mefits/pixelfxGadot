@@ -135,18 +135,20 @@ func release()->bool:
 # proxies, so the contact solver sees finite mass rather than an infinite motor.
 func cross_gap()->float:
     var state:Array=world.state()
+    var circles:Array=[[],[]]
+    for c in 2:
+        for i in n:
+            var b:Dictionary=models[c].bodies[i]
+            var r:Array=state[c*n+i]
+            for shape in b.samples:
+                var p:Vector2=Vector2(r[0],r[1])+(Vector2(shape[0])-Vector2(b.com)).rotated(r[2])
+                circles[c].append(Vector3(p.x,p.y,float(shape[1])))
     var gap:float=INF
-    for i in n:
-        var a:Dictionary=models[0].bodies[i]
-        var ra:Array=state[i]
-        for j in n:
-            var b:Dictionary=models[1].bodies[j]
-            var rb:Array=state[n+j]
-            for ca in a.samples:
-                var pa:Vector2=Vector2(ra[0],ra[1])+(Vector2(ca[0])-Vector2(a.com)).rotated(ra[2])
-                for cb in b.samples:
-                    var pb:Vector2=Vector2(rb[0],rb[1])+(Vector2(cb[0])-Vector2(b.com)).rotated(rb[2])
-                    gap=minf(gap,pa.distance_to(pb)-float(ca[1])-float(cb[1]))
+    for a0 in circles[0]:
+        for b0 in circles[1]:
+            var a:Vector3=a0
+            var b:Vector3=b0
+            gap=minf(gap,Vector2(a.x,a.y).distance_to(Vector2(b.x,b.y))-a.z-b.z)
     return gap
 
 func release_attacker()->bool:
