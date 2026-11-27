@@ -10,7 +10,7 @@ func run()->void:
     var menu=load("res://lab/main.tscn").instantiate()
     root.add_child(menu)
     await process_frame
-    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 RC1" or menu.routes.size()!=9 or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
+    if menu.routes.get("H")!="res://lab/hybrid_studio.tscn" or menu.VERSION!="1.0 RC1" or menu.routes.size()!=10 or menu.routes.get("P")!="res://lab/motionphysics_studio.tscn" or menu.routes.get("M")!="res://lab/authoring/editor.tscn":
         fail("launcher routing")
         return
     for route in menu.routes.values():

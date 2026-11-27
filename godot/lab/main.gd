@@ -17,6 +17,7 @@ const SECTIONS=[
         ["U","Редактор анимаций","Позы скелета и ключевые кадры.","pose_workshop"],
         ["T","Бой (прежний стенд)","Два бойца и проверка прежних атак.","combat_lab"],
         ["H","Гибридное движение","Ядро Astra, объёмное тело, ткань, реакции.","hybrid_studio"],
+        ["P","Box2D · физика попаданий","Импульсы, параметры и частичная физика.","motionphysics_studio"],
         ["I","Физика и эволюция","Физика, атаки, изменение анатомии.","physics_lab"]
     ]}
 ]
@@ -63,7 +64,7 @@ func _ready() -> void:
             routes[spec[0]]=path
             var button:=Button.new()
             button.position=Vector2(28,y)
-            button.size=Vector2(226,39)
+            button.size=Vector2(226,35)
             button.text=spec[0]+"  "+spec[1]
             button.alignment=HORIZONTAL_ALIGNMENT_LEFT
             button.tooltip_text=spec[2]
@@ -72,7 +73,7 @@ func _ready() -> void:
             root.add_child(button)
             buttons.append(button)
             button.pressed.connect(func():_open(path))
-            y+=41
+            y+=36
     _label(root,"БИБЛИОТЕКА ШАБЛОНОВ",Vector2(274,96),14,Color("#79b9d4"))
     category=OptionButton.new()
     category.position=Vector2(274,122)
