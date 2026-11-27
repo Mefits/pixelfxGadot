@@ -3,6 +3,9 @@ extends RefCounted
 const Motion=preload("res://lab/walk_motion.gd")
 const Walk=preload("res://lab/walk_control.gd")
 const Clips=preload("res://addons/creature/clips.gd")
+const IK=preload("res://lab/support_adaptation_077.gd")
+const Leg=preload("res://lab/leg_constraints_082.gd")
+const Grid=preload("res://lab/hybrid091/precision.gd")
 const Entry=preload("res://lab/motion_entry.gd")
 var moving_entry
 var push_leg:int
@@ -257,9 +260,18 @@ func running_push(w)->void:
         # displacement to the pelvis around the supporting toe.
         var actual:=Motion.toe(w.rig,w.pose,Motion.SIDES[push_leg])
         var correction:Vector2=paths[push_leg].toe-actual
-        w.pose.root[0]+=correction.x
-        w.pose.root[1]+=correction.y
+        w.pose.root[0]=Grid.scalar(w.pose.root[0]+correction.x)
+        w.pose.root[1]=Grid.scalar(w.pose.root[1]+correction.y)
         w.rig.evaluate(w.pose)
+        # A low free foot may cross the floor after the pelvis correction.
+        var free_side:String=Motion.SIDES[1-push_leg]
+        var free_toe:=Motion.toe(w.rig,w.pose,free_side)
+        if free_toe.y>.001:
+            var ankle:Vector2=paths[1-push_leg].toe-IK.toe_vector(w.pose,free_side)
+            IK.solve_leg(w.rig,w.pose,free_side,ankle,1.)
+            Leg.put(w.pose,free_side,Leg.bend(w.pose,free_side),Leg.ankle(w.pose,free_side))
+            Grid.pose(w.pose)
+            w.rig.evaluate(w.pose)
 
 # A fresh press only, after leaving the ground; no third impulse.
 func can_second()->bool:

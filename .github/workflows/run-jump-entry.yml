@@ -74,7 +74,31 @@ jobs:
         run: |
           & $env:GODOT --headless --path godot --script res://tests/run_jump_entry.gd
           exit $LASTEXITCODE
+      - uses: actions/checkout@v4
+        with:
+          ref: f37af5221632f7273446b625ce454c972d02ab08
+          path: baseline
+      - name: Render both takes with the Windows engine and production raster
+        shell: pwsh
+        run: |
+          Copy-Item godot/addons/pixelfx/bin baseline/godot/addons/pixelfx/ -Recurse -Force
+          New-Item -ItemType Directory -Force baseline/godot/.godot
+          Set-Content -Encoding ascii baseline/godot/.godot/extension_list.cfg "res://addons/pixelfx/pixelfx.gdextension"
+          $probe=(Resolve-Path godot/tests/capture_run_jump.gd).Path
+          foreach ($take in @("base","new")) {
+            $project=if ($take -eq "base") { "baseline/godot" } else { "godot" }
+            & $env:GODOT --headless --path $project --script $probe -- "$pwd/frames/$take"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          python tools/run_jump_gifs.py frames/base frames/new previews
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Run-jump-Godot-4.4.1
+          path: previews/*.gif
       - run: python tools/package_lab_rc2.py
+      - shell: pwsh
+        run: Copy-Item docs/RUN_JUMP_ENTRY_RU.md dist/Lab-1.0-RC2/
+
       - uses: actions/upload-artifact@v4
         with:
           name: Lab-Transitions-Windows
