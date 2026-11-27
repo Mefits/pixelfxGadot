@@ -50,7 +50,9 @@ func _ready()->void:
     intensity.value=1.
     intensity.focus_mode=Control.FOCUS_NONE
     panel.add_child(intensity)
-    intensity.value_changed.connect(func(v:float):stylizer.strength=v;render_frame())
+    intensity.value_changed.connect(func(v:float):
+        stylizer.strength=v
+        render_frame())
     var t:=Label.new()
     t.text="Порог скорости конечности"
     panel.add_child(t)
@@ -61,7 +63,9 @@ func _ready()->void:
     threshold_control.value=75.
     threshold_control.focus_mode=Control.FOCUS_NONE
     panel.add_child(threshold_control)
-    threshold_control.value_changed.connect(func(v:float):stylizer.threshold=v;render_frame())
+    threshold_control.value_changed.connect(func(v:float):
+        stylizer.threshold=v
+        render_frame())
     repeat_choice=OptionButton.new()
     repeat_choice.focus_mode=Control.FOCUS_NONE
     for title in ["Автоповтор: выкл","Автоповтор: 1","Автоповтор: K"]:repeat_choice.add_item(title)

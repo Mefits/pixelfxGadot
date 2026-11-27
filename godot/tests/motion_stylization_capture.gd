@@ -4,14 +4,18 @@ var failures:Array[String]=[]
 func _initialize()->void:call_deferred("run")
 func run()->void:
     var args:=OS.get_cmdline_user_args()
-    if args.is_empty():quit(2);return
+    if args.is_empty():
+        quit(2)
+        return
     var folder:String=args[0]
     root.size=Vector2i(960,570)
     var s=Scene.instantiate()
     s.manual=true
     root.add_child(s)
     await process_frame
-    if s.raster==null:quit(3);return
+    if s.raster==null:
+        quit(3)
+        return
     for attack in ["punch","heel"]:
         var expected:Array=[]
         for mode in 5:
