@@ -94,6 +94,7 @@ func run()->void:
     var followup_hand_range:float=0.
     var followup_hand_start:=Vector2.ZERO
     var followup_hand_target_error:float=0.
+    var peak_target_tick:int=-1
     for t in 360:
         if t in [12,80,180]:replay(b,12)
         var start:int=Time.get_ticks_usec()
@@ -121,7 +122,10 @@ func run()->void:
                 followup_hand_range=maxf(followup_hand_range,hp.distance_to(followup_hand_start))
                 var q:Array=b.rows[0][hand]
                 var hr:Array=b.rows[0][h]
-                followup_hand_target_error=maxf(followup_hand_target_error,hp.distance_to(Vector2(q[0]-hr[0],q[1]-hr[1])))
+                var err:float=hp.distance_to(Vector2(q[0]-hr[0],q[1]-hr[1]))
+                if err>followup_hand_target_error:
+                    followup_hand_target_error=err
+                    peak_target_tick=t
         for c in 2:
             var m=b.models[c]
             var p:Dictionary=poses[c]
@@ -182,7 +186,7 @@ func run()->void:
         check(float(post_x.get("245",0))-float(post_x.get("190",0))>10.,"attacker failed to resume locomotion")
         check(absf(float(post_x.get("359",0))-float(post_x.get("300",0)))<5.,"attacker failed to stop")
     times.sort()
-    var report:Dictionary={"active":not baseline,"attacker_clock":b.players[0].tick,"attacker_peak_tilt":attacker_peak_tilt,"attacker_post_tilt":attacker_post_tilt,"attacker_height_error":attacker_post_height_error,"attacker_anchor":attacker_peak_anchor,"attacker_floor":attacker_floor,"attacker_limit":attacker_limit,"followup_seen":followup_seen,"followup_hand_range":followup_hand_range,"followup_hand_target_error":followup_hand_target_error,"attacker_x":post_x,"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"attacker_release_tick":b.attacker_release_tick,"attacker_release_error":b.attacker_release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"peak_precontact_anchor":peak_precontact_anchor,"worst_anchor_tick":worst_anchor_tick,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
+    var report:Dictionary={"active":not baseline,"attacker_clock":b.players[0].tick,"attacker_peak_tilt":attacker_peak_tilt,"attacker_post_tilt":attacker_post_tilt,"attacker_height_error":attacker_post_height_error,"attacker_anchor":attacker_peak_anchor,"attacker_floor":attacker_floor,"attacker_limit":attacker_limit,"followup_seen":followup_seen,"followup_hand_range":followup_hand_range,"followup_hand_target_error":followup_hand_target_error,"peak_target_tick":peak_target_tick,"attacker_x":post_x,"solo_tracking":solo.track_error,"solo_release_error":solo.release_error,"pair_tracking":b.track_error,"pair_release_error":b.release_error,"attacker_release_tick":b.attacker_release_tick,"attacker_release_error":b.attacker_release_error,"contact_tick":b.contact_tick,"release_tick":b.release_tick,"normal_impulse_sum":b.contact_impulse,"peak_anchor":peak_anchor,"peak_precontact_anchor":peak_precontact_anchor,"worst_anchor_tick":worst_anchor_tick,"peak_floor":peak_floor,"peak_angle_deg":peak_limit,"p95_us":times[int(.95*times.size())] if not times.is_empty() else -1,"failures":failures}
     var f:=FileAccess.open(out.path_join("report.json"),FileAccess.WRITE)
     f.store_string(JSON.stringify(report))
     f.close()
