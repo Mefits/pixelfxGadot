@@ -41,3 +41,8 @@ Godot 4.4.1 x86-64, импорт `godot/project.godot`. Для H нужен на
 
 ## Box2D — интеграционный кандидат
 Ветка feature/lab-1.0-box2d-integration от Astra 4141c63. P — отдельная физическая мастерская на риге 069 C, H/M и формат v1 сохранены. См. docs/BOX2D_INTEGRATION_RU.md. CI ожидается; Project N и исходные ветки не изменены.
+
+
+### Проверенный Box2D checkpoint
+
+CI 45916872981 — Windows/Linux build, backend, P UI, H/M и editor regression прошли. Box2D cross-platform traces отличаются, поэтому этот backend пока не является детерминированным lockstep-исполнителем. A/B прошли отдельный порог художественной ошибки 45°; C — 45.61°, художественная приёмка открыта. См. [результаты и ограничения](BOX2D_INTEGRATION_RU.md).

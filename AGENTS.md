@@ -50,4 +50,4 @@ On experiment/astra-body-raster-054 ONLY, docs/ASTRA_BODY_RASTER_TASK_RU.md and 
 
 
 ## Box2D — интеграционный кандидат
-Ветка feature/lab-1.0-box2d-integration от Astra 4141c63. P — отдельная физическая мастерская на риге 069 C, H/M и формат v1 сохранены. См. docs/BOX2D_INTEGRATION_RU.md. CI ожидается; Project N и исходные ветки не изменены.
+Ветка feature/lab-1.0-box2d-integration от Astra 4141c63. P — отдельная физическая мастерская на риге 069 C, H/M и формат v1 сохранены. См. docs/BOX2D_INTEGRATION_RU.md. CI 45916872981 success Windows/Linux. Astra cross-platform exact; Box2D cross-platform traces differ, so no Box2D lockstep claim. Profile C art gate remains open at 45.61° vs 45°. Project N and source branches unchanged.

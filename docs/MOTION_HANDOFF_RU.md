@@ -502,4 +502,15 @@ A exact 089; B same legs, root, torso and schedule, restored 087 arm arc through
 
 
 ## Box2D — интеграционный кандидат
-Ветка feature/lab-1.0-box2d-integration от Astra 4141c63. P — отдельная физическая мастерская на риге 069 C, H/M и формат v1 сохранены. См. docs/BOX2D_INTEGRATION_RU.md. CI ожидается; Project N и исходные ветки не изменены.
+Ветка feature/lab-1.0-box2d-integration от Astra 4141c63. P — отдельная физическая мастерская на риге 069 C, H/M и формат v1 сохранены. См. docs/BOX2D_INTEGRATION_RU.md. CI 45916872981 успешно пройден на commit de01f61b93afcef47958daa0f3751a1afa609374 под Windows/Linux; Astra 60/120 Гц совпала между платформами, Box2D трассы между Windows/Linux различаются. Project N и исходные ветки не изменены.
+
+
+## Box2D Lab integration — verified CI 2026-11-27
+
+[CI 45916872981](https://github.com/Mefits/pixelfxGadot/actions/runs/45916872981) успешно завершился на commit de01f61b93afcef47958daa0f3751a1afa609374: нативная сборка Box2D и PixelFX, тесты backend/controller, UI P, H/M regression и editor UI прошли на Windows и Linux. Linux artifact 15162448721 содержит реальные GIF ×1/×0.5, review sheet и скриншот P; Windows artifact 15162184971 содержит DLL и тестовые отчёты.
+
+Выбранные подшаги — 8. A/B/C физически прошли: скольжение 27.15/27.42/27.12 art units, 1/0/0 отскоков; суставной предел около 0.84°, FK ошибка около 0.29, остаточная скорость менее 0.016. Два экземпляра с экспортом состояния — p95 85 мкс на 120Hz шаг. Пять rollback cut points точны; partial authority: support error 0.0000019, движение руки 19.48, release continuity 0, replay exact.
+
+Художественный порог 45°: A 31.75°, B 39.26° — проходят; C 45.61° — не проходит. Не снижать порог и не объявлять C художественно принятым. GIF нужен владельцу для оценки; технический CI не заменяет визуальную приёмку.
+
+Критическое сетевое наблюдение: Astra трассы 60/120 Гц совпали между Windows/Linux, Box2D трассы — нет (сравнение диагностическое, не gating). Поэтому Box2D нельзя использовать как межплатформенный lockstep-источник истины. Будущий онлайн должен опираться на авторитетное состояние/репликацию или другой отдельно проверенный контракт; не переносить эту физику в N сейчас.
