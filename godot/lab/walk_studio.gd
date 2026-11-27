@@ -39,7 +39,7 @@ func _ready()->void:
     add_child(sprite)
     state_label=label("",Vector2(24,454),18)
     status=label("",Vector2(24,486),13)
-    label("M: Комбо 1 / 2 / 3 и Idle. Сохрани и снова открой T.",Vector2(24,514),12)
+    label("M: Комбо 1 / 2 / 3 и Idle.   Стойка v2 · широкая опора.",Vector2(24,514),12)
     if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
     reset()
 
@@ -72,7 +72,7 @@ func advance()->void:
 func render_frame()->void:
     state_label.text="Действие: "+("Остановка" if walker.direction==0 and walker.activity>0. else ("Idle" if walker.action_name()=="walk_breathe" else ["Ходьба назад","Стойка","Ходьба вперёд"][walker.direction+1]))
     if walker.action_name()=="walk_breathe" and training.active==0:
-        state_label.text="Действие: Idle · %.2f с"%fposmod(float(maxi(0,walker.transition_age-walker.STOP_TICKS-2))/60.,float(walker.programs.walk_breathe.doc.duration))
+        state_label.text="Действие: Idle · %.2f с / %.1f с"%[fposmod(float(maxi(0,walker.transition_age-walker.STOP_TICKS-2))/60.,float(walker.programs.walk_breathe.doc.duration)),walker.programs.walk_breathe.doc.duration]
     if training.active!=0:state_label.text="Удар %d  ·  комбо %d  ·  %s"%[training.active,training.chain,"В буфере: "+str(training.queued) if training.queued else ""]
     status.text="Попадания: %d   Промахи: %d   Последнее комбо: %d   ·   %s"%[training.hits,training.misses,training.last_chain,training.result]
     queue_redraw()

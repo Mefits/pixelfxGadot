@@ -10,6 +10,7 @@ const Grid=preload("res://lab/hybrid091/precision.gd")
 const STRIDE:float=32.
 const CONTACT:float=18.24/32.
 const SIDES=["near","far"]
+const GUARD_REVISION:int=2
 static var defaults:Dictionary={}
 
 static func key(t:float,p:Dictionary)->Dictionary:
@@ -29,7 +30,7 @@ static func default_doc(id:String)->Dictionary:
     var duration:float=.1 if idle else 64./60.
     if idle:
         var p:Dictionary=gait.intent().pose
-        p.root=[0.,-1.]
+        p.root=[0.,.35]
         p.angles.hips=2.
         p.angles.chest=0.
         p.angles.head=-2.
@@ -41,7 +42,7 @@ static func default_doc(id:String)->Dictionary:
         p.angles.shoulder_far=-53.
         p.angles.elbow_near=-134.
         p.angles.elbow_far=-124.
-        support.resolve(p,[{"toe":Vector2(5.,0.),"pitch":0.,"stance":true},{"toe":Vector2(-3.,0.),"pitch":0.,"stance":true}])
+        support.resolve(p,[{"toe":Vector2(7.,0.),"pitch":0.,"stance":true},{"toe":Vector2(-5.,0.),"pitch":0.,"stance":true}])
         keys.append(key(0.,p))
     else:
         for index in 9:
@@ -61,6 +62,7 @@ static func default_doc(id:String)->Dictionary:
             keys.append(key(phase*duration,p))
     var label:String="Стойка" if idle else ("Ходьба назад" if backward else "Ходьба вперёд")
     var d:Dictionary={"version":2,"id":id,"name":label,"kind":"action","walk_role":id,"duration":duration,"fps":60,"easing":"linear","loop":not idle,"keys":keys,"goals":[],"events":[]}
+    if idle:d.guard_revision=GUARD_REVISION
     defaults[id]=d.duplicate(true)
     return d
 
@@ -69,7 +71,7 @@ static func breathing_doc(stance:Dictionary)->Dictionary:
     # at the pelvis; chest and arms peak slightly later. Same foot anchors.
     var start:Dictionary=stance.keys[0]
     var keys:Array=[]
-    var duration:float=2.4
+    var duration:float=1.8
     var phases:Array=[0.,.30,.58,.80,1.]
     var lift:Array=[0.,.65,1.,.30,0.]
     var chest:Array=[0.,.45,1.,.50,0.]
@@ -77,20 +79,39 @@ static func breathing_doc(stance:Dictionary)->Dictionary:
     var rear:Array=[0.,.40,.85,1.,0.]
     for i in phases.size():
         var p:Dictionary={"angles":start.angles.duplicate(true),"root":start.root.duplicate()}
-        p.root[1]+=1.5*lift[i]
+        p.root[1]+=2.4*lift[i]
+        p.root[0]+=.65*chest[i]
         p.angles.hips-=.9*lift[i]
-        p.angles.chest-=2.2*chest[i]
+        p.angles.chest-=3.6*chest[i]
         p.angles.head+=1.5*arms[i]
         p.angles.shoulder_turn-=2.5*chest[i]
-        p.angles.shoulder_near-=8.*arms[i]
-        p.angles.elbow_near+=11.*arms[i]
-        p.angles.shoulder_far+=7.*rear[i]
-        p.angles.elbow_far-=10.*rear[i]
+        p.angles.shoulder_near-=10.*arms[i]
+        p.angles.elbow_near+=12.*arms[i]
+        p.angles.shoulder_far+=8.*rear[i]
+        p.angles.elbow_far-=11.*rear[i]
         keys.append(key(phases[i]*duration,p))
-    return {"version":2,"id":"walk_breathe","name":"Idle · дыхание","kind":"action","walk_role":"walk_breathe","duration":duration,"fps":60,"easing":"smooth","loop":true,"keys":keys,"goals":[],"events":[]}
+    return {"version":2,"guard_revision":GUARD_REVISION,"id":"walk_breathe","name":"Idle · дыхание","kind":"action","walk_role":"walk_breathe","duration":duration,"fps":60,"easing":"smooth","loop":true,"keys":keys,"goals":[],"events":[]}
+
+# One-time upgrade of the two bound guard slots. Retain the original bytes
+# in a separate directory; a failed archive leaves the old file untouched.
+static func archive_guard(id:String)->bool:
+    var source:String=Asset.FOLDER+id+".json"
+    if not FileAccess.file_exists(source):return true
+    var folder:String="user://motion_authoring_backup/"
+    if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(folder))!=OK:return false
+    var target:String=folder+id+"_before_guard_v2.json"
+    var suffix:int=1
+    while FileAccess.file_exists(target):
+        target=folder+id+"_before_guard_v2_"+str(suffix)+".json"
+        suffix+=1
+    return DirAccess.rename_absolute(ProjectSettings.globalize_path(source),ProjectSettings.globalize_path(target))==OK
 
 static func document(id:String)->Dictionary:
     var saved:Dictionary=Asset.read(Asset.FOLDER+id+".json")
+    var guard_slot:bool=id in ["walk_idle","walk_breathe"]
+    if guard_slot and FileAccess.file_exists(Asset.FOLDER+id+".json") and int(saved.get("guard_revision",0))<GUARD_REVISION:
+        if archive_guard(id):
+            return default_doc(id)
     if saved.get("id")==id and saved.get("walk_role")==id and Asset.problem(saved)=="":return Asset.normalise(saved)
     return default_doc(id)
 

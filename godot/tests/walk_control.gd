@@ -16,6 +16,10 @@ func run():
         check(doc.keys.size()==(1 if id=="walk_idle" else (5 if id=="walk_breathe" else 9)),"sparse keys")
     var idle=Walk.new(docs)
     var expected:Dictionary=idle.pose.duplicate(true)
+    var stance_toes:Array=Motion.toes(idle.rig,idle.pose)
+    var span:float=absf(stance_toes[0].x-stance_toes[1].x)
+    print("GUARD_STANCE_SPAN ",span)
+    check(span>11.5,"wider stance")
     for direction in [-1,1]:
         for phase_tick in range(0,64,2):
             var w=Walk.new(docs)
@@ -67,7 +71,7 @@ func run():
         for side in 2:
             slip=maxf(slip,Motion.toe(still.rig,still.pose,Motion.SIDES[side]).distance_to(foot_targets[side]))
         check(still.x==origin,"idle no travel")
-    check(hi-lo>.15,"idle visible breath")
+    check(hi-lo>1.5,"idle visible breath")
     check(slip<.1,"idle fixed foot "+str(slip))
     # Guard stays raised through a complete loop; wrists move in the
     # torso frame (not merely because of root bobbing).
