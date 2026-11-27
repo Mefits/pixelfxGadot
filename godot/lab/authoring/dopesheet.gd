@@ -10,6 +10,21 @@ var curve_drag_start:float=0.
 var curve_drag_value:float=0.
 var curve_drag_span:float=0.
 var curve_drag_y:float=0.
+func visible_start()->float:
+    return 0. if clip.get("gait",false) else float(clip.get("start",0))
+
+func at(t:float)->float:
+    var start:float=visible_start()
+    return LEFT+clampf((t-start)/maxf(1.,max_value-start),0.,1.)*(size.x-LEFT-10)
+
+func _time_at(x:float)->float:
+    var start:float=visible_start()
+    return start+clampf((x-LEFT)/maxf(1.,size.x-LEFT-10),0.,1.)*maxf(0.,max_value-start)
+
+func _seek(x:float)->void:
+    var start:float=visible_start()
+    value_changed.emit(clampf(start+snappedf(_time_at(x)-start,maxf(step,.0001)),start,max_value))
+
 func _draw()->void:
     if curve_mode:
         draw_curve()
@@ -18,13 +33,12 @@ func _draw()->void:
     var font:Font=ThemeDB.fallback_font
     var start:float=float(clip.get("start",0))
     var gait:bool=bool(clip.get("gait",false))
-    if not gait:
-        draw_rect(Rect2(LEFT,0,at(start)-LEFT,size.y),Color("#243441"))
-        draw_string(font,Vector2(LEFT+4,13),"прогрев",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#a1adba"))
+    if gait:start=0.
     for i in range(3):
         draw_rect(Rect2(0,25+i*24,size.x,24),Color("#1e2d3c") if i%2==0 else Color("#192633"))
-    var interval:int=15 if max_value<=150 else 30
-    for f in range(0,int(max_value)+1,interval):
+    var span:float=max_value-start
+    var interval:int=1 if span<=12. else (5 if span<=40. else (10 if span<=100. else 30))
+    for f in range(int(start),int(max_value)+1,interval):
         var x:float=at(f)
         draw_line(Vector2(x,19),Vector2(x,size.y),Color("#35485a"))
         draw_string(font,Vector2(x+2,20),str(f if gait else f-int(start)),HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#a9bac8"))

@@ -18,6 +18,7 @@ static func key(t:float,p:Dictionary)->Dictionary:
     return {"t":t,"angles":angles,"root":p.root.duplicate()}
 
 static func default_doc(id:String)->Dictionary:
+    if id=="walk_breathe":return breathing_doc(document("walk_idle"))
     if defaults.has(id):return defaults[id].duplicate(true)
     var rig=Body.make_rig()
     var gait=Gait.new(rig,Asset.read(Asset.FIX+"run053a_C.json").payload.clip)
@@ -61,6 +62,29 @@ static func default_doc(id:String)->Dictionary:
     defaults[id]=d.duplicate(true)
     return d
 
+static func breathing_doc(stance:Dictionary)->Dictionary:
+    # Five sparse, smoothly interpolated poses. The rising motion starts
+    # at the pelvis; chest and arms peak slightly later. Same foot anchors.
+    var start:Dictionary=stance.keys[0]
+    var keys:Array=[]
+    var duration:float=2.4
+    var phases:Array=[0.,.30,.58,.80,1.]
+    var lift:Array=[0.,.65,1.,.30,0.]
+    var chest:Array=[0.,.45,1.,.50,0.]
+    var arms:Array=[0.,.15,1.,.65,0.]
+    for i in phases.size():
+        var p:Dictionary={"angles":start.angles.duplicate(true),"root":start.root.duplicate()}
+        p.root[1]-=.8*lift[i]
+        p.angles.hips-=.9*lift[i]
+        p.angles.chest-=2.2*chest[i]
+        p.angles.head+=1.5*arms[i]
+        p.angles.shoulder_near+=2.8*arms[i]
+        p.angles.shoulder_far+=2.2*arms[i]
+        p.angles.elbow_near-=2.5*arms[i]
+        p.angles.elbow_far-=1.8*arms[i]
+        keys.append(key(phases[i]*duration,p))
+    return {"version":2,"id":"walk_breathe","name":"Idle · дыхание","kind":"action","walk_role":"walk_breathe","duration":duration,"fps":60,"easing":"smooth","loop":true,"keys":keys,"goals":[],"events":[]}
+
 static func document(id:String)->Dictionary:
     var saved:Dictionary=Asset.read(Asset.FOLDER+id+".json")
     if saved.get("id")==id and saved.get("walk_role")==id and Asset.problem(saved)=="":return Asset.normalise(saved)
@@ -86,7 +110,7 @@ static func contact_start(d:Dictionary,index:int)->float:
 
 # Precompute the authored touchdown and liftoff endpoints. Runtime uses a
 # world-fixed stance target and a continuous correction on the swing arc.
-static func prepare(d:Dictionary)->Dictionary:
+static func prepare(d:Dictionary,stance:Dictionary={})->Dictionary:
     var rig=Body.make_rig()
     var contacts:Array=[]
     for i in 2:
@@ -94,7 +118,11 @@ static func prepare(d:Dictionary)->Dictionary:
         var start:Vector2=toes(rig,sample(d,c))[i]
         var end:Vector2=toes(rig,sample(d,fposmod(c+CONTACT,1.)))[i]
         contacts.append({"phase":c,"start":start,"end":end})
-    return {"doc":d,"contacts":contacts}
+    var fixed:Array=[]
+    if d.walk_role=="walk_breathe":
+        var base:Dictionary=stance if not stance.is_empty() else document("walk_idle")
+        fixed=toes(rig,sample(base,0.))
+    return {"doc":d,"contacts":contacts,"fixed":fixed}
 
 static func intent(program:Dictionary,phase:float,rig)->Dictionary:
     var d:Dictionary=program.doc
@@ -106,7 +134,8 @@ static func intent(program:Dictionary,phase:float,rig)->Dictionary:
         var point:Vector2=points[i]
         var pitch:float=p.angles["foot_pitch_"+SIDES[i]]
         var stance:bool=true
-        if d.walk_role=="walk_idle":
+        if d.walk_role in ["walk_idle","walk_breathe"]:
+            if d.walk_role=="walk_breathe":point=program.fixed[i]
             point.y=0.
         else:
             var c:Dictionary=program.contacts[i]

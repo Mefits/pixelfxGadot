@@ -352,11 +352,11 @@ func run():
     for index in editor.key_channels.item_count:
         if editor.key_channels.get_item_metadata(index)=="shoulder_near":editor.key_channels.select(index)
     editor.sync_key()
-    var before:float=editor.document.keys[1].angles.shoulder_near
-    editor.key_angle.value=before+15.
+    var walk_angle_before:float=editor.document.keys[1].angles.shoulder_near
+    editor.key_angle.value=walk_angle_before+15.
     editor.apply_key_angle()
     var expected:float=editor.document.keys[1].angles.shoulder_near
-    ok=ok and absf(expected-before)>10.
+    ok=ok and absf(expected-walk_angle_before)>10.
     editor.save_file()
     var loaded:Dictionary=editor.WalkMotion.document(walk_id)
     ok=ok and is_equal_approx(float(loaded.keys[1].angles.shoulder_near),expected)
@@ -379,8 +379,20 @@ func run():
     ok=ok and editor.document.keys.size()==1 and editor.key_at_frame()==0
     editor.open_motion("walk_backward")
     ok=ok and editor.document.walk_role=="walk_backward" and editor.document.keys.size()>=2
+    for id_test in ["walk_idle","walk_breathe","walk_forward","walk_backward","jab","feint"]:
+        editor.open_motion(id_test)
+        ok=ok and editor.frame==editor.START and is_equal_approx(editor.timeline.at(editor.START),editor.timeline.LEFT)
+        ok=ok and is_equal_approx(editor.timeline._time_at(editor.timeline.LEFT),float(editor.START))
+        if editor.document.keys.size()>1:
+            ok=ok and absf(editor.timeline.at(editor.START+editor.document.duration*60.)-(editor.timeline.size.x-10.))<1.
+    editor.open_motion("walk_breathe")
+    editor.set_pose_tool(2)
+    editor.seek(editor.START+60)
+    await process_frame
+    await RenderingServer.frame_post_draw
+    root.get_texture().get_image().save_png(out.path_join("idle-editor.png"))
     if not ok:
-        push_error("bound locomotion editor save and T reload")
+        push_error("bound locomotion editor save and T reload or authored timeline")
         quit(1)
         return
     print("WALK_EDITOR_BINDING_OK")

@@ -35,7 +35,7 @@ func _ready()->void:
     add_child(sprite)
     state_label=label("",Vector2(24,454),18)
     status=label("",Vector2(24,486),13)
-    label("Движения: M → Стойка / Ходьба вперёд / Ходьба назад → Сохранить.",Vector2(24,514),12)
+    label("M → Стойка / Idle / Ходьба вперёд / Ходьба назад → Сохранить.",Vector2(24,514),12)
     if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
     reset()
 
@@ -64,7 +64,7 @@ func advance()->void:
     render_frame()
 
 func render_frame()->void:
-    state_label.text="Действие: "+("Остановка" if walker.direction==0 and walker.activity>0. else ["Ходьба назад","Стойка","Ходьба вперёд"][walker.direction+1])
+    state_label.text="Действие: "+("Остановка" if walker.direction==0 and walker.activity>0. else ("Idle" if walker.action_name()=="walk_breathe" else ["Ходьба назад","Стойка","Ходьба вперёд"][walker.direction+1]))
     status.text="Положение: %.1f    ·    направление взгляда: вправо    ·    %s"%[walker.x,walker.action_name()]
     last_ok=false
     if raster==null:
@@ -89,9 +89,8 @@ func _process(delta:float)->void:
     accumulator+=minf(delta,.1)
     var changed:bool=false
     while accumulator>=1./60.:
-        if command()!=0 or walker.activity>0. or walker.direction!=0:
-            walker.step(command())
-            changed=true
+        walker.step(command())
+        changed=true
         accumulator-=1./60.
     if changed:render_frame()
 

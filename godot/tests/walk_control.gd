@@ -13,7 +13,7 @@ func run():
         var doc:Dictionary=Motion.default_doc(id)
         docs[id]=doc
         check(Asset.problem(doc)=="","valid "+id+" "+Asset.problem(doc))
-        check(doc.keys.size()==(1 if id=="walk_idle" else 9),"sparse keys")
+        check(doc.keys.size()==(1 if id=="walk_idle" else (5 if id=="walk_breathe" else 9)),"sparse keys")
     var idle=Walk.new(docs)
     var expected:Dictionary=idle.pose.duplicate(true)
     for direction in [-1,1]:
@@ -54,6 +54,24 @@ func run():
     for t in 31:p.step({})
     var target:Dictionary=Motion.intent(Motion.prepare(docs.walk_forward),0.,p.rig)
     check(p.final_pose==Motion.resolve(p.rig,p.support,target),"M preview same sampler")
+    var still=Walk.new(docs)
+    var origin:float=still.x
+    var foot_targets:Array=Motion.toes(still.rig,still.pose)
+    var lo:float=INF
+    var hi:float=-INF
+    var slip:float=0.
+    for tick in 320:
+        still.step(0)
+        lo=minf(lo,float(still.pose.root[1]))
+        hi=maxf(hi,float(still.pose.root[1]))
+        for side in 2:
+            slip=maxf(slip,Motion.toe(still.rig,still.pose,Motion.SIDES[side]).distance_to(foot_targets[side]))
+        check(still.x==origin,"idle no travel")
+    check(hi-lo>.15,"idle visible breath")
+    check(slip<.1,"idle fixed foot "+str(slip))
+    var breathing:Dictionary=docs.walk_breathe
+    check(breathing.keys[0].angles==breathing.keys[-1].angles and breathing.keys[0].root==breathing.keys[-1].root,"idle loop boundary")
+    print("IDLE_BREATH_RANGE ",hi-lo," FOOT_ERROR ",slip)
     print("WALK_CONTROL_SLIP ",max_slip)
     if failures.is_empty():print("WALK_CONTROL_OK")
     else:

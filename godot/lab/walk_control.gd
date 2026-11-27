@@ -26,8 +26,10 @@ var transition_x:float=0.
 var first_foot:int=0
 
 func _init(overrides:Dictionary={}):
+    var stance:Dictionary=overrides.get("walk_idle",Motion.document("walk_idle"))
     for id in ["walk_idle","walk_forward","walk_backward"]:
         programs[id]=Motion.prepare(overrides.get(id,Motion.document(id)))
+    programs.walk_breathe=Motion.prepare(overrides.get("walk_breathe",Motion.document("walk_breathe")),stance)
     set_intent(Motion.intent(programs.walk_idle,0.,rig))
 
 func set_intent(value:Dictionary)->void:
@@ -88,6 +90,16 @@ func stop_step()->void:
     var value:Dictionary=Motion.intent(programs.walk_idle,0.,rig)
     if transition_from.is_empty() or transition_age>=STOP_TICKS:
         activity=0.
+        var idle_age:int=maxi(0,transition_age-STOP_TICKS-2)
+        if idle_age>0:
+            var program:Dictionary=programs.walk_breathe
+            var cycle:float=fposmod(float(idle_age)/(float(program.doc.duration)*60.),1.)
+            var breath:Dictionary=Motion.intent(program,cycle,rig)
+            # Enter edited idle gently even if its first authored pose differs.
+            breath.pose=Clips.blend_pose(value.pose,breath.pose,smoothstep(0.,12.,float(idle_age)))
+            value.pose=breath.pose
+            for i in 2:
+                value.paths[i].pitch=lerpf(value.paths[i].pitch,breath.paths[i].pitch,smoothstep(0.,12.,float(idle_age)))
         set_intent(value)
         return
     var u:float=clampf(float(transition_age)/STOP_TICKS,0.,1.)
@@ -106,4 +118,4 @@ func stop_step()->void:
     set_intent(value)
 
 func action_name()->String:
-    return "walk_forward" if direction>0 else ("walk_backward" if direction<0 else "walk_idle")
+    return "walk_forward" if direction>0 else ("walk_backward" if direction<0 else ("walk_breathe" if transition_age>STOP_TICKS+2 else "walk_idle"))

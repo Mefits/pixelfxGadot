@@ -678,6 +678,10 @@ func request_open(id:String)->void:
     open_motion(id)
 
 func toggle_play()->void:
+    if document.get("walk_role","")=="walk_idle":
+        playing=false
+        seek(START)
+        return
     if rotate_active:cancel_rotation()
     if root_drag_active:finish_root_drag()
     if pose_tool.selected==1:pose_tool.select(2)
@@ -705,7 +709,7 @@ func sync_key()->void:
     var i:int=key_at_frame()
     key_apply.disabled=i<0 or key_channels.item_count==0
     key_angle.editable=not key_apply.disabled
-    key_info.text="Выбери ромб ключа. Углы редактируют исходную позу, не результат IK." if i<0 else "Ключ %d · кадр %d"%[i+1,frame-START]
+    key_info.text="Статичная поза · кадр 0" if document.get("walk_role","")=="walk_idle" else ("Выбери ромб ключа. Углы редактируют исходную позу, не результат IK." if i<0 else "Ключ %d · кадр %d"%[i+1,frame-START])
     root_x.editable=i>=0
     root_y.editable=i>=0
     if not key_apply.disabled:
@@ -1091,7 +1095,7 @@ func open_motion(id:String):
     history.clear()
     redo_history.clear()
     playing=false
-    refresh(START if document.has("walk_role") else 0)
+    refresh(0 if document.kind=="gait" else START)
     if document.has("walk_role"):
         set_pose_tool(1)
         info.text="Сохрани движение и проверь в T. Стопы корректируются в исполнении."
@@ -1100,9 +1104,10 @@ func open_motion(id:String):
         info.text="Крест — цель, круг — результат."
 
 func end_frame()->int:
+    if document.get("walk_role","")=="walk_idle":return START
     if document.has("walk_role"):return START+roundi(document.duration*60.)
     if document.kind=="gait":return 220
-    return START+ceili(document.duration*60.)*(3 if document.get("loop",false) else 1)+22
+    return START+roundi(document.duration*60.)
 
 func command(t:int)->Dictionary:
     if document.kind=="gait":return {"speed":1. if t<24 else (document.speed if t<132 else 0.)}
@@ -1120,6 +1125,7 @@ func seek(value:int):
     simulate(value)
 
 func simulate(value:int):
+    value=clampi(value,0 if document.kind=="gait" else START,end_frame())
     rotate_active=false
     if not player or value<=frame:
         player=build_preview_player()
@@ -1235,7 +1241,7 @@ func show_pose():
             else:sprite.texture=ImageTexture.create_from_image(im)
     var state:String="стойка" if player.stopped else ("полёт" if airborne() else "опора")
     if player.action!="":state=player.action
-    status.text="%s   ·   тик %d   ·   %s"%[document.name,frame,state]
+    status.text="%s   ·   кадр %d   ·   %s"%[document.name,frame if document.kind=="gait" else frame-START,state]
     if not rendered:
         status.text+="  |  НЕТ НАТИВНОГО ТЕЛА — нужен полный пакет"
         sprite.hide()
@@ -1791,7 +1797,7 @@ func _process(delta:float):
     if steps>0:
         clock-=steps/60.
         var next:int=frame+steps
-        if loop_play and document.has("walk_role"):
+        if loop_play and document.kind=="action":
             simulate(START+posmod(next-START,maxi(1,end_frame()-START)))
         elif loop_play:simulate(next%(end_frame()+1))
         else:
