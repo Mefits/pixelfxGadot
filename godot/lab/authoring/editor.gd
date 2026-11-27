@@ -461,7 +461,7 @@ func _ready():
         else:
             inspector.current_tab=4
             event_list.select(i)
-            select_event(i)
+            select_event(i))
     timeline.goal_selected.connect(func(i:int):select_goal(i);inspector.current_tab=1;show_pose())
     timeline.curve_edited.connect(edit_curve_key)
     add_child(timeline)

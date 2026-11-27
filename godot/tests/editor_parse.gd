@@ -16,6 +16,7 @@ func run()->void:
     var failed:bool=false
     for path in PATHS:
         var resource=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE)
-        print("EDITOR_RESOURCE_PARSE ",path," ",resource!=null)
-        if resource==null:failed=true
+        var valid:bool=resource is GDScript and resource.can_instantiate()
+        print("EDITOR_RESOURCE_PARSE ",path," ",valid)
+        if not valid:failed=true
     quit(1 if failed else 0)
