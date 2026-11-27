@@ -145,14 +145,18 @@ static func legacy_clip_to_action(c:Dictionary,id:String,label:String,fps:int=30
         for channel in k.pose.angles:
             if not channels.has(channel):channels.append(channel)
     if channels.is_empty():return {}
+    var release:Dictionary={}
+    for side in ["near","far"]:
+        var has_leg:bool=channels.has("thigh_"+side) or channels.has("knee_"+side) or channels.has("foot_pitch_"+side)
+        if not has_leg:continue
+        release[side]=[0.,.02,.98,1.]
+        for channel in ["thigh_"+side,"knee_"+side,"foot_pitch_"+side]:
+            if not channels.has(channel):channels.append(channel)
     var keys:Array=[]
     for k in c.keys:
         var angles:Dictionary={}
         for channel in channels:angles[channel]=float(k.pose.angles.get(channel,0.))
         keys.append({"t":float(k.t),"angles":angles,"root":[float(k.pose.root[0]),float(k.pose.root[1])],"easing":k.get("easing",c.get("easing","smooth"))})
-    var release:Dictionary={}
-    for side in ["near","far"]:
-        if channels.has("thigh_"+side) or channels.has("knee_"+side) or channels.has("foot_pitch_"+side):release[side]=[0.,.02,.98,1.]
     var d:Dictionary={"version":2,"id":id,"name":label,"kind":"action","duration":float(c.duration),"fps":clampi(fps,1,60),"easing":str(c.get("easing","smooth")),"loop":bool(c.loop),"keys":keys,"events":c.events.duplicate(true),"goals":[]}
     if not release.is_empty():d.release=release
     return d if problem(d)=="" else {}

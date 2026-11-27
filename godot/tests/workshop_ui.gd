@@ -301,8 +301,21 @@ func run():
         quit(1)
         return
     DirAccess.remove_absolute(ProjectSettings.globalize_path(bank_path))
-    for legacy_id in ["u_idle","u_walk","u_jump","u_strike","u_cast","u_guard","u_hurt"]:
-        if FileAccess.file_exists(editor.Asset.FOLDER+legacy_id+".json"):DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.Asset.FOLDER+legacy_id+".json"))
+    var exported_path:String="user://workspace_legacy_export.json"
+    var exported_file:=FileAccess.open(exported_path,FileAccess.WRITE)
+    exported_file.store_string(JSON.stringify({"name":"Exported Strike","payload":{"slot":"strike","clip":editor.Clips.defaults().strike}}))
+    exported_file.close()
+    editor.import_legacy_file(ProjectSettings.globalize_path(exported_path))
+    if not FileAccess.file_exists(editor.Asset.FOLDER+"u_strike_1.json") and not FileAccess.file_exists(editor.Asset.FOLDER+"u_strike.json"):
+        push_error("legacy catalog export import")
+        quit(1)
+        return
+    DirAccess.remove_absolute(ProjectSettings.globalize_path(exported_path))
+    var imported_dir:=DirAccess.open(editor.Asset.FOLDER)
+    if imported_dir:
+        for file in imported_dir.get_files():
+            if file.get_basename().begins_with("u_"):
+                DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.Asset.FOLDER.path_join(file)))
     DirAccess.remove_absolute(editor.Asset.FOLDER+id+".json")
     print("MOTION_WORKSPACE_UI_OK")
     quit()

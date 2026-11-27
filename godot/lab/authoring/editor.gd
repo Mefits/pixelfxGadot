@@ -552,7 +552,12 @@ func import_legacy_file(path:String)->void:
         info.text="Файл U не является JSON-банком."
         return
     var imported:Array=[]
-    if Asset.legacy_clip_valid(parsed):
+    if parsed.has("payload") and parsed.payload is Dictionary and parsed.payload.has("clip"):
+        var payload:Dictionary=parsed.payload
+        var slot:String=str(payload.get("slot",path.get_file().get_basename()))
+        var label:String=str(parsed.get("name",slot))
+        imported.append(Asset.legacy_clip_to_action(payload.clip,"u_"+slot.to_snake_case(),label,30))
+    elif Asset.legacy_clip_valid(parsed):
         var base_id:String="u_"+path.get_file().get_basename().to_snake_case()
         imported.append(Asset.legacy_clip_to_action(parsed,base_id,path.get_file().get_basename(),30))
     else:imported=Asset.import_legacy_bank(parsed,"u",30)
