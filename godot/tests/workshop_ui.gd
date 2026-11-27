@@ -54,8 +54,9 @@ func run():
     var channel:String=editor.key_channels.get_item_metadata(editor.key_channels.selected)
     var old:float=editor.document.keys[key].angles[channel]
     editor.key_angle.value=old+1.
+    var requested:float=editor.key_angle.value
     editor.apply_key_angle()
-    if not is_equal_approx(float(editor.document.keys[key].angles[channel]),old+1.):
+    if absf(requested-old)<.5 or not is_equal_approx(float(editor.document.keys[key].angles[channel]),requested):
         push_error("key angle edit")
         quit(1)
         return
@@ -64,12 +65,51 @@ func run():
         push_error("key undo")
         quit(1)
         return
+    editor.redo()
+    if not is_equal_approx(float(editor.document.keys[key].angles[channel]),requested):
+        push_error("key redo")
+        quit(1)
+        return
+    editor.undo()
     editor.seek_accent()
     editor.inspector.current_tab=2
+    var snapshot:PackedByteArray=editor.player.save()
+    editor.onion_enabled=true
+    editor.update_ghosts()
+    if editor.ghost_cache.size()!=2 or editor.player.save()!=snapshot:
+        push_error("onion skin must not change current simulation")
+        quit(1)
+        return
+    editor.curve_view.set_pressed_no_signal(true)
+    editor.timeline.curve_mode=true
+    editor.timeline.queue_redraw()
+    if editor.timeline.curve_keys.size()!=editor.document.keys.size():
+        push_error("curve data")
+        quit(1)
+        return
     await process_frame
     await RenderingServer.frame_post_draw
     if root.get_texture().get_image().save_png(out.path_join("workshop-action.png"))!=OK:
         quit(1)
         return
+    editor.create_action("UI test action",.5)
+    if editor.document.kind!="action" or editor.document.keys.size()!=2 or editor.document.name!="UI test action":
+        push_error("new action")
+        quit(1)
+        return
+    var id:String=editor.document.id
+    editor.seek(editor.START+15)
+    editor.key_pose()
+    if editor.document.keys.size()!=3:
+        push_error("new action pose insertion")
+        quit(1)
+        return
+    editor.save_file()
+    editor.open_motion(id)
+    if editor.document.keys.size()!=3:
+        push_error("new action persistence")
+        quit(1)
+        return
+    DirAccess.remove_absolute(editor.Asset.FOLDER+id+".json")
     print("MOTION_WORKSPACE_UI_OK")
     quit()

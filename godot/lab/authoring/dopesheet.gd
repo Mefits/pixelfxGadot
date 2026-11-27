@@ -1,7 +1,13 @@
 extends "res://lab/pose_timeline.gd"
 ## Frame-based v1 document timeline; gait goals are phase-relative, not fake time keys.
 signal goal_selected(index:int)
+var curve_mode:bool=false
+var curve_keys:Array=[]
+var curve_label:String=""
 func _draw()->void:
+    if curve_mode:
+        draw_curve()
+        return
     draw_rect(Rect2(Vector2.ZERO,size),Color("#14202c"))
     var font:Font=ThemeDB.fallback_font
     var start:float=float(clip.get("start",0))
@@ -36,7 +42,49 @@ func _draw()->void:
     draw_line(Vector2(at(value),0),Vector2(at(value),size.y),Color("#e9d38a"),2)
     if moving_marker:draw_line(Vector2(at(drag_time),23),Vector2(at(drag_time),size.y),Color.CORAL,2)
 
+func draw_curve()->void:
+    draw_rect(Rect2(Vector2.ZERO,size),Color("#14202c"))
+    var font:Font=ThemeDB.fallback_font
+    if curve_keys.is_empty():
+        draw_string(font,Vector2(12,40),"График доступен для ключевых действий; бег управляется процедурно.",HORIZONTAL_ALIGNMENT_LEFT,-1,12,Color("#b0bdca"))
+        return
+    var lo:float=INF
+    var hi:float=-INF
+    for p in curve_keys:
+        lo=minf(lo,p.y)
+        hi=maxf(hi,p.y)
+    lo-=5.
+    hi+=5.
+    draw_string(font,Vector2(5,13),curve_label,HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#c7d5e1"))
+    for i in 3:
+        var y:float=20.+i*34.
+        draw_line(Vector2(LEFT,y),Vector2(size.x-10,y),Color("#35485a"))
+        draw_string(font,Vector2(5,y+9),"%.1f°"%lerpf(hi,lo,i/2.),HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("#a9bac8"))
+    var prev:=Vector2.ZERO
+    for i in curve_keys.size():
+        var p:Vector2=curve_keys[i]
+        var pos:=Vector2(at(p.x),20.+(hi-p.y)/(hi-lo)*68.)
+        if i>0:draw_line(prev,pos,Color("#79b9d4"),2)
+        draw_circle(pos,3.5,Color("#e9d38a") if absf(p.x-value)<.51 else Color("#79b9d4"))
+        prev=pos
+    draw_line(Vector2(at(value),0),Vector2(at(value),size.y),Color("#e9d38a"),2)
+
 func _gui_input(e:InputEvent)->void:
+    if curve_mode:
+        if e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT and e.pressed:
+            var best:float=8.
+            var index:int=-1
+            for i in curve_keys.size():
+                var d:float=absf(at(curve_keys[i].x)-e.position.x)
+                if d<best:
+                    best=d
+                    index=i
+            if index>=0:
+                value_changed.emit(curve_keys[index].x)
+                marker_selected.emit(0,index)
+            else:_seek(e.position.x)
+            accept_event()
+        return
     if e is InputEventMouseButton and e.button_index==MOUSE_BUTTON_LEFT and e.pressed and e.position.y>=73:
         var best:float=9.
         var index:int=-1

@@ -46,6 +46,17 @@ var param_key:="speed"
 var pose_controls:HBoxContainer
 var selected:=-1
 var history:Array=[]
+var redo_history:Array=[]
+var undo_button:Button
+var redo_button:Button
+var onion_enabled:bool=false
+var ghost_sprites:Array[Sprite2D]=[]
+var ghost_cache:Dictionary={}
+var ghost_raster
+var curve_view:CheckButton
+var new_dialog:ConfirmationDialog
+var new_name:LineEdit
+var new_duration:SpinBox
 var clip_board:Dictionary={}
 var clock:=0.
 var playing:=false
@@ -67,14 +78,16 @@ func _ready():
     panel(Rect2(8,371,944,143),"#192431")
     var title:=caption(self,"МАСТЕРСКАЯ ДВИЖЕНИЙ",Vector2(12,12),18)
     dirty_label=caption(self,"",Vector2(278,14),13)
-    dirty_label.size=Vector2(158,22)
+    dirty_label.size=Vector2(130,22)
     var top:=HBoxContainer.new()
-    top.position=Vector2(460,7)
+    top.position=Vector2(414,7)
     add_child(top)
-    button(top,"Копия движения",duplicate_motion,"Создать независимую копию JSON")
+    button(top,"+ Действие",ask_new_action,"Создать новое ключевое действие Astra")
+    button(top,"Копия",duplicate_motion,"Создать независимую копию JSON")
     button(top,"Сохранить",save_file,"Ctrl+S")
     button(top,"Загрузить",func():request_open(document.id),"Вернуться к сохранённому документу")
-    button(top,"Отмена",undo,"Ctrl+Z")
+    undo_button=button(top,"↶",undo,"Отмена · Ctrl+Z")
+    redo_button=button(top,"↷",redo,"Повтор · Ctrl+Shift+Z")
     button(top,"Меню",request_exit,"Esc")
 
     caption(self,"ДВИЖЕНИЯ",Vector2(16,55),12)
@@ -113,12 +126,22 @@ func _ready():
     clip.mouse_filter=Control.MOUSE_FILTER_IGNORE
     clip.z_index=-1
     add_child(clip)
+    for color in [Color(.35,.75,1.,.33),Color(1.,.58,.28,.33)]:
+        var ghost:=Sprite2D.new()
+        ghost.centered=false
+        ghost.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+        ghost.modulate=color
+        ghost.hide()
+        clip.add_child(ghost)
+        ghost_sprites.append(ghost)
     sprite=Sprite2D.new()
     sprite.centered=false
     sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
     clip.add_child(sprite)
     position_sprite()
-    if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
+    if ClassDB.class_exists("PixelFXBodyRaster"):
+        raster=ClassDB.instantiate("PixelFXBodyRaster")
+        ghost_raster=ClassDB.instantiate("PixelFXBodyRaster")
     var view_tools:=HBoxContainer.new()
     view_tools.position=Vector2(191,49)
     add_child(view_tools)
@@ -132,6 +155,11 @@ func _ready():
     button(view_tools,"+",func():set_zoom(view_zoom+.5),"Увеличить модель")
     button(view_tools,"1:1",func():set_zoom(ZOOM),"Сброс масштаба")
     button(view_tools,"К акценту",seek_accent,"К контакту / фазе полёта")
+    var onion:=CheckButton.new()
+    onion.text="Соседние"
+    onion.tooltip_text="Синий: 4 кадра назад; оранжевый: 4 кадра вперёд. Только просмотр."
+    view_tools.add_child(onion)
+    onion.toggled.connect(func(v:bool):onion_enabled=v;update_ghosts())
     var help:=caption(self,"ЛКМ — потяни точку · колесо — масштаб",Vector2(202,346),12)
     help.mouse_filter=Control.MOUSE_FILTER_IGNORE
 
@@ -179,8 +207,8 @@ func _ready():
     key_channels=OptionButton.new()
     key_channels.fit_to_longest_item=false
     keys_tab.add_child(key_channels)
-    key_channels.item_selected.connect(func(_i:int):sync_key())
-    key_angle=field(keys_tab,"Угол, °",-360,360,.1,0.)
+    key_channels.item_selected.connect(func(_i:int):sync_key();sync_curve())
+    key_angle=field(keys_tab,"Угол, °",-360,360,.001,0.)
     key_apply=button(keys_tab,"Применить угол",apply_key_angle,"Изменить выбранный канал существующего ключа")
     pose_controls=HBoxContainer.new()
     keys_tab.add_child(pose_controls)
@@ -207,6 +235,11 @@ func _ready():
     loop.button_pressed=true
     controls.add_child(loop)
     loop.toggled.connect(func(v:bool):loop_play=v)
+    curve_view=CheckButton.new()
+    curve_view.text="График"
+    curve_view.tooltip_text="Угол выбранного канала по ключам; клик — переход к ключу"
+    controls.add_child(curve_view)
+    curve_view.toggled.connect(func(v:bool):timeline.curve_mode=v;timeline.queue_redraw())
     frame_label=caption(self,"",Vector2(745,382),12)
     timeline=preload("res://lab/authoring/dopesheet.gd").new()
     timeline.position=Vector2(15,409)
@@ -233,6 +266,19 @@ func _ready():
         if requested_id=="":get_tree().change_scene_to_file("res://lab/main.tscn")
         else:open_motion(requested_id))
     switch_dialog.canceled.connect(func():motion.select(ids.find(document.id)))
+    new_dialog=ConfirmationDialog.new()
+    new_dialog.title="Новое действие Astra"
+    new_dialog.ok_button_text="Создать"
+    var new_fields:=VBoxContainer.new()
+    new_dialog.add_child(new_fields)
+    caption(new_fields,"Имя действия",Vector2.ZERO,14)
+    new_name=LineEdit.new()
+    new_name.text="Новое действие"
+    new_fields.add_child(new_name)
+    new_duration=field(new_fields,"Длительность, с",.1,5.,.05,.5)
+    caption(new_fields,"Начальная поза: текущая. Опора остаётся под Astra.",Vector2.ZERO,12)
+    new_dialog.confirmed.connect(func():create_action(new_name.text,new_duration.value))
+    add_child(new_dialog)
     open_motion(ids[0])
 
 func panel(rect:Rect2,color:String)->void:
@@ -274,6 +320,9 @@ func joint_name(id:String)->String:
 func position_sprite()->void:
     sprite.position=ORIGIN-VIEW.position-Vector2(240,219)*view_zoom/3.
     sprite.scale=Vector2.ONE*view_zoom/3.
+    for ghost in ghost_sprites:
+        ghost.position=sprite.position
+        ghost.scale=sprite.scale
 
 func set_zoom(value:float)->void:
     view_zoom=clampf(value,3.,6.)
@@ -299,6 +348,7 @@ func toggle_play()->void:
     playing=not playing
     clock=0.
     update_play_button()
+    update_ghosts()
 
 func update_play_button()->void:
     play_button.text="Ⅱ Пауза" if playing else "▶ Пуск"
@@ -323,10 +373,71 @@ func sync_key()->void:
         var channel:String=key_channels.get_item_metadata(key_channels.selected)
         key_angle.set_value_no_signal(float(document.keys[i].angles[channel]))
 
+func sync_curve()->void:
+    if timeline==null:return
+    timeline.curve_keys=[]
+    timeline.curve_label=""
+    if document.kind=="action" and key_channels.item_count>0:
+        var channel:String=key_channels.get_item_metadata(key_channels.selected)
+        timeline.curve_label=UI.label(channel)
+        for k in document.keys:
+            timeline.curve_keys.append(Vector2(START+float(k.t)*60.,float(k.angles[channel])))
+    timeline.queue_redraw()
+
+func ask_new_action()->void:
+    if JSON.stringify(document)!=saved_signature:
+        info.text="Сначала сохрани или отмени текущие правки."
+        return
+    new_dialog.popup_centered(Vector2i(420,165))
+
+func create_action(label:String,duration:float)->void:
+    if player==null or label.strip_edges().is_empty():return
+    var angles:Dictionary={}
+    for channel in Asset.CHANNELS+["hips","pelvis_turn"]:
+        angles[channel]=float(player.final_pose.angles.get(channel,0.))
+    var index:int=1
+    while ids.has("action_%d"%index) or FileAccess.file_exists(Asset.FOLDER+"action_%d.json"%index):index+=1
+    var id:String="action_%d"%index
+    var d:Dictionary={"version":1,"id":id,"name":label.strip_edges(),"kind":"action","duration":duration,"keys":[{"t":0.,"angles":angles.duplicate(true)},{"t":duration,"angles":angles.duplicate(true)}],"events":[],"goals":[]}
+    var err:=Asset.persist(d)
+    if err!=OK:
+        info.text=error_string(err)
+        return
+    ids.append(id)
+    motion.add_item(d.name)
+    open_motion(id)
+    seek(START)
+    inspector.current_tab=2
+    info.text="Создано. Добавь ключи и измени углы."
+
+func remember()->void:
+    history.append(document.duplicate(true))
+    redo_history.clear()
+    if history.size()>100:history.pop_front()
+
+func update_ghosts()->void:
+    for ghost in ghost_sprites:ghost.hide()
+    if not onion_enabled or playing or player==null or ghost_raster==null:return
+    for i in 2:
+        var t:int=clampi(frame+[-4,4][i],0,end_frame())
+        if t==frame:continue
+        if not ghost_cache.has(t):
+            var probe=Asset.player(document,60)
+            for f in range(t+1):probe.step(command(f))
+            var parts:Array=body.make(probe.rig.points,probe.final_pose.angles,probe.rig.rotations.head)
+            Depth.apply(parts,probe.style)
+            var result:Dictionary=ghost_raster.render(Studio.CFG,parts)
+            if not result.get("ok",false):continue
+            var im:=Image.create_from_data(result.width,result.height,false,Image.FORMAT_RGBA8,result.rgba)
+            if ghost_cache.size()>=12:ghost_cache.clear()
+            ghost_cache[t]=ImageTexture.create_from_image(im)
+        ghost_sprites[i].texture=ghost_cache[t]
+        ghost_sprites[i].show()
+
 func apply_key_angle()->void:
     var i:int=key_at_frame()
     if i<0 or key_channels.item_count==0:return
-    history.append(document.duplicate(true))
+    remember()
     var channel:String=key_channels.get_item_metadata(key_channels.selected)
     document.keys[i].angles[channel]=key_angle.value
     refresh(frame)
@@ -334,7 +445,7 @@ func apply_key_angle()->void:
 func delete_key()->void:
     var i:int=key_at_frame()
     if i<=0 or i>=document.keys.size()-1:return
-    history.append(document.duplicate(true))
+    remember()
     document.keys.remove_at(i)
     refresh(frame)
 
@@ -377,6 +488,7 @@ func open_motion(id:String):
     motion.select(ids.find(id))
     selected=-1
     history.clear()
+    redo_history.clear()
     playing=false
     refresh(0)
     info.text="Крест — цель, круг — результат."
@@ -406,6 +518,7 @@ func simulate(value:int):
     show_pose()
 
 func refresh(value:int):
+    ghost_cache.clear()
     player=null
     syncing=true
     param_choice.clear()
@@ -491,7 +604,11 @@ func show_pose():
     frame_label.text=("%d / %d к."%[frame,end_frame()]) if document.kind=="gait" else ("%d к. · %.2f с"%[frame-START,float(frame-START)/60.])
     dirty_label.text="● Не сохранено" if JSON.stringify(document)!=saved_signature else "Сохранено"
     sync_key()
+    sync_curve()
     update_play_button()
+    undo_button.disabled=history.is_empty()
+    redo_button.disabled=redo_history.is_empty()
+    update_ghosts()
     queue_redraw()
 
 func airborne()->bool:
@@ -523,7 +640,7 @@ func move_marker(lane:int,index:int,value:float):
     if lane==0 and index in [0,entries.size()-1]:return
     var t:=clampf((roundf(value)-START)/60.,0.,document.duration)
     if lane==0 and (t<=entries[index-1].t or t>=entries[index+1].t):return
-    history.append(document.duplicate(true))
+    remember()
     entries[index].t=t
     refresh(START+roundi(t*60))
 
@@ -540,7 +657,11 @@ func _unhandled_input(event):
             KEY_SPACE:toggle_play()
             KEY_ESCAPE:request_exit()
             KEY_Z:
-                if event.ctrl_pressed:undo()
+                if event.ctrl_pressed:
+                    if event.shift_pressed:redo()
+                    else:undo()
+            KEY_Y:
+                if event.ctrl_pressed:redo()
             KEY_S:
                 if event.ctrl_pressed:save_file()
     if event is InputEventMouseButton and event.pressed and VIEW.has_point(event.position):
@@ -588,6 +709,8 @@ func drag_to(point:Vector2):
     if not dragging:return
     if not gesture.is_empty():
         history.append(gesture)
+        redo_history.clear()
+        if history.size()>100:history.pop_front()
         gesture={}
     var xy:=[clampf(point.x,-128,128),clampf(point.y,-128,128)]
     var data:={"joint":Asset.JOINTS[joints.selected],"xy":xy,"clock":gesture_clock,"center":gesture_phase,"width":width.value,"weight":strength.value,"priority":int(priority.value)}
@@ -603,7 +726,7 @@ func drag_to(point:Vector2):
 
 func update_goal(_v:float):
     if syncing or selected<0:return
-    history.append(document.duplicate(true))
+    remember()
     var g:Dictionary=document.goals[selected]
     g.weight=strength.value
     g.priority=int(priority.value)
@@ -612,7 +735,7 @@ func update_goal(_v:float):
 
 func change_param(value:float):
     if syncing:return
-    history.append(document.duplicate(true))
+    remember()
     if document.kind=="gait":document[param_key]=value
     else:
         var ratio:float=value/document.duration
@@ -631,7 +754,7 @@ func key_pose():
     var t:=clampf((frame-START)/60.,0.,document.duration)
     var angles:Dictionary={}
     for id in document.keys[0].angles:angles[id]=player.final_pose.angles[id]
-    history.append(document.duplicate(true))
+    remember()
     for k in document.keys:
         if absf(t-k.t)<.00001:
             k.angles=angles
@@ -647,7 +770,7 @@ func toggle_contact():
     var id:String=Asset.JOINTS[joints.selected]
     if not (id.begins_with("hand") or id.begins_with("foot")):return
     var t:=clampf((frame-START)/60.,0.,document.duration)
-    history.append(document.duplicate(true))
+    remember()
     for i in document.events.size():
         if roundi(document.events[i].t*60)==roundi(t*60) and document.events[i].anchor==id:
             document.events.remove_at(i)
@@ -661,7 +784,7 @@ func copy_goal():
 
 func paste_goal():
     if clip_board.is_empty() or document.goals.size()>=64:return
-    history.append(document.duplicate(true))
+    remember()
     var g:=clip_board.duplicate(true)
     if document.kind=="action":g.clock="action"
     elif g.clock=="action":g.clock="cycle"
@@ -676,21 +799,29 @@ func mirror_goal():
     g.joint=g.joint.get_slice("_",0)+("_far" if near else "_near")
     if g.clock=="cycle":g.center=fposmod(g.center+.5,1.)
     if g.clock.begins_with("swing_"):g.clock="swing_"+g.joint.get_slice("_",1)
-    history.append(document.duplicate(true))
+    remember()
     document.goals.append(g)
     selected=document.goals.size()-1
     refresh(frame)
 
 func erase_goal():
     if selected<0:return
-    history.append(document.duplicate(true))
+    remember()
     document.goals.remove_at(selected)
     selected=-1
     refresh(frame)
 
 func undo():
     if history.is_empty():return
+    redo_history.append(document.duplicate(true))
     document=history.pop_back()
+    selected=-1
+    refresh(frame)
+
+func redo():
+    if redo_history.is_empty():return
+    history.append(document.duplicate(true))
+    document=redo_history.pop_back()
     selected=-1
     refresh(frame)
 
