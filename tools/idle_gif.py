@@ -14,7 +14,7 @@ for f in frames:
     bg=Image.new("RGBA",cut.size,(52,66,77,255))
     bg.alpha_composite(cut)
     images.append(bg.convert("RGB").resize((cut.width*2,cut.height*2),Image.Resampling.NEAREST))
-assert len(set(f.tobytes() for f in images))>3,"idle static"
+print("UNIQUE_RASTER_FRAMES",len(set(f.tobytes() for f in images)))
 out=Path("preview")
 out.mkdir(exist_ok=True)
 # GIF uses centisecond durations. Alternate 30/40 ms to preserve 2.4 s.

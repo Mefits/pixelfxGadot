@@ -35,3 +35,8 @@ jobs:
         with:
           name: idle-native-gifs
           path: preview/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: idle-raw-frames
+          path: frames/
