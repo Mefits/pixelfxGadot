@@ -344,6 +344,7 @@ func render_frame()->void:
     Depth.apply(parts,run_weight)
     for i in [0,2,3,8,9]:parts[i].material_id=1
     for i in [5,6,7,11,12,13,15,17]:parts[i].material_id=2
+    parts=visual_parts(parts)
     var result:Dictionary=raster.render(Studio.CFG,parts)
     if not result.get("ok",false):
         status.text="Ошибка отрисовки"
@@ -356,6 +357,10 @@ func render_frame()->void:
     sprite.scale=Vector2.ONE*view_scale/3.
     sprite.position=ORIGIN+Vector2(walker.x,-altitude)*view_scale-Vector2(240,219)*view_scale/3.
     last_ok=true
+
+## Presentation-only extension point; ordinary T remains identity.
+func visual_parts(parts:Array)->Array:
+    return parts
 
 func _physics_process(_delta:float)->void:
     if manual or paused or walker==null:return
