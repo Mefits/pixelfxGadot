@@ -336,10 +336,6 @@ func _ready() -> void:
     UI.action_button(_button(save,"Загрузить",_ask_load),"Загрузить сохранённое")
     advanced_controls.append(_button(save,"Сброс",_ask_default))
     UI.action_button(_button(save,"Меню",func():_go("res://lab/main.tscn")),"Главное меню (Esc)")
-    mode_button=_button(self,"Простой ▾",_toggle_mode)
-    mode_button.position=Vector2(388,8)
-    mode_button.size=Vector2(196,30)
-    UI.action_button(mode_button,"Показать или скрыть технические параметры")
     timeline=preload("res://lab/pose_timeline.gd").new()
     timeline.position=Vector2(18,478)
     timeline.size=Vector2(922,40)
@@ -398,7 +394,7 @@ func _ready() -> void:
             preview.bag_visible=true
             preview.rd_skin=true
     _choose(name_id)
-    advanced_mode=UI.advanced("animation")
+    advanced_mode=true
     _apply_mode()
 
 func _choose(n: String) -> void:
@@ -915,11 +911,9 @@ func _update_transport()->void:
     if delete_button!=null and keys!=null and event_list!=null:
         delete_button.disabled=event_list.get_selected_items().is_empty() if delete_lane==1 else (keys.get_selected_items().is_empty() or bank[name_id].keys.size()<=1)
 func _toggle_mode()->void:
-    advanced_mode=not advanced_mode
-    UI.set_advanced("animation",advanced_mode)
+    advanced_mode=true
     _apply_mode()
 func _apply_mode()->void:
     for control in advanced_controls:control.visible=advanced_mode
-    mode_button.text="Расширенный ▾" if advanced_mode else "Простой ▾"
-    status.text="Все параметры и события доступны" if advanced_mode else "Простой: поза, ключи, время. События и VFX — в расширенном."
+    status.text="Все параметры и события доступны"
     _update_transport()

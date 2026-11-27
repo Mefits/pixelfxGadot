@@ -4,7 +4,9 @@ const Goals=preload("goals.gd")
 const Studio=preload("res://lab/hybrid_studio.gd")
 const Depth=preload("res://lab/arm_depth_090.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
-const ORIGIN=Vector2(302,345)
+const ORIGIN=Vector2(445,334)
+const VIEW=Rect2(190,78,510,286)
+const UI=preload("res://lab/ui_ru.gd")
 const ZOOM=5.
 const START=30
 var document:Dictionary
@@ -16,7 +18,23 @@ var sprite:Sprite2D
 var timeline
 var status:Label
 var info:Label
-var motion:OptionButton
+var motion:ItemList
+var target_list:ItemList
+var view_zoom:float=ZOOM
+var show_handles:bool=true
+var play_rate:float=1.
+var loop_play:bool=true
+var play_button:Button
+var frame_label:Label
+var key_channels:OptionButton
+var key_angle:SpinBox
+var key_apply:Button
+var key_info:Label
+var saved_signature:String=""
+var dirty_label:Label
+var switch_dialog:ConfirmationDialog
+var requested_id:String=""
+var inspector:TabContainer
 var joints:OptionButton
 var goal_list:OptionButton
 var strength:SpinBox
@@ -41,25 +59,30 @@ var frame:=0
 var ids:Array=Asset.IDS.duplicate()
 
 func _ready():
-    sprite=Sprite2D.new()
-    sprite.centered=false
-    sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
-    sprite.position=ORIGIN-Vector2(240,219)*ZOOM/3.
-    sprite.scale=Vector2.ONE*ZOOM/3.
-    sprite.z_index=-1
-    add_child(sprite)
-    if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
-    var side:=VBoxContainer.new()
-    side.position=Vector2(608,10)
-    side.custom_minimum_size.x=340
-    side.add_theme_constant_override("separation",3)
-    add_child(side)
-    var title:=Label.new()
-    title.text="Мастерская движений"
-    title.add_theme_font_size_override("font_size",22)
-    side.add_child(title)
-    motion=OptionButton.new()
-    side.add_child(motion)
+    panel(Rect2(0,0,960,540),"#101822")
+    panel(Rect2(0,0,960,45),"#1c2938")
+    panel(Rect2(8,50,174,314),"#192431")
+    panel(VIEW,"#263442")
+    panel(Rect2(708,50,244,314),"#192431")
+    panel(Rect2(8,371,944,143),"#192431")
+    var title:=caption(self,"МАСТЕРСКАЯ ДВИЖЕНИЙ",Vector2(12,12),18)
+    dirty_label=caption(self,"",Vector2(278,14),13)
+    dirty_label.size=Vector2(158,22)
+    var top:=HBoxContainer.new()
+    top.position=Vector2(460,7)
+    add_child(top)
+    button(top,"Копия движения",duplicate_motion,"Создать независимую копию JSON")
+    button(top,"Сохранить",save_file,"Ctrl+S")
+    button(top,"Загрузить",func():request_open(document.id),"Вернуться к сохранённому документу")
+    button(top,"Отмена",undo,"Ctrl+Z")
+    button(top,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn"),"Esc")
+
+    caption(self,"ДВИЖЕНИЯ",Vector2(16,55),12)
+    motion=ItemList.new()
+    motion.position=Vector2(14,76)
+    motion.size=Vector2(162,97)
+    motion.add_theme_font_size_override("font_size",13)
+    add_child(motion)
     var directory:=DirAccess.open(Asset.FOLDER)
     if directory:
         for file in directory.get_files():
@@ -69,89 +92,262 @@ func _ready():
         var path:String=Asset.FOLDER+id+".json"
         var entry:=Asset.read(path if FileAccess.file_exists(path) else Asset.DIR+id+".json")
         motion.add_item(str(entry.get("name",id)))
-    motion.item_selected.connect(func(i):open_motion(ids[i]))
-    joints=OptionButton.new()
-    for id in Asset.JOINTS:
-        var limb:String={"hand":"Кисть","elbow":"Локоть","knee":"Колено","foot":"Носок"}[id.get_slice("_",0)]
-        joints.add_item(limb+(" · ближняя сторона" if id.ends_with("_near") else " · дальняя сторона"))
-    side.add_child(joints)
-    goal_list=OptionButton.new()
-    side.add_child(goal_list)
-    goal_list.item_selected.connect(func(i):select_goal(i-1))
-    strength=field(side,"Сила",0,1,.05,1.)
-    priority=field(side,"Приоритет",0,9,1,1)
-    width=field(side,"Радиус фазы",.01,1,.01,.20)
-    for control in [strength,priority,width]:control.value_changed.connect(update_goal)
+    motion.item_selected.connect(func(i):request_open(ids[i]))
+    caption(self,"УПРАВЛЯЕМЫЕ ТОЧКИ",Vector2(16,181),12)
+    target_list=ItemList.new()
+    target_list.position=Vector2(14,201)
+    target_list.size=Vector2(162,156)
+    target_list.add_theme_font_size_override("font_size",12)
+    add_child(target_list)
+    for id in Asset.JOINTS:target_list.add_item(joint_name(id))
+    target_list.item_selected.connect(func(i:int):
+        joints.select(i)
+        inspector.current_tab=1
+        show_pose())
+    target_list.select(0)
+
+    var clip:=Control.new()
+    clip.position=VIEW.position
+    clip.size=VIEW.size
+    clip.clip_contents=true
+    clip.mouse_filter=Control.MOUSE_FILTER_IGNORE
+    clip.z_index=-1
+    add_child(clip)
+    sprite=Sprite2D.new()
+    sprite.centered=false
+    sprite.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+    clip.add_child(sprite)
+    position_sprite()
+    if ClassDB.class_exists("PixelFXBodyRaster"):raster=ClassDB.instantiate("PixelFXBodyRaster")
+    var view_tools:=HBoxContainer.new()
+    view_tools.position=Vector2(191,49)
+    add_child(view_tools)
+    caption(view_tools,"ВИД СБОКУ",Vector2.ZERO,12)
+    var handles:=CheckButton.new()
+    handles.text="Точки"
+    handles.button_pressed=true
+    view_tools.add_child(handles)
+    handles.toggled.connect(func(v:bool):show_handles=v;queue_redraw())
+    button(view_tools,"−",func():set_zoom(view_zoom-.5),"Уменьшить модель")
+    button(view_tools,"+",func():set_zoom(view_zoom+.5),"Увеличить модель")
+    button(view_tools,"1:1",func():set_zoom(ZOOM),"Сброс масштаба")
+    button(view_tools,"К акценту",seek_accent,"К контакту / фазе полёта")
+    var help:=caption(self,"ЛКМ — потяни точку · колесо — масштаб",Vector2(202,346),12)
+    help.mouse_filter=Control.MOUSE_FILTER_IGNORE
+
+    inspector=TabContainer.new()
+    inspector.position=Vector2(714,54)
+    inspector.size=Vector2(232,305)
+    inspector.add_theme_font_size_override("font_size",12)
+    add_child(inspector)
+    var movement:=tab("Движение")
+    caption(movement,"Параметры документа",Vector2.ZERO,13)
     param_choice=OptionButton.new()
-    side.add_child(param_choice)
+    param_choice.fit_to_longest_item=false
+    movement.add_child(param_choice)
     param_choice.item_selected.connect(choose_param)
     param=SpinBox.new()
     param.step=.01
-    side.add_child(param)
+    movement.add_child(param)
     param.value_changed.connect(change_param)
+    var note:=caption(movement,"Параметры меняют документ, а не частоту симуляции (60 Гц).",Vector2.ZERO,12)
+    note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    var goals:=tab("Цели")
+    caption(goals,"Точка / сохранённая цель",Vector2.ZERO,12)
+    joints=OptionButton.new()
+    joints.fit_to_longest_item=false
+    for id in Asset.JOINTS:joints.add_item(joint_name(id))
+    goals.add_child(joints)
+    joints.item_selected.connect(func(i:int):target_list.select(i);show_pose())
+    goal_list=OptionButton.new()
+    goal_list.fit_to_longest_item=false
+    goals.add_child(goal_list)
+    goal_list.item_selected.connect(func(i):select_goal(i-1);show_pose())
+    strength=field(goals,"Вес",0,1,.05,1.)
+    priority=field(goals,"Приоритет",0,9,1,1)
+    width=field(goals,"Окно фазы",.01,1,.01,.20)
+    for control in [strength,priority,width]:control.value_changed.connect(update_goal)
     var row:=HBoxContainer.new()
-    side.add_child(row)
-    button(row,"Копия цели",copy_goal)
+    goals.add_child(row)
+    button(row,"Копия",copy_goal)
     button(row,"Вставить",paste_goal)
-    button(row,"⇄",mirror_goal)
-    button(row,"Удалить",erase_goal)
-    row=HBoxContainer.new()
-    side.add_child(row)
-    button(row,"Сохранить",save_file)
-    button(row,"Загрузить",func():open_motion(document.id))
-    button(row,"Отмена",undo)
-    row=HBoxContainer.new()
-    side.add_child(row)
-    button(row,"Новое из текущего",duplicate_motion)
-    button(row,"Меню",func():get_tree().change_scene_to_file("res://lab/main.tscn"))
-    info=Label.new()
-    info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-    info.custom_minimum_size=Vector2(335,50)
-    side.add_child(info)
+    button(row,"⇄",mirror_goal,"Создать цель парной конечности")
+    button(goals,"Удалить цель",erase_goal)
+    var keys_tab:=tab("Ключ")
+    key_info=caption(keys_tab,"",Vector2.ZERO,12)
+    key_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+    key_channels=OptionButton.new()
+    key_channels.fit_to_longest_item=false
+    keys_tab.add_child(key_channels)
+    key_channels.item_selected.connect(func(_i:int):sync_key())
+    key_angle=field(keys_tab,"Угол, °",-360,360,.1,0.)
+    key_apply=button(keys_tab,"Применить угол",apply_key_angle,"Изменить выбранный канал существующего ключа")
+    pose_controls=HBoxContainer.new()
+    keys_tab.add_child(pose_controls)
+    button(pose_controls,"+ Ключ",key_pose)
+    button(pose_controls,"− Ключ",delete_key)
+    button(keys_tab,"± Контакт",toggle_contact,"Маркер удара выбранной кисти или стопы")
+
     var controls:=HBoxContainer.new()
-    controls.position=Vector2(14,421)
+    controls.position=Vector2(15,375)
     add_child(controls)
-    button(controls,"▶ / Ⅱ",func():playing=not playing)
+    play_button=button(controls,"▶ Пуск",toggle_play,"Space")
+    button(controls,"|◀",func():seek(0),"Начало просмотра")
     button(controls,"−1",func():seek(maxi(0,frame-1)))
     button(controls,"+1",func():seek(mini(end_frame(),frame+1)))
-    button(controls,"Полёт / акцент",seek_accent)
-    pose_controls=HBoxContainer.new()
-    pose_controls.position=Vector2(14,376)
-    add_child(pose_controls)
-    button(pose_controls,"Записать позу",key_pose)
-    button(pose_controls,"± Контакт",toggle_contact)
-    timeline=preload("res://lab/pose_timeline.gd").new()
-    timeline.position=Vector2(18,454)
-    timeline.size=Vector2(565,40)
+    button(controls,"+ Ключ",key_pose,"Записать текущую позу действия")
+    button(controls,"± Контакт",toggle_contact,"Добавить / удалить контакт выбранной кисти или стопы")
+    var speed:=OptionButton.new()
+    for label in ["×0.25","×0.5","×1"]:speed.add_item(label)
+    speed.select(2)
+    controls.add_child(speed)
+    speed.item_selected.connect(func(i:int):play_rate=[.25,.5,1.][i])
+    var loop:=CheckButton.new()
+    loop.text="Цикл"
+    loop.button_pressed=true
+    controls.add_child(loop)
+    loop.toggled.connect(func(v:bool):loop_play=v)
+    frame_label=caption(self,"",Vector2(745,382),12)
+    timeline=preload("res://lab/authoring/dopesheet.gd").new()
+    timeline.position=Vector2(15,409)
+    timeline.size=Vector2(930,99)
     timeline.step=1
     timeline.marker_moved.connect(move_marker)
+    timeline.marker_selected.connect(func(lane:int,_i:int):
+        if lane==0:inspector.current_tab=2
+        else:inspector.current_tab=1)
+    timeline.goal_selected.connect(func(i:int):select_goal(i);inspector.current_tab=1;show_pose())
     add_child(timeline)
     timeline.value_changed.connect(func(v):if not syncing:seek(roundi(v)))
-    status=Label.new()
-    status.position=Vector2(18,495)
-    add_child(status)
+    status=caption(self,"",Vector2(14,517),12)
+    status.size=Vector2(610,20)
+    status.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+    info=caption(self,"",Vector2(630,517),12)
+    info.size=Vector2(317,20)
+    info.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+    switch_dialog=ConfirmationDialog.new()
+    switch_dialog.title="Несохранённые изменения"
+    switch_dialog.dialog_text="Отменить несохранённые правки и открыть выбранное движение?"
+    add_child(switch_dialog)
+    switch_dialog.confirmed.connect(func():open_motion(requested_id))
+    switch_dialog.canceled.connect(func():motion.select(ids.find(document.id)))
     open_motion(ids[0])
+
+func panel(rect:Rect2,color:String)->void:
+    var p:=ColorRect.new()
+    p.position=rect.position
+    p.size=rect.size
+    p.color=Color(color)
+    p.mouse_filter=Control.MOUSE_FILTER_IGNORE
+    p.z_index=-2
+    add_child(p)
+
+func caption(parent:Node,value:String,pos:Vector2,font_size:int)->Label:
+    var l:=Label.new()
+    l.text=value
+    l.position=pos
+    l.add_theme_font_size_override("font_size",font_size)
+    l.add_theme_color_override("font_color",Color("#d9e5ef"))
+    l.mouse_filter=Control.MOUSE_FILTER_IGNORE
+    parent.add_child(l)
+    return l
+
+func tab(title:String)->VBoxContainer:
+    var scroll:=ScrollContainer.new()
+    scroll.name=title
+    scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+    inspector.add_child(scroll)
+    var content:=VBoxContainer.new()
+    content.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    content.add_theme_constant_override("separation",5)
+    var theme:=Theme.new()
+    theme.default_font_size=12
+    content.theme=theme
+    scroll.add_child(content)
+    return content
+
+func joint_name(id:String)->String:
+    return UI.label(id)
+
+func position_sprite()->void:
+    sprite.position=ORIGIN-VIEW.position-Vector2(240,219)*view_zoom/3.
+    sprite.scale=Vector2.ONE*view_zoom/3.
+
+func set_zoom(value:float)->void:
+    view_zoom=clampf(value,3.,6.)
+    position_sprite()
+    queue_redraw()
+
+func request_open(id:String)->void:
+    if not document.is_empty() and JSON.stringify(document)!=saved_signature:
+        requested_id=id
+        switch_dialog.popup_centered(Vector2i(400,140))
+        return
+    open_motion(id)
+
+func toggle_play()->void:
+    playing=not playing
+    clock=0.
+    update_play_button()
+
+func update_play_button()->void:
+    play_button.text="Ⅱ Пауза" if playing else "▶ Пуск"
+
+func key_at_frame()->int:
+    if document.kind!="action":return -1
+    for i in document.keys.size():
+        if absf(document.keys[i].t-(frame-START)/60.)<.0001:return i
+    return -1
+
+func sync_key()->void:
+    var i:int=key_at_frame()
+    key_apply.disabled=i<0 or key_channels.item_count==0
+    key_angle.editable=not key_apply.disabled
+    key_info.text="Выбери ромб ключа. Углы редактируют исходную позу, не результат IK." if i<0 else "Ключ %d · кадр %d"%[i+1,frame-START]
+    if not key_apply.disabled:
+        var channel:String=key_channels.get_item_metadata(key_channels.selected)
+        key_angle.set_value_no_signal(float(document.keys[i].angles[channel]))
+
+func apply_key_angle()->void:
+    var i:int=key_at_frame()
+    if i<0 or key_channels.item_count==0:return
+    history.append(document.duplicate(true))
+    var channel:String=key_channels.get_item_metadata(key_channels.selected)
+    document.keys[i].angles[channel]=key_angle.value
+    refresh(frame)
+
+func delete_key()->void:
+    var i:int=key_at_frame()
+    if i<=0 or i>=document.keys.size()-1:return
+    history.append(document.duplicate(true))
+    document.keys.remove_at(i)
+    refresh(frame)
 
 func field(parent:Control,title:String,lo:float,hi:float,step:float,initial:float)->SpinBox:
     var row:=HBoxContainer.new()
     parent.add_child(row)
     var l:=Label.new()
     l.text=title
-    l.custom_minimum_size.x=145
+    l.custom_minimum_size.x=93
     row.add_child(l)
     var spin:=SpinBox.new()
     spin.min_value=lo
     spin.max_value=hi
     spin.step=step
     spin.value=initial
+    spin.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+    spin.get_line_edit().custom_minimum_size.x=32
     row.add_child(spin)
     return spin
 
-func button(row:Control,title:String,fn:Callable):
+func button(row:Control,title:String,fn:Callable,hint:String="")->Button:
     var b:=Button.new()
     b.text=title
+    b.tooltip_text=hint
+    b.add_theme_font_size_override("font_size",12)
     row.add_child(b)
     b.pressed.connect(fn)
+    return b
 
 func open_motion(id:String):
     var path:=Asset.FOLDER+id+".json"
@@ -162,11 +358,13 @@ func open_motion(id:String):
         info.text="Загрузка: "+error
         return
     document=d
+    saved_signature=JSON.stringify(d)
+    motion.select(ids.find(id))
     selected=-1
     history.clear()
     playing=false
     refresh(0)
-    info.text="Перетащи цветную точку. Крест — цель, круг — результат."
+    info.text="Крест — цель, круг — результат."
 
 func end_frame()->int:
     return 220 if document.kind=="gait" else START+ceili(document.duration*60.)+22
@@ -177,6 +375,7 @@ func command(t:int)->Dictionary:
 
 func seek(value:int):
     playing=false
+    update_play_button()
     simulate(value)
 
 func simulate(value:int):
@@ -214,7 +413,19 @@ func refresh(value:int):
     goal_list.add_item("+ Новая цель")
     for g in document.goals:goal_list.add_item("%s · %.2f · %s"%[g.joint,g.center,g.clock])
     timeline.max_value=end_frame()
-    timeline.clip={"keys":[],"events":[]}
+    timeline.clip={"keys":[],"events":[],"goals":[],"gait":document.kind=="gait","start":START}
+    var previous_channel:String=""
+    if key_channels.item_count>0:previous_channel=key_channels.get_item_metadata(key_channels.selected)
+    key_channels.clear()
+    if document.kind=="action":
+        for channel in document.keys[0].angles:
+            key_channels.add_item(UI.label(channel))
+            key_channels.set_item_metadata(key_channels.item_count-1,channel)
+            if channel==previous_channel:key_channels.select(key_channels.item_count-1)
+        if key_channels.selected<0:key_channels.select(0)
+        for i in document.goals.size():
+            var g:Dictionary=document.goals[i]
+            timeline.clip.goals.append({"t":START+g.center*document.duration*60.,"radius":g.width*document.duration*60.,"index":i})
     if document.kind=="action":
         for k in document.keys:timeline.clip.keys.append({"t":START+k.t*60})
         for e in document.events:timeline.clip.events.append({"t":START+e.t*60,"kind":e.kind})
@@ -230,6 +441,7 @@ func select_goal(i:int):
     syncing=true
     var g:Dictionary=document.goals[i]
     joints.select(Asset.JOINTS.find(g.joint))
+    target_list.select(joints.selected)
     strength.value=g.weight
     priority.value=g.priority
     width.value=g.width
@@ -261,6 +473,10 @@ func show_pose():
     if player.goal_report.has(joint):
         var r:Dictionary=player.goal_report[joint]
         status.text+="   ·   %s   Δ %.2f"%[r.reason,at_joint(joint).distance_to(r.target)]
+    frame_label.text=("%d / %d к."%[frame,end_frame()]) if document.kind=="gait" else ("%d к. · %.2f с"%[frame-START,float(frame-START)/60.])
+    dirty_label.text="● Не сохранено" if JSON.stringify(document)!=saved_signature else "Сохранено"
+    sync_key()
+    update_play_button()
     queue_redraw()
 
 func airborne()->bool:
@@ -272,14 +488,19 @@ func at_joint(joint:String)->Vector2:
 
 func _draw():
     if not player:return
-    draw_line(Vector2(12,ORIGIN.y),Vector2(590,ORIGIN.y),Color("#73858e"))
+    draw_line(Vector2(VIEW.position.x,ORIGIN.y),Vector2(VIEW.end.x,ORIGIN.y),Color("#73858e"))
+    if not show_handles:return
     for j in Asset.JOINTS:
-        draw_circle(ORIGIN+at_joint(j)*ZOOM,4.,Color("#ffcf62") if j==Asset.JOINTS[joints.selected] else Color("#85c5c1"))
+        var p:Vector2=ORIGIN+at_joint(j)*view_zoom
+        if VIEW.has_point(p):
+            draw_circle(p,4.,Color("#ffcf62") if j==Asset.JOINTS[joints.selected] else Color("#85c5c1"))
     for j in player.goal_report:
-        var v:Vector2=ORIGIN+player.goal_report[j].target*ZOOM
+        var v:Vector2=ORIGIN+player.goal_report[j].target*view_zoom
+        if not VIEW.has_point(v):continue
         draw_line(v-Vector2(6,0),v+Vector2(6,0),Color.CORAL,2)
         draw_line(v-Vector2(0,6),v+Vector2(0,6),Color.CORAL,2)
-        draw_line(v,ORIGIN+at_joint(j)*ZOOM,Color.CORAL)
+        var actual:Vector2=ORIGIN+at_joint(j)*view_zoom
+        if VIEW.has_point(actual):draw_line(v,actual,Color.CORAL)
 
 func move_marker(lane:int,index:int,value:float):
     if document.kind!="action":return
@@ -299,31 +520,34 @@ func seek_accent():
     while frame<130 and not airborne():simulate(frame+1)
 
 func _unhandled_input(event):
-    if event is InputEventKey and event.pressed and not event.echo:
-        match event.keycode:
-            KEY_SPACE:playing=not playing
+    if event is InputEventKey and UI.editor_shortcut(self,event):
+        match UI.physical_key(event):
+            KEY_SPACE:toggle_play()
             KEY_ESCAPE:get_tree().change_scene_to_file("res://lab/main.tscn")
             KEY_Z:
                 if event.ctrl_pressed:undo()
             KEY_S:
                 if event.ctrl_pressed:save_file()
+    if event is InputEventMouseButton and event.pressed and VIEW.has_point(event.position):
+        if event.button_index==MOUSE_BUTTON_WHEEL_UP:set_zoom(view_zoom+.5)
+        elif event.button_index==MOUSE_BUTTON_WHEEL_DOWN:set_zoom(view_zoom-.5)
     if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
         if not event.pressed:
             dragging=false
-        elif Rect2(0,0,600,414).has_point(event.position):
+        elif show_handles and VIEW.has_point(event.position):
             var preferred:String=Asset.JOINTS[joints.selected]
-            if event.position.distance_to(ORIGIN+at_joint(preferred)*ZOOM)<=6.:
+            if event.position.distance_to(ORIGIN+at_joint(preferred)*view_zoom)<=6.:
                 begin_drag(preferred)
                 return
             var best:=18.
             var id:=""
             for j in Asset.JOINTS:
-                var distance:float=event.position.distance_to(ORIGIN+at_joint(j)*ZOOM)
+                var distance:float=event.position.distance_to(ORIGIN+at_joint(j)*view_zoom)
                 if distance<best:
                     best=distance
                     id=j
             if id!="":begin_drag(id)
-    if event is InputEventMouseMotion and dragging:drag_to((event.position-ORIGIN)/ZOOM)
+    if event is InputEventMouseMotion and dragging:drag_to((event.position-ORIGIN)/view_zoom)
 
 func begin_drag(joint:String):
     playing=false
@@ -341,6 +565,8 @@ func begin_drag(joint:String):
     gesture_clock=phase_clock
     if selected>=0 and document.goals[selected].joint!=joint:selected=-1
     joints.select(Asset.JOINTS.find(joint))
+    target_list.select(joints.selected)
+    inspector.current_tab=1
     dragging=true
 
 func drag_to(point:Vector2):
@@ -455,7 +681,9 @@ func undo():
 
 func save_file():
     var err:=Asset.persist(document)
+    if err==OK:saved_signature=JSON.stringify(document)
     info.text="Сохранено: "+document.id+".json" if err==OK else error_string(err)
+    show_pose()
 
 func duplicate_motion():
     var d:=document.duplicate(true)
@@ -471,8 +699,12 @@ func duplicate_motion():
 
 func _process(delta:float):
     if not playing:return
-    clock+=delta
+    clock+=delta*play_rate
     var steps:=floori(clock*60.)
     if steps>0:
         clock-=steps/60.
-        simulate((frame+steps)%(end_frame()+1))
+        var next:int=frame+steps
+        if loop_play:simulate(next%(end_frame()+1))
+        else:
+            simulate(mini(next,end_frame()))
+            if next>=end_frame():playing=false;update_play_button()
