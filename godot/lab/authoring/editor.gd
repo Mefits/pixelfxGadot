@@ -65,6 +65,7 @@ var event_kind:OptionButton
 var event_anchor:OptionButton
 var vfx_select:OptionButton
 var vfx_choices:Array=[]
+var selected_event:int=-1
 var quick_dialog
 var import_dialog:FileDialog
 var fps_select:OptionButton
@@ -568,6 +569,68 @@ func import_legacy_file(path:String)->void:
         open_motion(ids[-1])
     else:info.text="В файле не найдено поддерживаемых клипов U."
 
+func set_fps(index:int)->void:
+    if syncing or document.kind!="action":return
+    remember()
+    document.fps=[24,30,60][index]
+    refresh(frame)
+
+func set_easing(index:int)->void:
+    if syncing or document.kind!="action":return
+    remember()
+    document.easing=Asset.EASING[index]
+    refresh(frame)
+
+func set_loop(value:bool)->void:
+    if syncing or document.kind!="action":return
+    remember()
+    document.loop=value
+    var error:String=Asset.problem(document)
+    if error!="":
+        document.loop=not value
+        loop_toggle.set_pressed_no_signal(not value)
+        history.pop_back()
+        info.text=error
+        return
+    refresh(frame)
+
+func set_preview_speed(index:int)->void:
+    preview_speed=[0.,1.,1.85][index]
+    seek(0)
+
+func apply_key_root()->void:
+    if syncing or document.kind!="action":return
+    var index:int=key_at_frame()
+    if index<0:return
+    var next:Array=[root_x.value,root_y.value]
+    if document.keys[index].get("root",[0.,0.])==next:return
+    remember()
+    document.keys[index].root=next
+    refresh(frame)
+
+func mirror_id(id:String)->String:
+    if id.ends_with("_near"):return id.trim_suffix("_near")+"_far"
+    if id.ends_with("_far"):return id.trim_suffix("_far")+"_near"
+    return id
+
+func mirror_action()->void:
+    if document.kind!="action":return
+    remember()
+    for k in document.keys:
+        var mirrored:Dictionary={}
+        for id in k.angles:mirrored[mirror_id(str(id))]=-float(k.angles[id])
+        k.angles=mirrored
+        var root:Array=k.get("root",[0.,0.])
+        k.root=[-float(root[0]),float(root[1])]
+    for g in document.goals:
+        g.joint=mirror_id(str(g.joint))
+        g.xy[0]=-float(g.xy[0])
+    for event in document.events:event.anchor=mirror_id(str(event.anchor))
+    var release:Dictionary=document.get("release",{})
+    document.release={"near":release.far,"far":release.near} if release.has("far") and release.has("near") else ({"near":release.far} if release.has("far") else ({"far":release.near} if release.has("near") else {}))
+    refresh(frame)
+    info.text="Движение зеркально отражено."
+
 func request_exit()->void:
     if JSON.stringify(document)!=saved_signature:
         requested_id=""
@@ -616,6 +679,111 @@ func sync_key()->void:
         key_angle.set_value_no_signal(float(document.keys[i].angles[channel]))
         root_x.set_value_no_signal(float(document.keys[i].get("root",[0.,0.])[0]))
         root_y.set_value_no_signal(float(document.keys[i].get("root",[0.,0.])[1]))
+
+
+func load_vfx_library()->void:
+    vfx_choices.clear()
+    vfx_select.clear()
+    for i in 12:
+        var preset:Dictionary=VFX.demo(i)
+        vfx_choices.append(preset)
+        vfx_select.add_item("Демо: "+str(preset.name))
+    var directory:=DirAccess.open(VFX.FOLDER)
+    if directory:
+        for file in directory.get_files():
+            if not file.ends_with(".json"):continue
+            var preset:Dictionary=VFX.load_preset(VFX.FOLDER.path_join(file))
+            if preset.is_empty():continue
+            vfx_choices.append(preset)
+            vfx_select.add_item("Свой: "+str(preset.name))
+    if not vfx_choices.is_empty():vfx_select.select(0)
+
+func sync_events()->void:
+    if event_list==null:return
+    event_list.clear()
+    selected_event=-1
+    for event in document.get("events",[]):
+        var label:String=str(event.kind).to_upper()+" · %.3f · %s"%[event.t,joint_name(str(event.anchor))]
+        if event.kind=="vfx":label=str(event.preset.name)+" · %.3f"%event.t
+        event_list.add_item(label)
+        if event.kind=="vfx":event_list.set_item_custom_fg_color(event_list.item_count-1,Color("#c5a1ff"))
+
+func select_event(index:int)->void:
+    if index<0 or index>=document.events.size():return
+    selected_event=index
+    var event:Dictionary=document.events[index]
+    event_kind.select(["strike","charge","cast","vfx"].find(str(event.kind)))
+    event_anchor.select(Asset.EVENT_ANCHORS.find(str(event.anchor)))
+    timeline.selected_lane=1
+    timeline.selected_index=index
+    seek(START+roundi(float(event.t)*60.))
+    inspector.current_tab=4
+    timeline.queue_redraw()
+
+func add_event()->void:
+    if document.kind!="action" or document.events.size()>=32:return
+    if event_kind.selected==3:
+        add_vfx_event()
+        return
+    remember()
+    var t:=clampf(float(frame-START)/60.,0.,document.duration)
+    t=snappedf(t,1./float(document.get("fps",60)))
+    var marker:Dictionary={"t":t,"kind":["strike","charge","cast","vfx"][event_kind.selected],"anchor":Asset.EVENT_ANCHORS[event_anchor.selected]}
+    document.events.append(marker)
+    document.events.sort_custom(func(a,b):return float(a.t)<float(b.t))
+    refresh(frame)
+    info.text="Событие добавлено."
+
+func add_vfx_event()->void:
+    if document.kind!="action" or document.events.size()>=32 or vfx_select.selected<0:return
+    remember()
+    var t:=clampf(float(frame-START)/60.,0.,document.duration)
+    t=snappedf(t,1./float(document.get("fps",60)))
+    var marker:Dictionary={"t":t,"kind":"vfx","anchor":Asset.EVENT_ANCHORS[event_anchor.selected],"preset":vfx_choices[vfx_select.selected].duplicate(true)}
+    document.events.append(marker)
+    document.events.sort_custom(func(a,b):return float(a.t)<float(b.t))
+    refresh(frame)
+    info.text="VFX-маркер добавлен."
+
+func delete_event()->void:
+    if selected_event<0 or selected_event>=document.events.size():return
+    remember()
+    document.events.remove_at(selected_event)
+    refresh(frame)
+    info.text="Событие удалено."
+
+func replace_vfx_event()->void:
+    if selected_event<0 or selected_event>=document.events.size() or vfx_select.selected<0:return
+    if document.events[selected_event].kind!="vfx":return
+    remember()
+    document.events[selected_event].preset=vfx_choices[vfx_select.selected].duplicate(true)
+    document.events[selected_event].anchor=Asset.EVENT_ANCHORS[event_anchor.selected]
+    refresh(frame)
+    info.text="Пресет VFX заменён."
+
+func open_quick_vfx()->void:
+    if selected_event<0 or selected_event>=document.events.size() or document.events[selected_event].kind!="vfx":
+        info.text="Выбери VFX-маркер."
+        return
+    quick_dialog.open_for(document.events[selected_event].preset)
+
+func apply_quick_vfx(value:Dictionary)->void:
+    if selected_event<0 or selected_event>=document.events.size() or not VFX.valid(value):return
+    remember()
+    document.events[selected_event].preset=value.duplicate(true)
+    refresh(frame)
+    info.text="VFX обновлён. Ctrl+Z — отменить."
+
+func render_vfx()->void:
+    if fx_surface==null or fx_visible==null:return
+    fx_surface.visible=fx_visible.button_pressed and document.kind=="action"
+    if not fx_surface.visible:return
+    var clip:Dictionary={"duration":document.duration,"loop":document.get("loop",false),"easing":document.get("easing","linear"),"keys":[],"events":document.events}
+    for key in document.keys:
+        clip.keys.append({"t":key.t,"pose":{"angles":key.angles,"root":key.get("root",[0.,0.])},"easing":key.get("easing",document.get("easing","linear"))})
+    var t:=clampf(float(frame-START)/60.,0.,document.duration)
+    fx_preview.draw(fx_surface.painter,clip,t,Vector2(240,219),Vector2(280,193))
+    fx_surface.present()
 
 func load_reference(path:String)->void:
     var file:=FileAccess.open(path,FileAccess.READ)
@@ -872,7 +1040,7 @@ func open_motion(id:String):
     rotate_active=false
     root_drag_active=false
     if d.kind=="gait":pose_tool.select(0)
-    saved_signature=JSON.stringify(d)
+    saved_signature=JSON.stringify(document)
     motion.select(ids.find(id))
     selected=-1
     history.clear()
@@ -1034,6 +1202,9 @@ func at_joint(joint:String)->Vector2:
 func _draw():
     if not player:return
     draw_line(Vector2(VIEW.position.x,ORIGIN.y),Vector2(VIEW.end.x,ORIGIN.y),Color("#73858e"))
+    if pose_tool.selected==1 and not edit_pose.is_empty():
+        var root_pos:=root_handle_position()
+        draw_rect(Rect2(root_pos-Vector2(5,5),Vector2(10,10)),Color("#f0cf77"),false,2.)
     if not show_handles or pose_tool.selected==2:return
     if pose_tool.selected==1:
         draw_pose_bones()
@@ -1085,6 +1256,7 @@ func _unhandled_input(event):
         match UI.physical_key(event):
             KEY_ESCAPE:
                 if rotate_active:cancel_rotation()
+                elif root_drag_active:finish_root_drag()
                 else:request_exit()
             KEY_1:set_pose_tool(0)
             KEY_2:set_pose_tool(1)
@@ -1224,7 +1396,7 @@ func start_root_drag(mouse:Vector2)->void:
     if document.kind!="action":return
     playing=false
     root_drag_key=key_at_frame()
-    root_drag_time=float(document.keys[root_drag_key].t) if root_drag_key>=0 else clampf(float(frame-START)/60.,0.,float(document.duration))
+    root_drag_time=float(document.keys[root_drag_key].t) if root_drag_key>=0 else clampf(snappedf(float(frame-START)/60.,1./float(document.get("fps",60))),0.,float(document.duration))
     root_drag_initial=sampled_pose(root_drag_time).root
     root_drag_start=mouse
     root_drag_delta=Vector2.ZERO
@@ -1250,8 +1422,15 @@ func finish_root_drag()->void:
         remember()
         var pose_value:Dictionary=sampled_pose(t)
         var root_value:Vector2=Vector2(pose_value.root)+delta
+        root_value.x=clampf(root_value.x,-40.,40.)
+        root_value.y=clampf(root_value.y,-40.,40.)
         if existing>=0:document.keys[existing].root=[root_value.x,root_value.y]
-        else:document.keys.append({"t":t,"angles":pose_value.angles.duplicate(true),"root":[root_value.x,root_value.y]})
+        elif document.keys.size()<600:document.keys.append({"t":t,"angles":pose_value.angles.duplicate(true),"root":[root_value.x,root_value.y]})
+        else:
+            history.pop_back()
+            info.text="Лимит 600 ключей."
+            refresh(frame)
+            return
         document.keys.sort_custom(func(a,b):return a.t<b.t)
         refresh(START+roundi(t*60.))
         info.text="Перемещение корня записано в ключ."
@@ -1282,8 +1461,8 @@ func start_rotation(mouse:Vector2)->void:
     rotate_channel=chosen
     rotate_key=key_at_frame()
     rotate_time=float(document.keys[rotate_key].t) if rotate_key>=0 else clampf(float(frame-START)/60.,0.,float(document.duration))
-    if rotate_key<0 and document.keys.size()>=256:
-        info.text="Лимит 256 ключей."
+    if rotate_key<0 and document.keys.size()>=600:
+        info.text="Лимит 600 ключей."
         return
     rotate_angles=document.keys[rotate_key].angles.duplicate(true) if rotate_key>=0 else sampled_angles(rotate_time)
     rotate_initial=float(rotate_angles[chosen])
@@ -1410,7 +1589,7 @@ func key_pose():
             k.root=root
             refresh(frame)
             return
-    if document.keys.size()<256:
+    if document.keys.size()<600:
         document.keys.append({"t":t,"angles":angles,"root":root})
         document.keys.sort_custom(func(a,b):return a.t<b.t)
     refresh(frame)
