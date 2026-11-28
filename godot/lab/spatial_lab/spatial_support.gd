@@ -47,8 +47,20 @@ func target_frame(c:Dictionary,yaw:int)->Basis:
     return frame
 
 func resolve(r,pose:Dictionary,yaw:int,root_z:float=0.,max_shift:float=8.,chest_twist:int=0,shoulder_twist:int=0,azimuth:Dictionary={},legacy_girdle:bool=true)->Dictionary:
-    assert(max_shift>=0.)
     scratch.evaluate_spatial(pose,yaw,root_z,chest_twist,shoulder_twist,azimuth,legacy_girdle)
+    return resolve_evaluated(r,scratch,max_shift)
+
+# Solve an already reconstructed spatial target, including entry residuals.
+# Preserve free-foot overrides and never alias or modify the caller target.
+func resolve_evaluated(r,desired,max_shift:float=8.)->Dictionary:
+    assert(max_shift>=0. and desired.spatial_enabled)
+    if desired!=scratch:
+        scratch.spatial_enabled=true
+        scratch.yaw_units=desired.yaw_units
+        scratch.joint_xyz=desired.joint_xyz.duplicate()
+        scratch.joint_basis=desired.joint_basis.duplicate()
+        scratch.foot_basis_override=desired.foot_basis_override.duplicate()
+    var yaw:int=scratch.yaw_units
     var goals:Dictionary={}
     var frames:Dictionary={}
     var shift:=Vector3.ZERO
