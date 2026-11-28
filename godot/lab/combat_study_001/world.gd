@@ -71,6 +71,7 @@ func capture(slot:int,cmd:Dictionary)->void:
 # Policy hooks; default 0.01 remains full-recovery-only.
 func rule_for(action:String)->Dictionary:return RULES.get(action,{})
 func can_act(_slot:int)->bool:return true
+func can_start(slot:int,_action:String)->bool:return can_act(slot)
 func motion_command(_slot:int,_action:String,command:Dictionary)->Dictionary:return command
 func advance_positions()->void:pass
 func marker_event(ev:Dictionary,_a:Vector2,_b:Vector2,_blocking:bool,_kind:String)->Dictionary:return ev
@@ -108,7 +109,7 @@ func step(left:Dictionary,right:Dictionary)->void:
         if s.interrupt:
             command.action="recover"
             s.interrupt=false
-        elif s.stun==0 and can_act(i) and not s.guard and not str(s.buffer).is_empty() and (s.remaining==0 or can_cancel(i)):
+        elif s.stun==0 and can_start(i,s.buffer) and not s.guard and not str(s.buffer).is_empty() and (s.remaining==0 or can_cancel(i)):
             var prev:String=s.action
             var old_remaining:int=s.remaining
             var cancelled:bool=old_remaining>0

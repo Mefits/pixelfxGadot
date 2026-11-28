@@ -76,7 +76,7 @@ func step(cmd:Dictionary)->void:
     speed=move_toward(speed,maxf(1.,target),.035*scale)
     if target>0.:stopped=false
     if not stopped:
-        gait.move_distance(speed,speed*scale)
+        gait.move_distance(speed,minf(speed*scale,maxf(0.,float(cmd.get("travel_limit",INF)))))
     var old_paths:=paths
     var base:Dictionary=gait.intent()
     paths=base.paths
