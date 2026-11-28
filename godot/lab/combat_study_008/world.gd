@@ -4,11 +4,13 @@ extends "res://lab/combat_study_007/world.gd"
 const TEMPO_NAMES=["A Control","B Faster recovery","C Recovery + mobility"]
 const GROUND_STRIKES=["jab","cross","kick","pulse"]
 var tempo:int=0
+var original_cross:Dictionary={}
 
 func _init(gap:float=30.,stop_enabled:bool=true,profile:int=2,variant:int=0,enabled:bool=true):
     super(gap,stop_enabled,profile,enabled)
     assert(variant in [0,1,2])
     tempo=variant
+    original_cross=bank.cross.duplicate(true)
     if tempo>0:
         for id in GROUND_STRIKES:
             var src:Dictionary=bank[id]
