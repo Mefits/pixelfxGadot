@@ -76,6 +76,8 @@ func motion_command(_slot:int,_action:String,command:Dictionary)->Dictionary:ret
 func advance_positions()->void:pass
 func marker_event(ev:Dictionary,_a:Vector2,_b:Vector2,_blocking:bool,_kind:String)->Dictionary:return ev
 func after_resolve(_event:Dictionary)->void:pass
+# Optional candidate collection, same authoritative resolution path.
+func collect_contacts(_pending:Array,_old_centers:Array,_old_tips:Array,_blocking:Array,_actions:Array)->void:pass
 func resolve_special(_event:Dictionary)->bool:return false
 func can_cancel(_slot:int)->bool:return false
 func started(_slot:int,_previous:String,_next:String,_cancelled:bool,_old_remaining:int)->void:pass
@@ -154,6 +156,7 @@ func step(left:Dictionary,right:Dictionary)->void:
             var contact:bool=near.length()<=RADIUS and (root_x(other)-root_x(i))*facing(i)>0.
             var outcome:String=("block" if blocking[other] else "hit") if contact else "miss"
             pending.append(marker_event({"id":"%d:%d:%d:%d"%[tick,i,ev[1],ev[2]],"tick":tick,"attacker":i,"target":other,"attack":action_at_tick[i],"result":outcome,"anchor":id,"point":tip(i,id),"distance":near.length()},a,b,blocking[other],ev[5]))
+    collect_contacts(pending,old_centers,old_tips,blocking,action_at_tick)
     for ev in pending:
         events.append(ev)
         outcome(ev,int(old_stun[ev.target]))
