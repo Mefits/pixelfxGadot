@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageChops
 import sys,json,subprocess,shutil
 root=Path(sys.argv[1])
-modes=["A Original","B Godot control","C Seamless","D Surface accent","E Offset trail","F Multiples"]
+modes=["A Original","B Godot control","C Onset trail","D Stretch","E Curved","F Surface","G Offset"]
 report={}
 def encode(frames,filename,slow=False):
     # At 0.5x each source tick lasts 33.33 ms. Use video instead of relying
@@ -23,7 +23,7 @@ def encode(frames,filename,slow=False):
     assert abs(float(data["duration"])-len(frames)/rate)<.04
 for attack in ("punch","heel"):
     lanes=[]
-    for mode in range(6):
+    for mode in range(7):
         paths=sorted((root/"frames"/f"{attack}_{mode}").glob("*.png"))
         assert len(paths)==78,(attack,mode,len(paths))
         frames=[Image.open(p).convert("RGB").crop((335,145,650,535)) for p in paths]
@@ -31,7 +31,7 @@ for attack in ("punch","heel"):
         frames[0].save(root/f"{attack}_{mode}.gif",save_all=True,append_images=frames[1:],duration=[20 if i%3!=1 else 10 for i in range(78)],loop=0,optimize=False,disposal=2)
     # Pair original with each candidate, native size and mobile-first layout.
     counts={}
-    for j in range(1,6):
+    for j in range(1,7):
         pixels=[sum(1 for rgb in ImageChops.difference(a,b).getdata() if rgb!=(0,0,0)) for a,b in zip(lanes[0],lanes[j])]
         counts[modes[j]]={"frames":sum(n>0 for n in pixels),"peak_pixels":max(pixels)}
         assert max(pixels)>0,(attack,j)
@@ -45,26 +45,26 @@ for attack in ("punch","heel"):
         # Static peak panel is useful even if client fails to play animation.
         peak=max(range(78),key=lambda i:pixels[i])
         frames[peak].save(root/f"{attack}_A{j}_peak.png")
-        if j in (2,3,4,5):encode(frames,f"{attack}_A{j}_half",True)
-    for j in (3,4):
-        pixels=[sum(1 for rgb in ImageChops.difference(a,b).getdata() if rgb!=(0,0,0)) for a,b in zip(lanes[2],lanes[j])]
+        if j in (2,3,4,5,6):encode(frames,f"{attack}_A{j}_half",True)
+    for j in (5,6):
+        pixels=[sum(1 for rgb in ImageChops.difference(a,b).getdata() if rgb!=(0,0,0)) for a,b in zip(lanes[4],lanes[j])]
         assert max(pixels)>0,(attack,"accent not visible",j)
         frames=[]
         for i in range(78):
             im=Image.new("RGB",(630,414),(29,38,48))
             d=ImageDraw.Draw(im)
-            d.text((8,5),modes[2],fill="white");d.text((323,5),modes[j],fill="white")
-            im.paste(lanes[2][i],(0,24));im.paste(lanes[j][i],(315,24))
+            d.text((8,5),modes[4],fill="white");d.text((323,5),modes[j],fill="white")
+            im.paste(lanes[4][i],(0,24));im.paste(lanes[j][i],(315,24))
             frames.append(im)
-        frames[max(range(78),key=lambda i:pixels[i])].save(root/f"{attack}_C{j}_peak.png")
-        encode(frames,f"{attack}_C{j}_half",True)
-        counts["C vs "+modes[j]]={"frames":sum(n>0 for n in pixels),"peak_pixels":max(pixels)}
+        frames[max(range(78),key=lambda i:pixels[i])].save(root/f"{attack}_E{j}_peak.png")
+        encode(frames,f"{attack}_E{j}_half",True)
+        counts["E vs "+modes[j]]={"frames":sum(n>0 for n in pixels),"peak_pixels":max(pixels)}
     report[attack]=counts
     sheet=[]
     for i in range(78):
-        im=Image.new("RGB",(630,3*414),(29,38,48))
+        im=Image.new("RGB",(630,4*414),(29,38,48))
         d=ImageDraw.Draw(im)
-        for j in range(6):
+        for j in range(7):
             x=(j%2)*315;y=(j//2)*414
             d.text((x+8,y+5),modes[j],fill="white")
             im.paste(lanes[j][i],(x,y+24))

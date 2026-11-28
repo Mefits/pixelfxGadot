@@ -5,7 +5,11 @@ const Sweep=preload("res://lab/motion_stylization/swept_body.gd")
 var sweep=Sweep.new()
 const Seamless=preload("res://lab/motion_stylization/seamless_smear.gd")
 var seamless=Seamless.new()
-const MODES=["A · Original","B · Godot Trail Control","C · Seamless Smear","D · Surface Accent","E · Offset Trail","F · Multiples refined"]
+const Drive=preload("res://lab/motion_stylization/acceleration_signal.gd")
+const Directed=preload("res://lab/motion_stylization/directional_shape.gd")
+var drive=Drive.new()
+var directed=Directed.new()
+const MODES=["A · Original","B · Godot control","C · Onset Trail","D · Directional Stretch","E · Curved Smear","F · Curved + Surface","G · Curved + Offset"]
 var stylizer=Stylizer.new()
 var mode:int=0
 var choice:OptionButton
@@ -37,7 +41,7 @@ func _ready()->void:
     panel.z_index=25
     add_child(panel)
     var heading:=Label.new()
-    heading.text="MOTION STYLIZATION v0.04"
+    heading.text="MOTION STYLIZATION v0.05"
     panel.add_child(heading)
     choice=OptionButton.new()
     choice.focus_mode=Control.FOCUS_NONE
@@ -71,17 +75,17 @@ func _ready()->void:
         stylizer.threshold=v
         render_frame())
     var sm:=Label.new()
-    sm.text="Порог скорости смаза"
+    sm.text="Чувствительность разгона (20–220%)"
     panel.add_child(sm)
     var sm_slider:=HSlider.new()
     sm_slider.min_value=20.
     sm_slider.max_value=220.
     sm_slider.step=5.
-    sm_slider.value=55.
+    sm_slider.value=100.
     sm_slider.focus_mode=Control.FOCUS_NONE
     panel.add_child(sm_slider)
     sm_slider.value_changed.connect(func(v:float):
-        stylizer.smear_threshold=v
+        drive.sensitivity=v/100.
         render_frame())
     repeat_choice=OptionButton.new()
     repeat_choice.focus_mode=Control.FOCUS_NONE
@@ -96,12 +100,14 @@ func reset()->void:
     stylizer.reset()
     sweep.reset()
     seamless.reset()
+    drive.reset()
+    directed.reset()
     repeat_clock=0
     if repeat_choice!=null:repeat_choice.select(0)
     super.reset()
 
 func set_mode(value:int)->void:
-    mode=clampi(value,0,5)
+    mode=clampi(value,0,6)
     if choice!=null:choice.select(mode)
     render_frame()
 
@@ -123,6 +129,7 @@ func visual_parts(parts:Array)->Array:
     var age:int=0
     var gate:bool=false
     var smear_gate:bool=false
+    var permitted:bool=false
     var accent:bool=false
     var world:=Vector2.ZERO
     if training.kick.active:
@@ -134,6 +141,7 @@ func visual_parts(parts:Array)->Array:
         gate=age>=maxi(1,actor.hit_tick-9) and age<=actor.hit_tick
         smear_gate=age>=maxi(1,actor.hit_tick-5) and age<actor.hit_tick
         accent=age==actor.hit_tick
+        permitted=age>actor.chamber_tick and age<actor.hit_tick
     elif training.active!=0 and training.strike_anchor.begins_with("hand_"):
         key="1-"+str(training.active)
         age=training.age
@@ -143,36 +151,41 @@ func visual_parts(parts:Array)->Array:
         gate=training.preparation_age>=int(training.binding.prepare_ticks) and age>=maxi(1,hit-7) and age<=hit
         smear_gate=age>=maxi(1,hit-5) and age<hit
         accent=age==hit and training.preparation_age>=int(training.binding.prepare_ticks)
+        permitted=training.preparation_age>=int(training.binding.prepare_ticks) and age>0 and age<hit
     var local:Vector2=world-Vector2.RIGHT*walker.x
     stylizer.sample(training.ticks,key,age,anchor,local,world,gate,smear_gate,accent)
     sweep.power=stylizer.strength
     sweep.speed_threshold=maxf(20.,stylizer.smear_threshold*.65)
     # Broader pre-impact window; no smear on the accent or recovery.
     sweep.sample(training.ticks,key,anchor,age,gate and not accent,accent,parts,walker.x,world)
-    seamless.reset()
+    drive.strength=stylizer.strength
+    drive.sample(training.ticks,key,anchor,permitted,local,world)
+    directed.reset()
     var out:Array=parts
-    if mode in [2,3,4]:out=seamless.build(parts,sweep)
-    if mode==5:out=sweep.multiples(parts)
+    if mode in [3,4,5,6]:out=directed.build(parts,drive,mode!=3)
     if trail_line!=null:render_trail()
     return out
 
 func visual_config()->Dictionary:
-    if mode!=3 or not seamless.changed:return super.visual_config()
+    if mode!=5 or not directed.changed:return super.visual_config()
     var cfg:Dictionary=super.visual_config().duplicate(true)
     cfg.debug=true
     return cfg
 
 func visual_image(im:Image,result:Dictionary)->Image:
-    if mode==3:return seamless.paint_surface(im,result)
+    if mode==5:return directed.surface.paint_surface(im,result)
     return im
 
 func render_trail()->void:
     trail_line.clear_points()
     trail_line.visible=mode==1
-    pixel_sprite.visible=mode==4
+    pixel_sprite.visible=mode in [2,6]
     var points:Array[Dictionary]=stylizer.trail()
-    if fx_status!=null:fx_status.text="Скорость %.0f · Смаз %.2f"%[stylizer.delta.length()*60.,sweep.envelope]
-    if mode==4:
+    if fx_status!=null:fx_status.text="V %.0f · A %.0f · FX %.2f"%[drive.velocity.length(),drive.acceleration,drive.score]
+    if mode==2:
+        render_onset()
+        return
+    if mode==6:
         render_offset()
         return
     if points.size()<2:
@@ -199,8 +212,30 @@ func render_trail()->void:
         gradient.colors=colors
         trail_line.width_curve=widths
         trail_line.gradient=gradient
+func render_onset()->void:
+    var rows:Array[Dictionary]=drive.trail()
+    if rows.size()<2:
+        pixel_sprite.hide()
+        return
+    painter.clear()
+    var origin:=Vector2(240,219)
+    var shift:=Vector2(walker.x,0.)
+    for i in range(1,rows.size()):
+        var a:Dictionary=rows[i-1]
+        var b:Dictionary=rows[i]
+        var pa:Vector2=origin+(Vector2(a.p)-shift)*3.
+        var pb:Vector2=origin+(Vector2(b.p)-shift)*3.
+        var count:int=clampi(ceili(pa.distance_to(pb)),1,96)
+        for j in range(count+1):
+            var u:float=float(j)/count
+            var p:Vector2=pa.lerp(pb,u)
+            var width:float=lerpf(a.width,b.width,u)*3.
+            var alpha:float=lerpf(a.alpha,b.alpha,u)
+            painter.circle(p.x,p.y,maxf(.3,width*.5),0xffa0d4ff,alpha)
+    present_pixels()
+
 func render_offset()->void:
-    var rows:Array[Dictionary]=seamless.offset_segments()
+    var rows:Array[Dictionary]=directed.surface.offset_segments()
     if rows.is_empty():
         pixel_sprite.hide()
         return
