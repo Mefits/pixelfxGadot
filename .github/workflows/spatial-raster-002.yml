@@ -42,7 +42,7 @@ jobs:
           set -euo pipefail
           mkdir -p raster-results
           timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script res://tests/spatial_raster_002.gd -- "$PWD/raster-results" 2>&1 | tee raster-results/engine.log
-          ! grep -E 'SCRIPT ERROR|ERROR:' raster-results/engine.log
+          if grep -E 'SCRIPT ERROR|ERROR:' raster-results/engine.log; then exit 1; fi
           grep SPATIAL_RASTER_002 raster-results/engine.log
           test -s raster-results/pose-0-yaw-090.png
           test -s raster-results/pose-2-yaw-270.png

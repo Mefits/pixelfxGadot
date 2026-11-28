@@ -42,7 +42,7 @@ jobs:
           set -euo pipefail
           mkdir -p entry-results
           timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script res://tests/spatial_entry_004.gd -- "$PWD/entry-results" 2>&1 | tee entry-results/engine.log
-          ! grep -E 'SCRIPT ERROR|ERROR:' entry-results/engine.log
+          if grep -E 'SCRIPT ERROR|ERROR:' entry-results/engine.log; then exit 1; fi
           grep SPATIAL_ENTRY_004 entry-results/engine.log
           test -s entry-results/transition-13.png
           test -s entry-results/near-support-15.png

@@ -170,6 +170,15 @@ func legacy_probe(pose:Dictionary)->void:
     r.lift_legacy(pose,0)
     s.capture(r,pose,"near",Support.FIXED)
     check(not Entry.legacy_gate(r,pose,s).allowed,"contact fallback denied")
+func tiny_rotation_probe()->void:
+    for axis in [Vector3.RIGHT,Vector3.UP,Vector3.BACK,Vector3(1,2,3).normalized()]:
+        for angle in [.000001,.00001,.0001,.001,.01,.1]:
+            var now:=Quaternion(axis,angle)
+            var result:Quaternion=Entry.extrapolate(Quaternion.IDENTITY,now,2.)
+            var expected:=Quaternion(axis,3.*angle)
+            check(result.is_finite() and absf(result.length()-1.)<.00001,"tiny delta unit quaternion")
+            check((Basis(result).x-Basis(expected).x).length()<.00001 and (Basis(result).y-Basis(expected).y).length()<.00001,"tiny delta extrapolation")
+
 func run()->void:
     var args:=OS.get_cmdline_user_args()
     if args.size()!=1 or not ClassDB.class_exists("PixelFXBodyRaster"):
@@ -179,6 +188,7 @@ func run()->void:
     out=args[0]
     DirAccess.make_dir_recursive_absolute(out)
     raster=ClassDB.instantiate("PixelFXBodyRaster")
+    tiny_rotation_probe()
     var f=Training.new()
     var pose:Dictionary=f.walker.pose.duplicate(true)
     for start in [0,16384,32768,49152,64000,-64000]:

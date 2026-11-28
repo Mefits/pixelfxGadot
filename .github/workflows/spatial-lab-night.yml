@@ -28,7 +28,7 @@ jobs:
           mkdir -p results
           for script in spatial_fk_001 training_control walk_control run_v14 attack_polish_v19 attack_repeat_v20; do
             timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script "res://tests/$script.gd" 2>&1 | tee "results/$script.log"
-            ! grep -E 'SCRIPT ERROR|ERROR:' "results/$script.log"
+            if grep -E 'SCRIPT ERROR|ERROR:' "results/$script.log"; then exit 1; fi
           done
           grep SPATIAL_FK_001 results/spatial_fk_001.log
           grep TRAINING_CONTROL_OK results/training_control.log

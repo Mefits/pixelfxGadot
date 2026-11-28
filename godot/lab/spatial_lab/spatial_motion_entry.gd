@@ -60,9 +60,13 @@ static func update_xy(r)->void:
 static func extrapolate(old:Quaternion,now:Quaternion,t:float)->Quaternion:
     var delta:Quaternion=(now*old.inverse()).normalized()
     if delta.w<0.:delta=-delta
-    var angle:float=delta.get_angle()
-    if angle<.000001:return now
-    return (Quaternion(delta.get_axis(),minf(angle*t,PI))*now).normalized()
+    # atan2 of the quaternion vector avoids acos(w) cancellation near identity.
+    # Explicitly normalize the axis: Godot get_axis() is ill-conditioned here.
+    var vector:=Vector3(delta.x,delta.y,delta.z)
+    var magnitude:float=vector.length()
+    if magnitude<.0000001:return now
+    var angle:float=2.*atan2(magnitude,clampf(delta.w,0.,1.))
+    return (Quaternion(vector/magnitude,minf(angle*t,PI))*now).normalized()
 
 static func direction_step(old:Vector3,now:Vector3,t:float)->Vector3:
     var d:float=clampf(old.dot(now),-1.,1.)

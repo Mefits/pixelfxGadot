@@ -42,7 +42,7 @@ jobs:
           set -euo pipefail
           mkdir -p support-results
           timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script res://tests/spatial_support_003.gd -- "$PWD/support-results" 2>&1 | tee support-results/engine.log
-          ! grep -E 'SCRIPT ERROR|ERROR:' support-results/engine.log
+          if grep -E 'SCRIPT ERROR|ERROR:' support-results/engine.log; then exit 1; fi
           grep SPATIAL_SUPPORT_003 support-results/engine.log
           test -s support-results/near-pivot-pos-12.png
           test -s support-results/far-pivot-pos-12.png
