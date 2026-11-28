@@ -1,0 +1,55 @@
+name: Spatial Lab roundhouse L 005
+on:
+  push:
+    branches: [experiment/spatial-lab-night]
+    paths:
+      - 'godot/lab/spatial_lab/**'
+      - 'godot/tests/spatial_l_005.gd'
+      - '.github/workflows/spatial-l-005.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  support:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: pip install scons
+      - name: Existing native raster oracle
+        run: |
+          g++ -std=c++17 -O2 -ffp-contract=off -fno-fast-math native_cpp/body_tests/test.cpp -o /tmp/body-test
+          /tmp/body-test native_cpp/body_tests/oracle.txt
+          g++ -std=c++17 -O2 -ffp-contract=off native_cpp/body_tests/loft.cpp -o /tmp/loft-test
+          /tmp/loft-test
+      - name: Build existing PixelFX extension
+        run: python native_cpp/build.py
+      - name: Install Godot 4.4.1
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=$PWD/engine/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+      - name: Native Godot spatial L and visual gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p l-results
+          timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script res://tests/spatial_l_005.gd -- "$PWD/l-results" 2>&1 | tee l-results/engine.log
+          if grep -E 'SCRIPT ERROR|ERROR:' l-results/engine.log; then exit 1; fi
+          grep SPATIAL_L_005 l-results/engine.log
+          test -s l-results/near-default-spatial-13.png
+          test -s l-results/far-default-spatial-36.png
+          test -s l-results/near-default-legacy-13.png
+          test -s l-results/trace.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spatial-l-005
+          path: l-results/
