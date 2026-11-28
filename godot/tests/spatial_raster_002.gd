@@ -1,6 +1,6 @@
 extends SceneTree
 const FK=preload("res://lab/spatial_lab/spatial_fk.gd")
-const Skin=preload("res://lab/spatial_lab/spatial_body.gd")
+const SpatialBody=preload("res://lab/spatial_lab/spatial_body.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
 const Training=preload("res://lab/training_control.gd")
 const Depth=preload("res://lab/arm_depth_090.gd")
@@ -43,9 +43,9 @@ func overlap_test()->void:
     var far:Array=[]
     # Exactly camera-aligned tube: analytic loft rejects zero XY length,
     # but the spatial caps must cover the center with positive front Z.
-    Skin.loft(near,p,Vector3(0,-20,1),Vector3(0,-20,8),Basis.IDENTITY,2)
+    SpatialBody.loft(near,p,Vector3(0,-20,1),Vector3(0,-20,8),Basis.IDENTITY,2)
     p.part_id=9
-    Skin.loft(far,p,Vector3(0,-20,-8),Vector3(0,-20,-1),Basis.IDENTITY,2)
+    SpatialBody.loft(far,p,Vector3(0,-20,-8),Vector3(0,-20,-1),Basis.IDENTITY,2)
     var a:Dictionary=render(far+near)
     var b:Dictionary=render(near+far)
     if not a.get("ok",false) or not b.get("ok",false):return
@@ -74,7 +74,7 @@ func run()->void:
     overlap_test()
     var f=Training.new()
     var rig=FK.new()
-    var skin=Skin.new()
+    var skin=SpatialBody.new()
     var legacy_body=Body.new(2)
     var poses:Array=[f.walker.pose.duplicate(true)]
     for i in 20:f.step(1,true)
@@ -89,7 +89,7 @@ func run()->void:
         old.evaluate(pose)
         var legacy:Array=legacy_body.make(old.points,pose.angles,old.rotations.head)
         Depth.apply(legacy,0.)
-        Skin.materials(legacy)
+        SpatialBody.materials(legacy)
         var control:Dictionary=render(legacy)
         if not control.get("ok",false):continue
         write(control,"legacy-%d.png"%i)
