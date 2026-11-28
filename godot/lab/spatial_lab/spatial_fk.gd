@@ -11,6 +11,7 @@ var _order:Array[String]=[]
 var joint_xyz:Dictionary={}
 var joint_basis:Dictionary={}
 var points:Dictionary={}
+var foot_basis_override:Dictionary={}
 var yaw_units:int=0
 var spatial_enabled:bool=false
 
@@ -53,6 +54,7 @@ func point3(id:String)->Vector3:
 
 func evaluate_legacy(pose:Dictionary)->void:
     spatial_enabled=false
+    foot_basis_override.clear()
     yaw_units=0
     _legacy.evaluate(pose)
     points=_legacy.points.duplicate()
@@ -68,6 +70,7 @@ func evaluate_legacy(pose:Dictionary)->void:
 ## Girdle-only legacy projection is explicit and does not rotate limb bases.
 func evaluate_spatial(pose:Dictionary,full_yaw:int,root_z:float=0.,chest_twist:int=0,shoulder_twist:int=0,azimuth:Dictionary={},legacy_girdle:bool=false)->void:
     spatial_enabled=true
+    foot_basis_override.clear()
     yaw_units=full_yaw
     points.clear()
     joint_xyz.clear()

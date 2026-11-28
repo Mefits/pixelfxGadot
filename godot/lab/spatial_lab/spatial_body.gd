@@ -55,6 +55,7 @@ func make(r,pose:Dictionary)->Array:
         # Legacy foot_pitch is world planar pitch, not local ankle flexion.
         # Rotate its sole with body yaw; individual foot IK/orientation is 0.03+.
         var sole:Basis=FK.yaw_basis(r.yaw_units)*Basis(Vector3.BACK,deg_to_rad(float(angles.get("foot_pitch_"+side,0.))))
+        if r.foot_basis_override.has(side):sole=r.foot_basis_override[side]
         loft(out,profiles[15+2*k],foot+sole*Vector3(-1.65,-.30,0),foot+sole*Vector3(3.75,-.30,0),sole,4)
     var p:Dictionary=profiles[18].duplicate(true)
     p.center=xyz(head.lerp(chest,.20))
