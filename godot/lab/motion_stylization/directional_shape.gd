@@ -17,10 +17,10 @@ static func move(p:Dictionary,k:String,d:Vector2)->void:
     p[k][0]+=d.x
     p[k][1]+=d.y
 
-func build(parts:Array,signal,curved:bool)->Array:
+func build(parts:Array,drive,curved:bool)->Array:
     reset()
-    if not signal.phase or signal.score<=.005 or signal.strength<=0. or signal.onset_tick<0:return parts
-    var ids:Array=Sweep.indices(signal.anchor)
+    if not drive.phase or drive.score<=.005 or drive.strength<=0. or drive.onset_tick<0:return parts
+    var ids:Array=Sweep.indices(drive.anchor)
     if ids.is_empty():return parts
     var upper:int=ids[0]
     var lower:int=ids[1]
@@ -30,8 +30,8 @@ func build(parts:Array,signal,curved:bool)->Array:
     var axis:Vector2=(b-a).normalized()
     if axis.length_squared()<.01:return parts
     var normal:=Vector2(-axis.y,axis.x)
-    var amount:float=sqrt(signal.score)*signal.strength
-    var travel:Vector2=signal.displacement
+    var amount:float=sqrt(drive.score)*drive.strength
+    var travel:Vector2=drive.displacement
     # Stretch the visual hinge away from current motion; retain shoulder/hip,
     # terminal wrist/ankle and hand/foot. Bound the lag by limb length.
     var max_lag:float=minf(8.,a.distance_to(b)*.42)

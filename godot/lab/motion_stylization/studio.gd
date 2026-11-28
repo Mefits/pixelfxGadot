@@ -1,10 +1,6 @@
 extends "res://lab/walk_studio.gd"
 const Stylizer=preload("res://lab/motion_stylization/stylizer.gd")
 const Painter=preload("res://addons/pixelfx/native/painter.gd")
-const Sweep=preload("res://lab/motion_stylization/swept_body.gd")
-var sweep=Sweep.new()
-const Seamless=preload("res://lab/motion_stylization/seamless_smear.gd")
-var seamless=Seamless.new()
 const Drive=preload("res://lab/motion_stylization/acceleration_signal.gd")
 const Directed=preload("res://lab/motion_stylization/directional_shape.gd")
 var drive=Drive.new()
@@ -98,8 +94,6 @@ func _ready()->void:
 
 func reset()->void:
     stylizer.reset()
-    sweep.reset()
-    seamless.reset()
     drive.reset()
     directed.reset()
     repeat_clock=0
@@ -154,10 +148,6 @@ func visual_parts(parts:Array)->Array:
         permitted=training.preparation_age>=int(training.binding.prepare_ticks) and age>0 and age<hit
     var local:Vector2=world-Vector2.RIGHT*walker.x
     stylizer.sample(training.ticks,key,age,anchor,local,world,gate,smear_gate,accent)
-    sweep.power=stylizer.strength
-    sweep.speed_threshold=maxf(20.,stylizer.smear_threshold*.65)
-    # Broader pre-impact window; no smear on the accent or recovery.
-    sweep.sample(training.ticks,key,anchor,age,gate and not accent,accent,parts,walker.x,world)
     drive.strength=stylizer.strength
     drive.sample(training.ticks,key,anchor,permitted,local,world)
     directed.reset()

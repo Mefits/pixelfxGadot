@@ -6,6 +6,7 @@ var key:String=""
 var anchor:String=""
 var phase:bool=false
 var prior:Vector2=Vector2.ZERO
+var prior_world:Vector2=Vector2.ZERO
 var velocity:Vector2=Vector2.ZERO
 var acceleration:float=0.
 var score:float=0.
@@ -59,7 +60,7 @@ func sample(t:int,id:String,limb:String,allowed:bool,local:Vector2,world:Vector2
         # Numerical visibility cutoff, not another motion classifier.
         if onset_tick<0 and score>.025:
             onset_tick=t
-            onset_world=world-(local-old_p)
+            onset_world=prior_world
             path.append(onset_world)
         if onset_tick>=0:
             if path.is_empty() or path[-1].distance_to(world)>.08:path.append(world)
@@ -68,6 +69,7 @@ func sample(t:int,id:String,limb:String,allowed:bool,local:Vector2,world:Vector2
     if v.length_squared()>1.:direction=v.normalized()
     velocity=v
     prior=local
+    prior_world=world
     tick=t
     key=id
     anchor=limb

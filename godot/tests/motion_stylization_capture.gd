@@ -38,7 +38,7 @@ func run()->void:
                 s.advance(false)
                 if not s.last_ok:failures.append("raster error")
                 if s.drive.phase:
-                    timing.append({"tick":tick,"age":s.drive.tick,"speed":s.drive.velocity.length(),"acceleration":s.drive.acceleration,"score":s.drive.score,"onset":s.drive.onset_tick})
+                    timing.append({"tick":tick,"simulation_tick":s.drive.tick,"attack_age":s.training.kick.age if attack=="heel" else s.training.age,"speed":s.drive.velocity.length(),"acceleration":s.drive.acceleration,"score":s.drive.score,"onset":s.drive.onset_tick})
                 if mode==2 and s.drive.trail().size()>1:onset_ticks+=1
                 if mode in [3,4,5,6] and s.directed.changed:
                     active_mesh+=1
