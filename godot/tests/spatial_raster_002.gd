@@ -4,7 +4,7 @@ const SpatialBody=preload("res://lab/spatial_lab/spatial_body.gd")
 const Body=preload("res://lab/body_ankle_069.gd")
 const Training=preload("res://lab/training_control.gd")
 const Depth=preload("res://lab/arm_depth_090.gd")
-const CFG={"width":240,"height":240,"origin":[120,192],"density":3,"ink":0xff000000,"outline":3,"light":[-.48,-.64,.6],"seams":false,"debug":true,"materials":[[0xffe6ded7,0xffbdb3a8,0xff9e9081,0xff746759],[0xffa09d74,0xff827d50,0xff656139,0xff4a4628],[0xff655a4c,0xff50473b,0xff3c342c,0xff29231e],[0xff7278e2,0xff4c53bb,0xff35398b,0xff27265c]]}
+const CFG={"width":480,"height":270,"origin":[240,219],"density":3,"ink":0xff000000,"outline":3,"light":[-.48,-.64,.6],"seams":false,"debug":true,"materials":[[0xffe6ded7,0xffbdb3a8,0xff9e9081,0xff746759],[0xffa09d74,0xff827d50,0xff656139,0xff4a4628],[0xff655a4c,0xff50473b,0xff3c342c,0xff29231e],[0xff7278e2,0xff4c53bb,0xff35398b,0xff27265c]]}
 var failures:Array[String]=[]
 var raster
 var out:String
@@ -49,7 +49,7 @@ func overlap_test()->void:
     var a:Dictionary=render(far+near)
     var b:Dictionary=render(near+far)
     if not a.get("ok",false) or not b.get("ok",false):return
-    var center:int=132*240+120
+    var center:int=(int(CFG.origin[1])-20*int(CFG.density))*int(CFG.width)+int(CFG.origin[0])
     check(a.part[center]==3 and b.part[center]==3,"front owns overlap regardless submission order")
     check(absf(a.depth[center]-8.)<.0001,"end-on cap front Z")
     check(a.part==b.part and a.depth==b.depth,"order-invariant non-tied surfaces")
@@ -92,6 +92,8 @@ func run()->void:
         SpatialBody.materials(legacy)
         var control:Dictionary=render(legacy)
         if not control.get("ok",false):continue
+        var old_bounds:Rect2i=image(control).get_used_rect()
+        check(old_bounds.position.x>0 and old_bounds.end.x<int(CFG.width) and old_bounds.position.y>0 and old_bounds.end.y<int(CFG.height),"legacy control unclipped")
         write(control,"legacy-%d.png"%i)
         var zero:Dictionary={}
         var pose_before:Dictionary=pose.duplicate(true)
@@ -107,12 +109,12 @@ func run()->void:
             cases+=1
             min_pixels=mini(min_pixels,int(result.body_pixels))
             var bounds:Rect2i=image(result).get_used_rect()
-            check(result.body_pixels>100 and bounds.position.x>0 and bounds.end.x<240 and bounds.position.y>0 and bounds.end.y<240,"visible unclipped body")
+            check(result.body_pixels>100 and bounds.position.x>0 and bounds.end.x<int(CFG.width) and bounds.position.y>0 and bounds.end.y<int(CFG.height),"visible unclipped body")
             if step==0:
                 zero=result
                 min_iou=minf(min_iou,compare_mask(control,result))
             if step==16:check(result.rgba==zero.rgba and result.part==zero.part,"360 closure exact")
-            if step%4==0:write(result,"pose-%d-yaw-%03d.png"%[i,roundi(step*22.5)])
+            write(result,"pose-%d-yaw-%03d.png"%[i,roundi(step*22.5)])
         var legacy_after:Dictionary=render(legacy)
         check(legacy_after.get("rgba")==control.rgba and legacy_after.get("part")==control.part,"legacy renderer unchanged by spatial draws")
     # Independent azimuth and chest/shoulder twist, not just rigid yaw.
