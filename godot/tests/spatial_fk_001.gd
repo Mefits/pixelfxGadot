@@ -85,9 +85,10 @@ func run()->void:
         for tick in 50:f.step(0)
         for roundhouse in [false,true]:
             var actor=f.round_kick if roundhouse else f.kick
-            actor.configure({"leg":"near" if side==0 else "far"})
+            actor.configure({"leg":side})
             var accepted:bool=f.press_round_kick() if roundhouse else f.press_kick()
             check(accepted,"accepted legacy attack")
+            check(actor.striking==side,"forced anatomical side")
             for tick in actor.end_tick:
                 f.step(0)
                 compare_legacy(r,legacy,f.walker.pose)

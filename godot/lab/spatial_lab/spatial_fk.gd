@@ -40,9 +40,9 @@ static func yaw_basis(units:int)->Basis:
     var u:int=posmod(units,TURN)
     match u:
         0:return Basis.IDENTITY
-        QUARTER:return Basis(Vector3(0,0,-1),Vector3(0,1,0),Vector3(1,0,0))
-        QUARTER*2:return Basis(Vector3(-1,0,0),Vector3(0,1,0),Vector3(0,0,-1))
-        QUARTER*3:return Basis(Vector3(0,0,1),Vector3(0,1,0),Vector3(-1,0,0))
+        16384:return Basis(Vector3(0,0,-1),Vector3(0,1,0),Vector3(1,0,0))
+        32768:return Basis(Vector3(-1,0,0),Vector3(0,1,0),Vector3(0,0,-1))
+        49152:return Basis(Vector3(0,0,1),Vector3(0,1,0),Vector3(-1,0,0))
     return Basis(Vector3.UP,float(u)*TAU/float(TURN))
 
 func point(id:String)->Vector2:
