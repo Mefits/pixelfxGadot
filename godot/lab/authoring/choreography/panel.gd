@@ -51,7 +51,7 @@ func _ready():
     var inspector:=HBoxContainer.new()
     layout.add_child(inspector)
     for control in [key_picker,field,value_edit,support]:inspector.add_child(control)
-    for name in ["tick","root.x","root.y"]+Player.TRACK:field.add_item(name)
+    for name in ["tick","root.x","root.y"]+Player.TRACK+Player.Asset.CHANNELS+Player.Asset.LEG_CHANNELS:field.add_item(name)
     for name in ["near","far","air"]:support.add_item(name)
     value_edit.min_value=-1440
     value_edit.max_value=1440
@@ -163,7 +163,8 @@ func select_key():
         "tick":val=roundi(k.t*60.)
         "root.x":val=k.root[0]
         "root.y":val=k.root[1]
-        _:val=k.space[name]
+        _:
+            val=k.space[name] if name in Player.TRACK else k.angles.get(name,0.)
     value_edit.value=val
     support.select(["near","far","air"].find(k.space.support))
     frame.value=roundi(k.t*60.)
@@ -178,7 +179,12 @@ func write_key():
             if key_picker.selected==next.keys.size()-1:next.duration=k.t
         "root.x":k.root[0]=value_edit.value
         "root.y":k.root[1]=value_edit.value
-        _:k.space[name]=value_edit.value
+        _:
+            if name in Player.TRACK:k.space[name]=value_edit.value
+            else:
+                for key in next.keys:
+                    if not key.angles.has(name):key.angles[name]=0.
+                k.angles[name]=value_edit.value
     k.space.support=support.get_item_text(support.selected)
     source.text=JSON.stringify(next,"  ",false,true)
     apply()

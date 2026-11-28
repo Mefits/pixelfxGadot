@@ -12,6 +12,7 @@ var raster
 var out:String
 var max_floor:=0.
 var max_ik:=0.
+var snapshot_bytes:=0
 var max_step:=0.
 var max_bone:=0.
 var max_anchor:=0.
@@ -72,7 +73,9 @@ func run():
                 if t==0:check(p.rig.point3("hips").distance_to(now.root)<.01,"entry")
                 max_floor=maxf(max_floor,maxf(p.current.toes.near.y,p.current.toes.far.y))
                 max_ik=maxf(max_ik,p.target_error)
-                if t==25:saved=p.save()
+                if t==25:
+                    saved=p.save()
+                    snapshot_bytes=maxi(snapshot_bytes,saved.size())
                 for joint in p.rig.ids_in_order():
                     var par=p.rig.parent_id(joint)
                     if par!="":max_bone=maxf(max_bone,absf(p.rig.point3(joint).distance_to(p.rig.point3(par))-p.rig.rest_offset_xyz(joint).length()))
@@ -116,7 +119,11 @@ func run():
             p.restore(saved)
             old=p.current
             check(p.start(other,old,p.previous,43) and p.step() and p.current.root.distance_to(old.root)<.01,"direct interrupt")
+            for z in range(1,p.frames.size()):
+                if not p.step():
+                    check(false,"interrupted sequence "+str(z))
+                    break
     check(max_bone<.001 and max_anchor<.001 and max_step<30. and max_floor<.002 and max_ik<.002,"geometry")
     print("TRACE ",digest.finish().hex_encode())
-    print("CHOREO_001 ",[max_bone,max_anchor,max_step,max_floor,max_ik,failures])
+    print("CHOREO_001 ",[max_bone,max_anchor,max_step,max_floor,max_ik,snapshot_bytes,failures])
     quit(0 if failures.is_empty() else 1)
