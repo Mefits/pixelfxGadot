@@ -2,7 +2,7 @@ extends "res://lab/spatial_lab/spatial_mocap_010.gd"
 ## G20 stylization: signed source winding, continuous retiming, local
 ## pose edits with canonical lengths. Parent grounding is unchanged.
 ## 1=B, 2=C, 3=D. A uses the original 010 class itself.
-const Curve=preload("res://lab/spatial_lab/spatial_roundhouse_007.gd")
+const RetimingCurve=preload("res://lab/spatial_lab/spatial_roundhouse_007.gd")
 const MAPS=[
     [],
     [[0.,0.],[5.,12.],[13.,34.],[18.,44.],[23.,56.],[28.,64.],[36.,80.],[44.,104.],[66.,170.]],
@@ -22,7 +22,7 @@ func setup(art:Dictionary)->void:
     super.setup(art)
 
 func source_at(tick:int)->float:
-    return Curve.curve(MAPS[mode],float(tick))
+    return RetimingCurve.curve(MAPS[mode],float(tick))
 
 # 010 uses normalized linear direction interpolation. Same interpolation
 # with fractional source time instead of rounding to original 60Hz ticks.
