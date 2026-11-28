@@ -19,6 +19,7 @@ func trace(id:String,gap:float,case:String,mirror:bool=false,capture:String="",r
     var events:Array=[]
     var simulation:Array=[]
     var visual:Array=[]
+    var plain_times:Array=[]
     var max_travel:float=0.
     var max_entities:int=0
     var min_gap:float=INF
@@ -55,7 +56,9 @@ func trace(id:String,gap:float,case:String,mirror:bool=false,capture:String="",r
             check(im!=null,"native render")
             if im!=null:check(im.save_png(output.path_join("%s-%03d.png"%[capture,t]))==OK,"png")
             view.enabled=false
+            start=Time.get_ticks_usec()
             var plain:Image=view.render(w)
+            plain_times.append(Time.get_ticks_usec()-start)
             check(plain!=null and w.save()==before,"VFX off leaves state unchanged")
             view.enabled=true
     var end:PackedByteArray=w.save()
@@ -76,7 +79,8 @@ func trace(id:String,gap:float,case:String,mirror:bool=false,capture:String="",r
     check(w.entities.is_empty(),"entity lifetime "+id)
     simulation.sort()
     visual.sort()
-    return {"contacts":outcomes,"hp":[w.actors[0].hp,w.actors[1].hp],"lifecycle":w.lifecycle,"starts":w.starts,"max_entities":max_entities,"max_travel":max_travel,"min_gap":min_gap,"sim_p95_us":simulation[int(simulation.size()*.95)],"view_p95_us":visual[int(visual.size()*.95)] if not visual.is_empty() else -1}
+    plain_times.sort()
+    return {"contacts":outcomes,"hp":[w.actors[0].hp,w.actors[1].hp],"lifecycle":w.lifecycle,"starts":w.starts,"max_entities":max_entities,"max_travel":max_travel,"min_gap":min_gap,"sim_p95_us":simulation[int(simulation.size()*.95)],"view_p95_us":visual[int(visual.size()*.95)] if not visual.is_empty() else -1,"base_view_p95_us":plain_times[int(plain_times.size()*.95)] if not plain_times.is_empty() else -1}
 
 func has_result(result:Dictionary,kind:String)->bool:
     for ev in result.contacts:
@@ -113,7 +117,12 @@ func run()->void:
         check(has_result(block,"block") and block.hp==[100,100],"block "+id)
         check(mirrored.hp==[hit.hp[1],hit.hp[0]],"mirror "+id)
         check(both.max_entities>=2,"concurrent "+id)
-        if id=="impact_dash":check(hit.max_travel>0. and hit.max_travel<=15.001,"bounded dash")
+        check(not moving.contacts.is_empty(),"moving target resolved "+id)
+        if id=="impact_dash":
+            var distance:float=0.
+            for row in hit.lifecycle:
+                if row[2]=="contact":distance=float(row[4])
+            check(distance>0. and distance<=15.001,"bounded dash")
         metrics[id]={"gap":gap,"probes":probes,"hit":hit,"miss":miss,"block":block,"mirror":mirrored,"moving":moving,"both":both}
     var interrupted:Dictionary=trace("energy_bolt",26.,"interrupt",false,"",true)
     var observed:bool=false
