@@ -32,7 +32,7 @@ func can_cancel(slot:int)->bool:
 func started(slot:int,previous_action:String,next:String,cancelled:bool,old_remaining:int)->void:
     super.started(slot,previous_action,next,cancelled,old_remaining)
     if not Profiles.has_action(next):return
-    var e:Dictionary={"id":next_entity,"owner":slot,"attack":next,"age":0,"detached":false,"spent":false,"p":tip(slot,"hand_near"),"travel":0.,"dash_travel":0.}
+    var e:Dictionary={"id":next_entity,"owner":slot,"attack":next,"age":0,"detached":false,"spent":false,"p":tip(slot,Profiles.DATA[next].motion.anchor),"travel":0.,"dash_travel":0.}
     next_entity+=1
     entities.append(e)
     lifecycle.append([tick,e.id,"start",slot])
@@ -45,7 +45,7 @@ func interrupted(slot:int)->void:
             lifecycle.append([tick,e.id,"interrupt",slot])
 
 func step(left:Dictionary,right:Dictionary)->void:
-    previous_elbows=[point(0,"elbow_near"),point(1,"elbow_near")]
+    previous_elbows=[{"hand_near":point(0,"elbow_near"),"hand_far":point(0,"elbow_far")},{"hand_near":point(1,"elbow_near"),"hand_far":point(1,"elbow_far")}]
     previous_travel=[players[0].gait.travel,players[1].gait.travel]
     super.step(left,right)
 
@@ -74,7 +74,7 @@ static func blade_end(hand:Vector2,elbow:Vector2,sign_x:float,length:float)->Vec
 func contact_event(e:Dictionary,point_at:Vector2,distance:float,hit:bool,blocking:bool)->Dictionary:
     var i:int=e.owner
     var result:String=("block" if blocking else "hit") if hit else "miss"
-    var ev:Dictionary={"id":"ability:%d:0"%int(e.id),"tick":tick,"attacker":i,"target":1-i,"attack":e.attack,"result":result,"anchor":"hand_near","point":point_at,"distance":distance,"entity":e.id}
+    var ev:Dictionary={"id":"ability:%d:0"%int(e.id),"tick":tick,"attacker":i,"target":1-i,"attack":e.attack,"result":result,"anchor":Profiles.DATA[e.attack].motion.anchor,"point":point_at,"distance":distance,"entity":e.id}
     # Reuse 005's classification (parry/escape) and the one resolver.
     return marker_event(ev,Vector2.ZERO,Vector2.ZERO,blocking,"strike")
 
@@ -116,8 +116,8 @@ func collect_contacts(pending:Array,old_centers:Array,old_tips:Array,blocking:Ar
                 expired=e.travel>=g.range or e.flight>=p.lifecycle.life
         elif e.age>=g.first and e.age<=g.last:
             if g.kind=="blade":
-                var old_end:Vector2=blade_end(old_hand,previous_elbows[i],facing(i),g.length)
-                var end:Vector2=blade_end(hand,point(i,"elbow_near"),facing(i),g.length)
+                var old_end:Vector2=blade_end(old_hand,previous_elbows[i][p.motion.anchor],facing(i),g.length)
+                var end:Vector2=blade_end(hand,point(i,str(p.motion.anchor).replace("hand_","elbow_")),facing(i),g.length)
                 # Sweep nine evenly spaced blade points against moving hurt circle.
                 # Bounded sampling, not an exact continuous rotating capsule.
                 for n in range(9):
