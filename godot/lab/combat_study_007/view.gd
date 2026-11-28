@@ -21,7 +21,7 @@ func line(im:Image,a:Vector2i,b:Vector2i,c:Color,thick:int=1)->void:
     var n:int=maxi(absi(b.x-a.x),absi(b.y-a.y))
     for i in range(n+1):
         var p:=Vector2(a).lerp(Vector2(b),float(i)/maxi(n,1))
-        rect(im,Rect2i(roundi(p.x)-thick/2,roundi(p.y)-thick/2,thick,thick),c)
+        rect(im,Rect2i(roundi(p.x)-(thick >> 1),roundi(p.y)-(thick >> 1),thick,thick),c)
 
 func outline(im:Image,r:Rect2i,c:Color)->void:
     rect(im,Rect2i(r.position,Vector2i(r.size.x,1)),c)
@@ -115,12 +115,12 @@ func render(w)->Image:
         var a:Vector2i=screen(origin+Vector2(e.a),mid)
         var b:Vector2i=screen(origin+Vector2(e.b),mid)
         if e.kind=="utility":
-            rect(im,Rect2i(b-Vector2i(3,3),7,7),col)
+            rect(im,Rect2i(b-Vector2i(3,3),Vector2i(7,7)),col)
             continue
         ring(im,screen(origin,mid),float(e.radius)*SCALE,col.darkened(.30))
         line(im,a,b,col,3 if current else 1)
         if Vector2(e.extra).length_squared()>0.:line(im,b,screen(origin+Vector2(e.b)+Vector2(e.extra),mid),col,3 if current else 1)
         var nearest:Vector2i=screen(origin+Vector2(e.nearest),mid)
-        rect(im,Rect2i(nearest-Vector2i(2,2),5,5),col)
+        rect(im,Rect2i(nearest-Vector2i(2,2),Vector2i(5,5)),col)
     if w.freeze>0:rect(im,Rect2i(0,HEIGHT-4,WIDTH,4),Color("#f9d784"))
     return im
