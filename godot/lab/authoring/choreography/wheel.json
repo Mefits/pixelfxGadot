@@ -1,0 +1,286 @@
+{
+  "version": 2,
+  "kind": "action",
+  "id": "wheel",
+  "name": "Ложный джеб и колесо",
+  "fps": 60,
+  "duration": 0.9166666666666666,
+  "loop": false,
+  "goals": [],
+  "events": [
+    {
+      "t": 0.5,
+      "kind": "strike",
+      "anchor": "foot_near"
+    }
+  ],
+  "keys": [
+    {
+      "t": 0.0,
+      "root": [
+        0,
+        0
+      ],
+      "angles": {
+        "hips": 0,
+        "chest": 0,
+        "thigh_near": -22,
+        "knee_near": 48,
+        "thigh_far": -15,
+        "knee_far": 44,
+        "shoulder_near": -28,
+        "elbow_near": -90,
+        "shoulder_far": -35,
+        "elbow_far": -80
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "guard",
+        "support": "near",
+        "yaw": 0,
+        "chest": 0,
+        "shoulders": 0,
+        "z": 0,
+        "azimuth": 0,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    },
+    {
+      "t": 0.15,
+      "root": [
+        -2,
+        1
+      ],
+      "angles": {
+        "hips": -8,
+        "chest": 9,
+        "thigh_near": -35,
+        "knee_near": 66,
+        "thigh_far": -22,
+        "knee_far": 48,
+        "shoulder_near": -76,
+        "elbow_near": -13,
+        "shoulder_far": -20,
+        "elbow_far": -115
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "false jab",
+        "support": "near",
+        "yaw": 22,
+        "chest": -30,
+        "shoulders": -15,
+        "z": 0,
+        "azimuth": -15,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    },
+    {
+      "t": 0.26666666666666666,
+      "root": [
+        0,
+        3
+      ],
+      "angles": {
+        "hips": 14,
+        "chest": -18,
+        "thigh_near": -58,
+        "knee_near": 98,
+        "thigh_far": -38,
+        "knee_far": 86,
+        "shoulder_near": 32,
+        "elbow_near": -97,
+        "shoulder_far": -75,
+        "elbow_far": -52
+      },
+      "easing": "accelerate",
+      "space": {
+        "phase": "load",
+        "support": "far",
+        "yaw": -20,
+        "chest": 35,
+        "shoulders": 24,
+        "z": 0,
+        "azimuth": 24,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    },
+    {
+      "t": 0.36666666666666664,
+      "root": [
+        3,
+        -3
+      ],
+      "angles": {
+        "hips": -13,
+        "chest": 8,
+        "thigh_near": -80,
+        "knee_near": 108,
+        "thigh_far": -25,
+        "knee_far": 42,
+        "shoulder_near": 42,
+        "elbow_near": -64,
+        "shoulder_far": -118,
+        "elbow_far": -27
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "spring",
+        "support": "air",
+        "yaw": -125,
+        "chest": 20,
+        "shoulders": 24,
+        "z": 0,
+        "azimuth": 24,
+        "weight": 0.35,
+        "gx": 6,
+        "gy": 3,
+        "gz": 12
+      }
+    },
+    {
+      "t": 0.5,
+      "root": [
+        10,
+        -13
+      ],
+      "angles": {
+        "hips": 48,
+        "chest": 12,
+        "thigh_near": -125,
+        "knee_near": 18,
+        "thigh_far": -40,
+        "knee_far": 110,
+        "shoulder_near": -104,
+        "elbow_near": -18,
+        "shoulder_far": 38,
+        "elbow_far": -42
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "wheel",
+        "support": "air",
+        "yaw": -235,
+        "chest": -38,
+        "shoulders": -20,
+        "z": 0,
+        "azimuth": -20,
+        "weight": 1,
+        "gx": 20,
+        "gy": -8,
+        "gz": 3
+      }
+    },
+    {
+      "t": 0.6,
+      "root": [
+        12,
+        -8
+      ],
+      "angles": {
+        "hips": 21,
+        "chest": -16,
+        "thigh_near": -64,
+        "knee_near": 98,
+        "thigh_far": -34,
+        "knee_far": 70,
+        "shoulder_near": -20,
+        "elbow_near": -80,
+        "shoulder_far": -85,
+        "elbow_far": -51
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "fold",
+        "support": "air",
+        "yaw": -340,
+        "chest": -12,
+        "shoulders": 8,
+        "z": 0,
+        "azimuth": 8,
+        "weight": 0.45,
+        "gx": 4,
+        "gy": 7,
+        "gz": -9
+      }
+    },
+    {
+      "t": 0.7333333333333333,
+      "root": [
+        14,
+        1
+      ],
+      "angles": {
+        "hips": -8,
+        "chest": -4,
+        "thigh_near": -30,
+        "knee_near": 76,
+        "thigh_far": -24,
+        "knee_far": 64,
+        "shoulder_near": -58,
+        "elbow_near": -62,
+        "shoulder_far": -24,
+        "elbow_far": -91
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "catch",
+        "support": "far",
+        "yaw": -360,
+        "chest": 10,
+        "shoulders": 14,
+        "z": 0,
+        "azimuth": 14,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    },
+    {
+      "t": 0.9166666666666666,
+      "root": [
+        14,
+        0
+      ],
+      "angles": {
+        "hips": -6,
+        "chest": 3,
+        "thigh_near": -21,
+        "knee_near": 54,
+        "thigh_far": -14,
+        "knee_far": 44,
+        "shoulder_near": -38,
+        "elbow_near": -86,
+        "shoulder_far": -30,
+        "elbow_far": -90
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "exit",
+        "support": "far",
+        "yaw": -360,
+        "chest": 0,
+        "shoulders": 0,
+        "z": 0,
+        "azimuth": 0,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    }
+  ],
+  "easing": "linear",
+  "spatial_version": 1,
+  "effector": "foot_near"
+}

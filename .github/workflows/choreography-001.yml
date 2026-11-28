@@ -1,0 +1,60 @@
+name: Choreography Lab 001
+on:
+  push:
+    branches: [experiment/choreography-lab-001]
+    paths: ['godot/**','tools/choreography_001_media.py','.github/workflows/choreography-001.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  support:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: |
+          pip install scons pillow
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Existing native raster oracle
+        run: |
+          g++ -std=c++17 -O2 -ffp-contract=off -fno-fast-math native_cpp/body_tests/test.cpp -o /tmp/body-test
+          /tmp/body-test native_cpp/body_tests/oracle.txt
+          g++ -std=c++17 -O2 -ffp-contract=off native_cpp/body_tests/loft.cpp -o /tmp/loft-test
+          /tmp/loft-test
+      - name: Build existing PixelFX extension
+        run: python native_cpp/build.py
+      - name: Install Godot 4.4.1
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=$PWD/engine/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+      - name: Godot entry, support, replay and editable documents
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          check() {
+            timeout 150s "$GODOT" --headless --path godot --script "res://tests/$1.gd" "${@:2}" 2>&1 | tee "results/$1.log"
+            ! grep -E 'SCRIPT ERROR|ERROR:' "results/$1.log"
+          }
+          check motion_authoring -- 60
+          check spatial_replay_006 -- "$PWD/regression"
+          check choreography_workshop
+          check choreography_001 -- "$PWD/frames"
+          cp results/choreography_001.log results/capture.log
+          check choreography_001
+          diff <(grep '^TRACE' results/capture.log) <(grep '^TRACE' results/choreography_001.log)
+          python tools/choreography_001_media.py frames
+          cp frames/*.gif frames/*.mp4 frames/phase*.png results/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Choreography-Lab-001
+          path: results/

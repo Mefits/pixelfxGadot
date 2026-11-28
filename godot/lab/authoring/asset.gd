@@ -198,7 +198,7 @@ static func available()->Array:
     for id in ids:
         var d:=read(FOLDER+id+".json")
         if d.get("id")!=id or problem(d)!="":d=read(DIR+id+".json")
-        if d.get("id")==id and problem(d)=="" and not d.has("walk_role"):result.append(d)
+        if d.get("id")==id and problem(d)=="" and not d.has("walk_role") and not d.has("spatial_version"):result.append(d)
     return result
 
 static func player(d:Dictionary,hz:int):

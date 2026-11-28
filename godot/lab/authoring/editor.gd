@@ -149,6 +149,17 @@ func _ready():
     var title:=caption(self,"МАСТЕРСКАЯ ДВИЖЕНИЙ",Vector2(12,12),18)
     dirty_label=caption(self,"",Vector2(278,14),13)
     dirty_label.size=Vector2(130,22)
+    var choreography:=Button.new()
+    choreography.text="Хореография"
+    choreography.position=Vector2(267,6)
+    add_child(choreography)
+    choreography.pressed.connect(func():
+        var window=get_node_or_null("Choreography")
+        if not window:
+            window=preload("choreography/panel.gd").new()
+            window.name="Choreography"
+            add_child(window)
+        window.popup_centered())
     var top:=HBoxContainer.new()
     top.position=Vector2(400,7)
     add_child(top)

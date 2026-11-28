@@ -1,0 +1,286 @@
+{
+  "version": 2,
+  "kind": "action",
+  "id": "hook",
+  "name": "Подвес и сброс пятки",
+  "fps": 60,
+  "duration": 1.05,
+  "loop": false,
+  "goals": [],
+  "events": [
+    {
+      "t": 0.6666666666666666,
+      "kind": "strike",
+      "anchor": "foot_near"
+    }
+  ],
+  "keys": [
+    {
+      "t": 0.0,
+      "root": [
+        0,
+        0
+      ],
+      "angles": {
+        "hips": 0,
+        "chest": 0,
+        "thigh_near": -22,
+        "knee_near": 48,
+        "thigh_far": -15,
+        "knee_far": 44,
+        "shoulder_near": -28,
+        "elbow_near": -90,
+        "shoulder_far": -35,
+        "elbow_far": -80
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "guard",
+        "support": "near",
+        "yaw": 0,
+        "chest": 0,
+        "shoulders": 0,
+        "z": 0,
+        "azimuth": 0,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    },
+    {
+      "t": 0.18333333333333332,
+      "root": [
+        -3,
+        3
+      ],
+      "angles": {
+        "hips": 16,
+        "chest": -16,
+        "thigh_near": -56,
+        "knee_near": 116,
+        "thigh_far": -30,
+        "knee_far": 95,
+        "shoulder_near": -108,
+        "elbow_near": -9,
+        "shoulder_far": 18,
+        "elbow_far": -69
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "low lure",
+        "support": "near",
+        "yaw": -38,
+        "chest": 38,
+        "shoulders": 16,
+        "z": 0,
+        "azimuth": 16,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    },
+    {
+      "t": 0.3,
+      "root": [
+        0,
+        2
+      ],
+      "angles": {
+        "hips": -15,
+        "chest": 7,
+        "thigh_near": -84,
+        "knee_near": 105,
+        "thigh_far": -35,
+        "knee_far": 73,
+        "shoulder_near": 18,
+        "elbow_near": -132,
+        "shoulder_far": -80,
+        "elbow_far": -30
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "reverse",
+        "support": "far",
+        "yaw": 4,
+        "chest": -40,
+        "shoulders": -20,
+        "z": 0,
+        "azimuth": -20,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    },
+    {
+      "t": 0.43333333333333335,
+      "root": [
+        3,
+        -12
+      ],
+      "angles": {
+        "hips": -31,
+        "chest": -12,
+        "thigh_near": -120,
+        "knee_near": 115,
+        "thigh_far": -44,
+        "knee_far": 87,
+        "shoulder_near": -143,
+        "elbow_near": -18,
+        "shoulder_far": -63,
+        "elbow_far": -102
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "rise",
+        "support": "air",
+        "yaw": 112,
+        "chest": 27,
+        "shoulders": 30,
+        "z": 0,
+        "azimuth": 30,
+        "weight": 0.45,
+        "gx": 0,
+        "gy": -9,
+        "gz": 8
+      }
+    },
+    {
+      "t": 0.5833333333333334,
+      "root": [
+        6,
+        -20
+      ],
+      "angles": {
+        "hips": -47,
+        "chest": 8,
+        "thigh_near": -104,
+        "knee_near": 135,
+        "thigh_far": -65,
+        "knee_far": 88,
+        "shoulder_near": -164,
+        "elbow_near": -10,
+        "shoulder_far": 38,
+        "elbow_far": -126
+      },
+      "easing": "accelerate",
+      "space": {
+        "phase": "hang",
+        "support": "air",
+        "yaw": 240,
+        "chest": 24,
+        "shoulders": -25,
+        "z": 0,
+        "azimuth": -25,
+        "weight": 0.94,
+        "gx": 10,
+        "gy": -19,
+        "gz": -4
+      }
+    },
+    {
+      "t": 0.6666666666666666,
+      "root": [
+        10,
+        -13
+      ],
+      "angles": {
+        "hips": -58,
+        "chest": 4,
+        "thigh_near": -7,
+        "knee_near": 12,
+        "thigh_far": -86,
+        "knee_far": 113,
+        "shoulder_near": 45,
+        "elbow_near": -48,
+        "shoulder_far": -134,
+        "elbow_far": -18
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "descending heel",
+        "support": "air",
+        "yaw": 302,
+        "chest": -48,
+        "shoulders": -22,
+        "z": 0,
+        "azimuth": -22,
+        "weight": 1,
+        "gx": 13,
+        "gy": 16,
+        "gz": 3
+      }
+    },
+    {
+      "t": 0.8333333333333334,
+      "root": [
+        14,
+        3
+      ],
+      "angles": {
+        "hips": 12,
+        "chest": -19,
+        "thigh_near": -40,
+        "knee_near": 94,
+        "thigh_far": -27,
+        "knee_far": 70,
+        "shoulder_near": -80,
+        "elbow_near": -30,
+        "shoulder_far": 9,
+        "elbow_far": -106
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "catch",
+        "support": "near",
+        "yaw": 360,
+        "chest": -22,
+        "shoulders": 12,
+        "z": 0,
+        "azimuth": 12,
+        "weight": 0.05,
+        "gx": 5,
+        "gy": 14,
+        "gz": 1
+      }
+    },
+    {
+      "t": 1.05,
+      "root": [
+        14,
+        0
+      ],
+      "angles": {
+        "hips": -9,
+        "chest": 4,
+        "thigh_near": -17,
+        "knee_near": 50,
+        "thigh_far": -22,
+        "knee_far": 49,
+        "shoulder_near": -40,
+        "elbow_near": -79,
+        "shoulder_far": -35,
+        "elbow_far": -85
+      },
+      "easing": "smooth",
+      "space": {
+        "phase": "exit",
+        "support": "near",
+        "yaw": 360,
+        "chest": 0,
+        "shoulders": 0,
+        "z": 0,
+        "azimuth": 0,
+        "weight": 0,
+        "gx": 0,
+        "gy": 0,
+        "gz": 0
+      }
+    }
+  ],
+  "easing": "linear",
+  "spatial_version": 1,
+  "effector": "foot_near"
+}
