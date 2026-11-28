@@ -132,6 +132,9 @@ func collect_contacts(pending:Array,old_centers:Array,old_tips:Array,blocking:Ar
         if hit or expired:
             pending.append(contact_event(e,at,distance if is_finite(distance) else 9999.,hit,blocking[j]))
             lifecycle.append([tick,e.id,"contact" if hit else "expire",i,e.dash_travel,e.travel])
+            if g.kind=="blade":
+                pending[-1].blade_base=hand
+                pending[-1].blade_end=blade_end(hand,point(i,str(p.motion.anchor).replace("hand_","elbow_")),facing(i),g.length)
             # A struck attached effect can still be represented by the event;
             # it cannot hit again. Projectile dies on any resolved contact.
             continue
