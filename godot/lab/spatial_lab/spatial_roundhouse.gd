@@ -161,3 +161,20 @@ func step()->Dictionary:
     result["diagnostic"]=diagnostic.duplicate(true)
     result["orbit"]=orbit
     return result
+
+# Lossless local checkpoint; precomputed source frames are intentionally
+# included in this prototype. No Object, render caches or native physics.
+const SNAP_FIELDS=["frames","tuning","striking","support_leg","plant_tick","chamber_tick","hit_tick","retract_tick","end_tick","contact_start","contact_end","start_yaw","direction","age","active","fired","diagnostic","previous_tip","origin_x","anchor_xyz","planted","pose","pending_tuning","max_root_orbit"]
+func checkpoint()->Dictionary:
+    var s:Dictionary={}
+    for id in SNAP_FIELDS:s[id]=get(id)
+    s["player"]=player.checkpoint()
+    return s.duplicate(true)
+
+func load_checkpoint(s:Dictionary)->void:
+    var copy:Dictionary=s.duplicate(true)
+    for id in SNAP_FIELDS:set(id,copy[id])
+    player.load_checkpoint(copy.player)
+    # The only post-begin use of control is its stateless XY contact query.
+    # Reconstruct an independent oracle, never restore a live Training actor.
+    if control==null:control=Training.new()

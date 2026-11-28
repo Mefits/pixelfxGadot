@@ -52,3 +52,19 @@ func step(target:Dictionary,max_shift:float=8.)->Dictionary:
     result.pose=p
     result.entry=false
     return result
+
+func checkpoint()->Dictionary:
+    var state:Dictionary={"current":current,"previous":previous,"age":age,"duration":duration,"contacts":support.contacts,"last_yaw":support.last_yaw,"boundary":{}}
+    if boundary!=null:state.boundary={"current":boundary.current,"previous":boundary.previous}
+    return state.duplicate(true)
+
+func load_checkpoint(state:Dictionary)->void:
+    var s:Dictionary=state.duplicate(true)
+    current=s.current
+    previous=s.previous
+    age=s.age
+    duration=s.duration
+    support.contacts=s.contacts
+    support.last_yaw=s.last_yaw
+    boundary=null if s.boundary.is_empty() else Entry.new(s.boundary.current,s.boundary.previous)
+    if not current.is_empty():Entry.write_exact(rig,current)

@@ -1,0 +1,68 @@
+name: Spatial Lab replay 006
+on:
+  push:
+    branches: [experiment/spatial-lab-night]
+    paths:
+      - 'godot/lab/spatial_lab/**'
+      - 'godot/tests/spatial_replay_006.gd'
+      - 'tools/spatial_compare_006.py'
+      - '.github/workflows/spatial-replay-006.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Godot and replay (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          mkdir -p replay-results
+          timeout 180s engine/Godot_v4.4.1-stable_linux.x86_64 --headless --path godot --audio-driver Dummy --script res://tests/spatial_replay_006.gd -- "$PWD/replay-results" 2>&1 | tee replay-results/engine.log
+          if grep -E 'SCRIPT ERROR|ERROR:' replay-results/engine.log; then exit 1; fi
+          grep SPATIAL_REPLAY_006 replay-results/engine.log
+      - name: Godot and replay (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_win64.exe.zip -OutFile engine.zip
+          Expand-Archive engine.zip -DestinationPath engine
+          New-Item -ItemType Directory replay-results
+          $exe = Get-ChildItem engine -Recurse -Filter '*console.exe' | Select-Object -First 1
+          if (!$exe) { throw 'Godot console executable missing' }
+          & $exe.FullName --headless --path godot --audio-driver Dummy --script res://tests/spatial_replay_006.gd -- "$pwd/replay-results" 2>&1 | Tee-Object replay-results/engine.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path replay-results/engine.log -Pattern 'SCRIPT ERROR|ERROR:') { exit 1 }
+          if (!(Select-String -Path replay-results/engine.log -Pattern SPATIAL_REPLAY_006)) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: replay-${{ runner.os }}
+          path: replay-results/
+  compare:
+    needs: replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: replay-*
+          path: comparison
+      - run: python tools/spatial_compare_006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cross-os-006
+          path: comparison/cross-os.json
