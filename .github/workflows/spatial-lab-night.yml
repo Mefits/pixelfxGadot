@@ -1,0 +1,43 @@
+name: Spatial Lab isolated gate
+on:
+  push:
+    branches: [experiment/spatial-lab-night]
+    paths:
+      - 'godot/lab/spatial_lab/**'
+      - 'godot/tests/spatial_*.gd'
+      - '.github/workflows/spatial-lab-night.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.4.1
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=$PWD/engine/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Spatial FK and accepted v21 regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          for script in spatial_fk_001 training_control walk_control run_v14 attack_polish_v19 attack_repeat_v20; do
+            timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script "res://tests/$script.gd" 2>&1 | tee "results/$script.log"
+            ! grep -E 'SCRIPT ERROR|ERROR:' "results/$script.log"
+          done
+          grep SPATIAL_FK_001 results/spatial_fk_001.log
+          grep TRAINING_CONTROL_OK results/training_control.log
+          grep WALK_CONTROL_OK results/walk_control.log
+          grep RUN_V14_OK results/run_v14.log
+          grep ATTACK_POLISH_V19 results/attack_polish_v19.log
+          grep ATTACK_REPEAT_V20 results/attack_repeat_v20.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spatial-fk-001-logs
+          path: results/
