@@ -103,7 +103,7 @@ func run()->void:
         for d in [26.,32.,40.,48.,60.,80.]:
             var p:Dictionary=trace(id,d,"hit")
             probes.append({"gap":d,"result":p})
-            if gap<0. and has_result(p,"hit"):gap=d
+            if gap<0. and has_result(p,"hit") and (id!="impact_dash" or d>26.):gap=d
         check(gap>0.,"real reachable hit "+id)
         if gap<0.:gap=26.
         var hit:Dictionary=trace(id,gap,"hit",false,id+"_hit",true)
