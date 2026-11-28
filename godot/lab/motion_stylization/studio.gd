@@ -4,8 +4,10 @@ const Painter=preload("res://addons/pixelfx/native/painter.gd")
 const Drive=preload("res://lab/motion_stylization/acceleration_signal.gd")
 const Directed=preload("res://lab/motion_stylization/directional_shape.gd")
 var drive=Drive.new()
+var burst=Drive.new()
+const BurstFX=preload("res://lab/motion_stylization/burst_fx.gd")
 var directed=Directed.new()
-const MODES=["A · Original","B · Godot control","C · Onset Trail","D · Directional Stretch","E · Curved Smear","F · Curved + Surface","G · Curved + Offset"]
+const MODES=["A · Original","B · Godot v0.05","C · Onset v0.05","D · Curved+Offset v0.05","E · Burst Blade","F · Detached Accent","G · Strong Curved"]
 var stylizer=Stylizer.new()
 var mode:int=0
 var choice:OptionButton
@@ -19,6 +21,7 @@ var repeat_choice:OptionButton
 var repeat_clock:int=0
 
 func _ready()->void:
+    burst.onset_level=.35
     super._ready()
     trail_line=Line2D.new()
     trail_line.antialiased=false
@@ -37,7 +40,7 @@ func _ready()->void:
     panel.z_index=25
     add_child(panel)
     var heading:=Label.new()
-    heading.text="MOTION STYLIZATION v0.05"
+    heading.text="MOTION STYLIZATION v0.06"
     panel.add_child(heading)
     choice=OptionButton.new()
     choice.focus_mode=Control.FOCUS_NONE
@@ -58,7 +61,7 @@ func _ready()->void:
         stylizer.strength=v
         render_frame())
     var t:=Label.new()
-    t.text="Порог скорости конечности"
+    t.text="Порог Godot (контроль B)"
     panel.add_child(t)
     threshold_control=HSlider.new()
     threshold_control.min_value=20.
@@ -82,7 +85,19 @@ func _ready()->void:
     panel.add_child(sm_slider)
     sm_slider.value_changed.connect(func(v:float):
         drive.sensitivity=v/100.
+        burst.sensitivity=v/100.
         render_frame())
+    var onset_label:=Label.new()
+    onset_label.text="Начало акцента E–G"
+    panel.add_child(onset_label)
+    var onset_slider:=HSlider.new()
+    onset_slider.min_value=.05
+    onset_slider.max_value=.65
+    onset_slider.step=.025
+    onset_slider.value=.35
+    onset_slider.focus_mode=Control.FOCUS_NONE
+    panel.add_child(onset_slider)
+    onset_slider.value_changed.connect(func(v:float):burst.onset_level=v)
     repeat_choice=OptionButton.new()
     repeat_choice.focus_mode=Control.FOCUS_NONE
     for title in ["Автоповтор: выкл","Автоповтор: 1","Автоповтор: K"]:repeat_choice.add_item(title)
@@ -95,6 +110,7 @@ func _ready()->void:
 func reset()->void:
     stylizer.reset()
     drive.reset()
+    burst.reset()
     directed.reset()
     repeat_clock=0
     if repeat_choice!=null:repeat_choice.select(0)
@@ -150,33 +166,35 @@ func visual_parts(parts:Array)->Array:
     stylizer.sample(training.ticks,key,age,anchor,local,world,gate,smear_gate,accent)
     drive.strength=stylizer.strength
     drive.sample(training.ticks,key,anchor,permitted,local,world)
+    burst.strength=stylizer.strength
+    burst.sample(training.ticks,key,anchor,permitted,local,world)
     directed.reset()
     var out:Array=parts
-    if mode in [3,4,5,6]:out=directed.build(parts,drive,mode!=3)
+    if mode==3:out=directed.build(parts,drive,true)
+    if mode==6:out=directed.build(parts,burst,true,1.85)
     if trail_line!=null:render_trail()
     return out
 
 func visual_config()->Dictionary:
-    if mode!=5 or not directed.changed:return super.visual_config()
-    var cfg:Dictionary=super.visual_config().duplicate(true)
-    cfg.debug=true
-    return cfg
+    return super.visual_config()
 
 func visual_image(im:Image,result:Dictionary)->Image:
-    if mode==5:return directed.surface.paint_surface(im,result)
     return im
 
 func render_trail()->void:
     trail_line.clear_points()
     trail_line.visible=mode==1
-    pixel_sprite.visible=mode in [2,6]
+    pixel_sprite.visible=mode in [2,3,4,5]
     var points:Array[Dictionary]=stylizer.trail()
     if fx_status!=null:fx_status.text="V %.0f · A %.0f · FX %.2f"%[drive.velocity.length(),drive.acceleration,drive.score]
     if mode==2:
         render_onset()
         return
-    if mode==6:
+    if mode==3:
         render_offset()
+        return
+    if mode in [4,5]:
+        render_burst(mode==5)
         return
     if points.size()<2:
         pixel_sprite.hide()
@@ -222,6 +240,35 @@ func render_onset()->void:
             var width:float=lerpf(a.width,b.width,u)*3.
             var alpha:float=lerpf(a.alpha,b.alpha,u)
             painter.circle(p.x,p.y,maxf(.3,width*.5),0xffa0d4ff,alpha)
+    present_pixels()
+
+func render_burst(offset:bool)->void:
+    var rows:Array[Dictionary]=BurstFX.rows(burst,offset)
+    if rows.size()<2:
+        pixel_sprite.hide()
+        return
+    painter.clear()
+    var origin:=Vector2(240,219)
+    var shift:=Vector2(walker.x,0.)
+    # Fill connected tapered cross-sections, not a row of round discs.
+    for i in range(1,rows.size()):
+        var a:Dictionary=rows[i-1]
+        var b:Dictionary=rows[i]
+        var pa:Vector2=origin+(Vector2(a.p)-shift)*3.
+        var pb:Vector2=origin+(Vector2(b.p)-shift)*3.
+        var count:int=clampi(ceili(pa.distance_to(pb)*1.5),1,128)
+        for j in range(count+1):
+            var u:float=float(j)/count
+            var p:Vector2=pa.lerp(pb,u)
+            var n:Vector2=Vector2(a.n).lerp(Vector2(b.n),u).normalized()
+            var w:float=lerpf(a.width,b.width,u)*3.
+            var alpha:float=lerpf(a.alpha,b.alpha,u)
+            var l:Vector2=p-n*w*.52
+            var r:Vector2=p+n*w*.48
+            painter.beam(l.x,l.y,r.x,r.y,.85,0xffa0d4ff,alpha)
+            if not offset:
+                var core:Vector2=p+n*w*.18
+                painter.beam(core.x,core.y,r.x,r.y,.65,0xffe4f5ff,alpha*.8)
     present_pixels()
 
 func render_offset()->void:

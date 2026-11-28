@@ -17,7 +17,7 @@ static func move(p:Dictionary,k:String,d:Vector2)->void:
     p[k][0]+=d.x
     p[k][1]+=d.y
 
-func build(parts:Array,drive,curved:bool)->Array:
+func build(parts:Array,drive,curved:bool,gain:float=1.)->Array:
     reset()
     if not drive.phase or drive.score<=.005 or drive.strength<=0. or drive.onset_tick<0:return parts
     var ids:Array=Sweep.indices(drive.anchor)
@@ -34,8 +34,8 @@ func build(parts:Array,drive,curved:bool)->Array:
     var travel:Vector2=drive.displacement
     # Stretch the visual hinge away from current motion; retain shoulder/hip,
     # terminal wrist/ankle and hand/foot. Bound the lag by limb length.
-    var max_lag:float=minf(8.,a.distance_to(b)*.42)
-    var lag:Vector2=(-travel*amount*.52).limit_length(max_lag)
+    var max_lag:float=minf(8.*gain,a.distance_to(b)*minf(.65,.42*gain))
+    var lag:Vector2=(-travel*amount*.52*gain).limit_length(max_lag)
     if lag.length_squared()<.015:return parts
     var out:Array=parts.duplicate(true)
     move(out[upper],"b",lag)
@@ -49,7 +49,7 @@ func build(parts:Array,drive,curved:bool)->Array:
     # One contiguous loft, centerline shifted laterally via asymmetric widths
     # (right-left)/2. Keep total width approximately constant, never inflate
     # the whole limb. Preserve end sections and their material.
-    var side:float=clampf((-travel).dot(normal)*amount*.30,-3.,3.) if curved else 0.
+    var side:float=clampf((-travel).dot(normal)*amount*.30*gain,-minf(4.,3.*gain),minf(4.,3.*gain)) if curved else 0.
     var rows:Array=p.sections
     var sections:Array=[]
     var lo:float=float(rows[0][0])

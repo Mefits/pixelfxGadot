@@ -12,6 +12,7 @@ var acceleration:float=0.
 var score:float=0.
 var strength:float=1.
 var sensitivity:float=1.
+var onset_level:float=.025
 var onset_tick:int=-1
 var onset_world:Vector2=Vector2.ZERO
 var path:PackedVector2Array=PackedVector2Array()
@@ -57,8 +58,8 @@ func sample(t:int,id:String,limb:String,allowed:bool,local:Vector2,world:Vector2
         # Fast attack onset, softer decay. Once begun, do not restart on
         # every positive acceleration spike or invent pre-chamber history.
         score=maxf(raw,score*.68)
-        # Numerical visibility cutoff, not another motion classifier.
-        if onset_tick<0 and score>.025:
+        # Single adjustable onset visibility level, not multiple motion gates.
+        if onset_tick<0 and score>onset_level:
             onset_tick=t
             onset_world=prior_world
             path.append(onset_world)

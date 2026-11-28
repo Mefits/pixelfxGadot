@@ -1,0 +1,52 @@
+extends SceneTree
+const Drive=preload("res://lab/motion_stylization/acceleration_signal.gd")
+const BurstFX=preload("res://lab/motion_stylization/burst_fx.gd")
+const Shape=preload("res://lab/motion_stylization/directional_shape.gd")
+const Sweep=preload("res://lab/motion_stylization/swept_body.gd")
+const Training=preload("res://lab/training_control.gd")
+const Body=preload("res://lab/body_ankle_069.gd")
+var failures:Array[String]=[]
+func check(v:bool,m:String)->void:
+    if not v:failures.append(m)
+func _initialize()->void:call_deferred("run")
+func run()->void:
+    var f=Training.new()
+    var b=Body.new(2)
+    var parts:Array=b.make(f.walker.rig.points,f.walker.pose.angles,f.walker.rig.rotations.head)
+    var drive=Drive.new()
+    var shape=Shape.new()
+    for anchor in ["hand_far","foot_near"]:
+        drive.reset()
+        drive.sample(0,"strike",anchor,false,Vector2.ZERO,Vector2.ZERO)
+        drive.sample(1,"strike",anchor,false,Vector2(5,0),Vector2(5,0))
+        check(drive.score==0. and drive.trail().is_empty(),"chamber clean")
+        drive.sample(2,"strike",anchor,true,Vector2(10,3),Vector2(10,3))
+        check(drive.onset_tick==2 and drive.onset_world==Vector2(5,0),"onset stored")
+        var origin:Vector2=drive.onset_world
+        drive.sample(3,"strike",anchor,true,Vector2(16,6),Vector2(16,6))
+        check(drive.onset_world==origin and drive.trail().size()>1,"origin stable")
+        var before:Array=parts.duplicate(true)
+        var ids:Array=Sweep.indices(anchor)
+        for curved in [false,true]:
+            var out:Array=shape.build(parts,drive,curved)
+            check(shape.changed and out.size()==parts.size(),"one body "+anchor)
+            check(parts==before,"source unchanged")
+            check(out[ids[0]].a==parts[ids[0]].a and out[ids[1]].b==parts[ids[1]].b,"endpoints")
+            check(out[ids[2]]==parts[ids[2]],"terminal unchanged")
+        drive.sample(4,"strike",anchor,false,Vector2(18,6),Vector2(18,6))
+        check(shape.build(parts,drive,true)==parts and drive.trail().is_empty(),"impact clean")
+    var burst=Drive.new()
+    burst.onset_level=.35
+    burst.sample(0,"test","hand_far",false,Vector2.ZERO,Vector2.ZERO)
+    burst.sample(1,"test","hand_far",true,Vector2(.4,0),Vector2(.4,0))
+    check(burst.onset_tick<0,"weak motion no burst")
+    burst.sample(2,"test","hand_far",true,Vector2(8,0),Vector2(8,0))
+    check(burst.onset_tick==2 and burst.onset_world==Vector2(.4,0),"strong onset exact")
+    var ribbon:Array[Dictionary]=BurstFX.rows(burst)
+    var offset:Array[Dictionary]=BurstFX.rows(burst,true)
+    check(ribbon.size()>1 and offset.size()==ribbon.size(),"both burst techniques")
+    if not ribbon.is_empty() and not offset.is_empty():
+        check(Vector2(ribbon[0].p)==burst.onset_world,"ribbon onset")
+        check(Vector2(offset[0].p).distance_to(Vector2(ribbon[0].p))>2.,"offset separated")
+    print("MOTION_STYLIZATION_V006 ",JSON.stringify({"failures":failures}))
+    quit(0 if failures.is_empty() else 1)
