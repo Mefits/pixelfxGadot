@@ -30,6 +30,7 @@ var phase:String
 static func problem(d:Dictionary)->String:
     var error:=Asset.problem(d)
     if error!="":return error
+    if not d.goals.is_empty() or not d.get("release",{}).is_empty() or d.get("loop",false):return "Пространственный клип использует собственные цели и опоры"
     if d.get("spatial_version")!=1 or d.kind!="action" or d.get("fps")!=60:return "Нужен пространственный документ 60 Гц"
     if not d.get("effector") in ["foot_near","foot_far","hand_near","hand_far"]:return "Конечность"
     var last:=-1
@@ -45,9 +46,18 @@ static func problem(d:Dictionary)->String:
         last=tick
     return ""
 
+# JSON decimal seconds can round differently in Godot 4.4. The spatial
+# clock stores integral ticks; canonicalize only these fields for identity.
+static func timeline_document(d:Dictionary)->Dictionary:
+    var value:=Asset.normalise(d)
+    value.duration=roundi(value.duration*60.)
+    for key in value.keys:key.t=roundi(key.t*60.)
+    for marker in value.events:marker.t=roundi(marker.t*60.)
+    return value
+
 func start(d:Dictionary,now:Dictionary,prior:Dictionary,instance:int,fighter:int=0)->bool:
     if problem(d)!="":return false
-    signature=JSON.stringify(d,"",true,true).sha256_text()
+    signature=JSON.stringify(timeline_document(d),"",true,true).sha256_text()
     effector=d.effector
     serial=instance
     slot=fighter

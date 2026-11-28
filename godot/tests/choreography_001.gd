@@ -51,7 +51,16 @@ func run():
         var d=Player.Asset.read("res://lab/authoring/choreography/"+id+".json")
         var copy:Dictionary=d.duplicate(true)
         copy.id="choreo_roundtrip_"+id
-        check(Player.Asset.persist(copy)==OK and Player.Asset.read(Player.Asset.FOLDER+copy.id+".json")==copy,"roundtrip")
+        var write_error:=Player.Asset.persist(copy)
+        var loaded:=Player.Asset.read(Player.Asset.FOLDER+copy.id+".json")
+        check(write_error==OK and not loaded.is_empty(),"persist")
+        if not loaded.is_empty():
+            var before:=Player.timeline_document(copy)
+            var after:=Player.timeline_document(loaded)
+            for field in before:
+                check(before[field]==after.get(field),"roundtrip "+field)
+                if before[field]!=after.get(field):print("ROUNDTRIP_DIFF ",field," ",before[field]," ",after.get(field))
+            d=loaded
         DirAccess.remove_absolute(Player.Asset.FOLDER+copy.id+".json")
         for start_phase in [0,17,33]:
             var p=Player.new()

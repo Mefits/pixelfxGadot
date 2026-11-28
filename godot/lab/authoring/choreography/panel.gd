@@ -119,6 +119,10 @@ func apply()->bool:
 
 func save_doc():
     if not apply():return
+    var existing:=Player.Asset.read(Player.Asset.FOLDER+doc.id+".json")
+    if doc.id in Player.Asset.IDS+Player.Asset.TRAIN_IDS+Player.Asset.WALK_IDS or (not existing.is_empty() and not existing.has("spatial_version")):
+        message.text="Этот ID занят другим движением M"
+        return
     var err:=Player.Asset.persist(doc)
     if err==OK and not ids.has(doc.id):
         ids.append(doc.id)
