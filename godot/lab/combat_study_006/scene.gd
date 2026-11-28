@@ -6,7 +6,7 @@ var view=View.new()
 var sprite:Sprite2D
 var hud:Label
 var pending:Array=[0,0]
-const Control=preload("res://lab/combat_study_006/control.gd")
+const CommandMap=preload("res://lab/combat_study_006/control.gd")
 var paused:bool=false
 var accum:float=0.
 var gap:float=30.
@@ -81,16 +81,16 @@ func _unhandled_input(e:InputEvent)->void:
         KEY_2:profile=1;reset()
         KEY_3:profile=2;reset()
         KEY_B:bot_enabled=not bot_enabled
-        KEY_F:pending[0]=int(pending[0])|Control.LIGHT
-        KEY_G:pending[0]=int(pending[0])|Control.HEAVY
-        KEY_H:pending[0]=int(pending[0])|Control.SKILL
-        KEY_W:pending[0]=int(pending[0])|Control.MOBILITY
-        KEY_Q:pending[0]=int(pending[0])|Control.DEFENSE
-        KEY_K:pending[1]=int(pending[1])|Control.LIGHT
-        KEY_L:pending[1]=int(pending[1])|Control.HEAVY
-        KEY_O:pending[1]=int(pending[1])|Control.SKILL
-        KEY_UP:pending[1]=int(pending[1])|Control.MOBILITY
-        KEY_U:pending[1]=int(pending[1])|Control.DEFENSE
+        KEY_F:pending[0]=int(pending[0])|CommandMap.LIGHT
+        KEY_G:pending[0]=int(pending[0])|CommandMap.HEAVY
+        KEY_H:pending[0]=int(pending[0])|CommandMap.SKILL
+        KEY_W:pending[0]=int(pending[0])|CommandMap.MOBILITY
+        KEY_Q:pending[0]=int(pending[0])|CommandMap.DEFENSE
+        KEY_K:pending[1]=int(pending[1])|CommandMap.LIGHT
+        KEY_L:pending[1]=int(pending[1])|CommandMap.HEAVY
+        KEY_O:pending[1]=int(pending[1])|CommandMap.SKILL
+        KEY_UP:pending[1]=int(pending[1])|CommandMap.MOBILITY
+        KEY_U:pending[1]=int(pending[1])|CommandMap.DEFENSE
         KEY_SPACE:paused=not paused
         KEY_P:
             if paused:advance()

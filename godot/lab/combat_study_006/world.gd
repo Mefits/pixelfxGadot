@@ -1,5 +1,5 @@
 extends "res://lab/combat_study_005/world.gd"
-const Control=preload("res://lab/combat_study_006/control.gd")
+const CommandMap=preload("res://lab/combat_study_006/control.gd")
 const RETREAT_SPEED:float=.85
 const RETREAT_CAP:float=90.
 var directions:Array=[false,false]
@@ -14,7 +14,7 @@ func _init(gap:float=30.,stop_enabled:bool=true,profile:int=2):
 func normalize(slot:int,cmd:Dictionary)->Dictionary:
     # Named commands remain supported for the existing ability/AI adapter.
     if cmd.has("edge"):
-        return Control.decode(cmd,airborne(slot),actors[slot].stun>0)
+        return CommandMap.decode(cmd,airborne(slot),actors[slot].stun>0)
     var c:Dictionary=cmd.duplicate(true)
     if bool(c.get("forward",false)) and bool(c.get("back",false)):
         c.forward=false
