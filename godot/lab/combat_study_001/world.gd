@@ -68,6 +68,13 @@ func capture(slot:int,cmd:Dictionary)->void:
     if tick>int(s.expires):s.buffer=""
     s.guard=bool(cmd.get("guard",false))
 
+# Policy hooks; default 0.01 remains full-recovery-only.
+func can_cancel(_slot:int)->bool:return false
+func started(_slot:int,_previous:String,_next:String,_cancelled:bool,_old_remaining:int)->void:pass
+func outcome(_event:Dictionary,_target_stun:int)->void:pass
+func interrupted(_slot:int)->void:pass
+func completed(_slot:int)->void:pass
+
 func step(left:Dictionary,right:Dictionary)->void:
     events=[]
     var cmds:Array=[left,right]
@@ -81,6 +88,7 @@ func step(left:Dictionary,right:Dictionary)->void:
         tick+=1
         return
     var old_centers:Array=[center(0),center(1)]
+    var old_stun:Array=[actors[0].stun,actors[1].stun]
     var old_tips:Array=[{},{}]
     for i in 2:
         for id in players[i].anchors:old_tips[i][id]=tip(i,id)
@@ -94,12 +102,16 @@ func step(left:Dictionary,right:Dictionary)->void:
         if s.interrupt:
             command.action="recover"
             s.interrupt=false
-        elif s.stun==0 and s.remaining==0 and not s.guard and not str(s.buffer).is_empty():
+        elif s.stun==0 and not s.guard and not str(s.buffer).is_empty() and (s.remaining==0 or can_cancel(i)):
+            var prev:String=s.action
+            var old_remaining:int=s.remaining
+            var cancelled:bool=old_remaining>0
             s.action=s.buffer
             s.buffer=""
             s.remaining=bank[s.action].frames.size()
             command.action=s.action
             starts.append([tick,i,s.action])
+            started(i,prev,s.action,cancelled,old_remaining)
         elif s.stun==0 and s.remaining==0 and not s.guard:
             command.speed=1. if bool(cmds[i].get("forward",false)) else 0.
         blocking[i]=s.guard and s.stun==0 and s.remaining==0
@@ -107,7 +119,9 @@ func step(left:Dictionary,right:Dictionary)->void:
         p.step(command)
         if s.remaining>0:
             s.remaining-=1
-            if s.remaining==0:s.action=""
+            if s.remaining==0:
+                s.action=""
+                completed(i)
         s.stun=maxi(0,int(s.stun)-1)
     # Fixed-facing, bounded two-slot pushbox. No world/rig teleport on hit.
     var gap:float=root_x(1)-root_x(0)
@@ -133,6 +147,7 @@ func step(left:Dictionary,right:Dictionary)->void:
             pending.append({"id":"%d:%d:%d:%d"%[tick,i,ev[1],ev[2]],"tick":tick,"attacker":i,"target":other,"attack":action_at_tick[i],"result":outcome,"anchor":id,"point":tip(i,id),"distance":near.length()})
     for ev in pending:
         events.append(ev)
+        outcome(ev,int(old_stun[ev.target]))
         if ev.result=="miss":continue
         var s:Dictionary=actors[ev.target]
         var rule:Dictionary=RULES[ev.attack]
@@ -143,6 +158,7 @@ func step(left:Dictionary,right:Dictionary)->void:
             s.action=""
             s.buffer=""
             s.interrupt=true
+            interrupted(int(ev.target))
             s.impulse=-100.
         else:
             s.stun=maxi(s.stun,rule.blockstun)

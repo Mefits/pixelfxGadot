@@ -1,0 +1,70 @@
+name: Combat Lab 002 combo policies
+on:
+  push:
+    branches: [experiment/combat-lab-002]
+    paths:
+      - 'godot/lab/combat_study_002/**'
+      - 'godot/lab/combat_study_001/world.gd'
+      - 'godot/tests/combat_study_002.gd'
+      - 'tools/combat_study_002_media.py'
+      - '.github/workflows/combat-study-002.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  support:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: native_cpp/godot-cpp
+          key: body-skin-godot-cpp-e4b7c25-linux
+      - run: |
+          pip install scons pillow
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Existing native raster oracle
+        run: |
+          g++ -std=c++17 -O2 -ffp-contract=off -fno-fast-math native_cpp/body_tests/test.cpp -o /tmp/body-test
+          /tmp/body-test native_cpp/body_tests/oracle.txt
+          g++ -std=c++17 -O2 -ffp-contract=off native_cpp/body_tests/loft.cpp -o /tmp/loft-test
+          /tmp/loft-test
+      - name: Build existing PixelFX extension
+        run: python native_cpp/build.py
+      - name: Install Godot 4.4.1
+        run: |
+          curl -fLsS --retry 2 https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -o engine.zip
+          unzip -q engine.zip -d engine
+          chmod +x engine/Godot_v4.4.1-stable_linux.x86_64
+          echo "GODOT=$PWD/engine/Godot_v4.4.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+          mkdir -p godot/.godot
+          echo res://addons/pixelfx/pixelfx.gdextension > godot/.godot/extension_list.cfg
+      - name: Original 001 duel regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p regression-results
+          timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script res://tests/combat_study_001.gd -- "$PWD/regression-results" 2>&1 | tee regression-results/engine.log
+          if grep -E 'SCRIPT ERROR|ERROR:' regression-results/engine.log; then exit 1; fi
+          grep COMBAT_STUDY_001 regression-results/engine.log
+      - name: Native Godot combo policy gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p l-results
+          timeout 120s "$GODOT" --headless --path godot --audio-driver Dummy --script res://tests/combat_study_002.gd -- "$PWD/l-results" 2>&1 | tee l-results/engine.log
+          if grep -E 'SCRIPT ERROR|ERROR:' l-results/engine.log; then exit 1; fi
+          grep COMBAT_STUDY_002 l-results/engine.log
+          test -s l-results/0-028.png
+          test -s l-results/2-053.png
+          test -s l-results/metrics.json
+      - name: Verified mobile comparisons
+        run: python tools/combat_study_002_media.py l-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combat-study-002
+          path: |
+            l-results/
+            regression-results/engine.log
