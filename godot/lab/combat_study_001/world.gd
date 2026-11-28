@@ -62,13 +62,19 @@ func center(slot:int)->Vector2:
 func capture(slot:int,cmd:Dictionary)->void:
     var s:Dictionary=actors[slot]
     var a:String=str(cmd.get("action",""))
-    if RULES.has(a):
+    if not rule_for(a).is_empty():
         s.buffer=a
         s.expires=tick+BUFFER
     if tick>int(s.expires):s.buffer=""
     s.guard=bool(cmd.get("guard",false))
 
 # Policy hooks; default 0.01 remains full-recovery-only.
+func rule_for(action:String)->Dictionary:return RULES.get(action,{})
+func can_act(_slot:int)->bool:return true
+func motion_command(_slot:int,_action:String,command:Dictionary)->Dictionary:return command
+func advance_positions()->void:pass
+func marker_event(ev:Dictionary,_a:Vector2,_b:Vector2,_blocking:bool,_kind:String)->Dictionary:return ev
+func after_resolve(_event:Dictionary)->void:pass
 func can_cancel(_slot:int)->bool:return false
 func started(_slot:int,_previous:String,_next:String,_cancelled:bool,_old_remaining:int)->void:pass
 func outcome(_event:Dictionary,_target_stun:int)->void:pass
@@ -102,7 +108,7 @@ func step(left:Dictionary,right:Dictionary)->void:
         if s.interrupt:
             command.action="recover"
             s.interrupt=false
-        elif s.stun==0 and not s.guard and not str(s.buffer).is_empty() and (s.remaining==0 or can_cancel(i)):
+        elif s.stun==0 and can_act(i) and not s.guard and not str(s.buffer).is_empty() and (s.remaining==0 or can_cancel(i)):
             var prev:String=s.action
             var old_remaining:int=s.remaining
             var cancelled:bool=old_remaining>0
@@ -112,17 +118,18 @@ func step(left:Dictionary,right:Dictionary)->void:
             command.action=s.action
             starts.append([tick,i,s.action])
             started(i,prev,s.action,cancelled,old_remaining)
-        elif s.stun==0 and s.remaining==0 and not s.guard:
+        elif s.stun==0 and can_act(i) and s.remaining==0 and not s.guard:
             command.speed=1. if bool(cmds[i].get("forward",false)) else 0.
-        blocking[i]=s.guard and s.stun==0 and s.remaining==0
+        blocking[i]=s.guard and can_act(i) and s.stun==0 and s.remaining==0
         action_at_tick[i]=s.action if s.remaining>0 and s.stun==0 else ""
-        p.step(command)
+        p.step(motion_command(i,action_at_tick[i],command))
         if s.remaining>0:
             s.remaining-=1
             if s.remaining==0:
                 s.action=""
                 completed(i)
         s.stun=maxi(0,int(s.stun)-1)
+    advance_positions()
     # Fixed-facing, bounded two-slot pushbox. No world/rig teleport on hit.
     var gap:float=root_x(1)-root_x(0)
     if gap<PUSH_GAP:
@@ -137,20 +144,20 @@ func step(left:Dictionary,right:Dictionary)->void:
         var other:int=1-i
         if str(action_at_tick[i]).is_empty():continue
         for ev in players[i].events:
-            if ev[5]!="strike":continue
+            if ev[5] not in ["strike","utility"]:continue
             var id:String=ev[3]
             var a:Vector2=Vector2(old_tips[i][id])-Vector2(old_centers[other])
             var b:Vector2=tip(i,id)-center(other)
             var near:Vector2=Geometry2D.get_closest_point_to_segment(Vector2.ZERO,a,b) if a.distance_squared_to(b)>.000001 else a
             var contact:bool=near.length()<=RADIUS and (root_x(other)-root_x(i))*facing(i)>0.
             var outcome:String=("block" if blocking[other] else "hit") if contact else "miss"
-            pending.append({"id":"%d:%d:%d:%d"%[tick,i,ev[1],ev[2]],"tick":tick,"attacker":i,"target":other,"attack":action_at_tick[i],"result":outcome,"anchor":id,"point":tip(i,id),"distance":near.length()})
+            pending.append(marker_event({"id":"%d:%d:%d:%d"%[tick,i,ev[1],ev[2]],"tick":tick,"attacker":i,"target":other,"attack":action_at_tick[i],"result":outcome,"anchor":id,"point":tip(i,id),"distance":near.length()},a,b,blocking[other],ev[5]))
     for ev in pending:
         events.append(ev)
         outcome(ev,int(old_stun[ev.target]))
-        if ev.result=="miss":continue
+        if ev.result not in ["hit","block"]:continue
         var s:Dictionary=actors[ev.target]
-        var rule:Dictionary=RULES[ev.attack]
+        var rule:Dictionary=rule_for(ev.attack)
         if ev.result=="hit":
             s.hp=maxi(0,int(s.hp)-int(rule.damage))
             s.stun=maxi(s.stun,rule.hitstun)
@@ -164,6 +171,7 @@ func step(left:Dictionary,right:Dictionary)->void:
             s.stun=maxi(s.stun,rule.blockstun)
             s.impulse=-45.
         if hitstop_enabled:freeze=maxi(freeze,int(rule.freeze))
+        after_resolve(ev)
     tick+=1
 
 func save()->PackedByteArray:
