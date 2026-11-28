@@ -76,6 +76,7 @@ func motion_command(_slot:int,_action:String,command:Dictionary)->Dictionary:ret
 func advance_positions()->void:pass
 func marker_event(ev:Dictionary,_a:Vector2,_b:Vector2,_blocking:bool,_kind:String)->Dictionary:return ev
 func after_resolve(_event:Dictionary)->void:pass
+func resolve_special(_event:Dictionary)->bool:return false
 func can_cancel(_slot:int)->bool:return false
 func started(_slot:int,_previous:String,_next:String,_cancelled:bool,_old_remaining:int)->void:pass
 func outcome(_event:Dictionary,_target_stun:int)->void:pass
@@ -156,6 +157,7 @@ func step(left:Dictionary,right:Dictionary)->void:
     for ev in pending:
         events.append(ev)
         outcome(ev,int(old_stun[ev.target]))
+        if resolve_special(ev):continue
         if ev.result not in ["hit","block"]:continue
         var s:Dictionary=actors[ev.target]
         var rule:Dictionary=rule_for(ev.attack)
