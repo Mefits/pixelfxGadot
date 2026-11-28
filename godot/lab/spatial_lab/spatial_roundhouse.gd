@@ -64,6 +64,14 @@ func yaw_at(tick:int)->int:
             break
     return start_yaw+direction*roundi(degrees*65536./360.)
 
+# Extension points for isolated choreography experiments. Defaults exactly
+# reproduce 0.06; no changes to the contact solver or legacy controller.
+func evaluate_target(authored:Dictionary,yaw:int,_next:int)->void:
+    desired.lift_legacy(authored,yaw)
+
+func adjust_supported_target(_next:int)->void:
+    pass
+
 func strike_tip()->Vector3:
     var side:String=Support.SIDES[striking]
     return player.rig.point3("knee_"+side).lerp(player.rig.point3("foot_"+side),.9)
@@ -116,7 +124,7 @@ func step()->Dictionary:
     var next:int=age+1
     var authored:Dictionary=frames[next].pose.duplicate(true)
     var yaw:int=yaw_at(next)
-    desired.lift_legacy(authored,yaw)
+    evaluate_target(authored,yaw,next)
     var side:String=Support.SIDES[support_leg]
     var old_contacts:Dictionary=player.support.contacts.duplicate(true)
     var old_current:Dictionary=player.current.duplicate(true)
@@ -135,6 +143,7 @@ func step()->Dictionary:
         orbit=anchor_xyz-Support.toe(desired,authored,side)
         for id in desired.ids_in_order():desired.joint_xyz[id]=desired.point3(id)+orbit
         Entry.update_xy(desired)
+        adjust_supported_target(next)
     var target:Dictionary=Entry.sample(desired,authored)
     var result:Dictionary=player.step(target)
     if not result.accepted:
