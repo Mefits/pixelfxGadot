@@ -1,0 +1,3 @@
+# External knowledge
+
+Полный первичный индекс: [OPEN_GAME_INDEX_RU](OPEN_GAME_INDEX_RU.md). OpenGame snapshot f17151f3cc7838ddbe13d9b94392e0f983fc341b; [provenance](https://github.com/nexu-io/opengame/blob/f17151f3cc7838ddbe13d9b94392e0f983fc341b/skills/openmotion-game/PROVENANCE.md). Apache-2.0 основного проекта, отдельные унаследованные материалы MIT; проверять лицензии конкретных файлов. Рекомендации не являются подтверждёнными результатами Godot. Для новых источников: дата, URL/ревизия, применимость, ограничения, лицензия.
