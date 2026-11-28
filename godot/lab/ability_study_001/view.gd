@@ -20,7 +20,7 @@ func render(w)->Image:
     for e in w.entities:
         if e.spent:continue
         var p:Dictionary=Profiles.DATA[e.attack]
-        var hand:Vector2=w.tip(e.owner,"hand_near")
+        var hand:Vector2=w.tip(e.owner,p.motion.anchor)
         var a:Vector2=screen(w,hand)
         var g:Dictionary=p.interaction
         if e.detached:
@@ -31,7 +31,7 @@ func render(w)->Image:
             ink.circle(a.x,a.y,g.radius,0xffffbd65)
             ink.circle(a.x,a.y,g.radius*.55,0xfff8ffff)
         elif g.kind=="blade" and e.age>=g.first and e.age<=g.last:
-            var end:Vector2=screen(w,w.blade_end(hand,w.point(e.owner,"elbow_near"),w.facing(e.owner),g.length))
+            var end:Vector2=screen(w,w.blade_end(hand,w.point(e.owner,str(p.motion.anchor).replace("hand_","elbow_")),w.facing(e.owner),g.length))
             energy(a,end,g.radius*2.,0xfff1a16b,0xfff6ffff)
             ink.glow(a.x,a.y,6.,0xffe99d74,.75)
         elif g.kind=="hand" and e.age>=p.movement.first and e.age<=p.movement.last:
