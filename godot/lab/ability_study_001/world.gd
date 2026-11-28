@@ -106,9 +106,9 @@ func collect_contacts(pending:Array,old_centers:Array,old_tips:Array,blocking:Ar
                 lifecycle.append([tick,e.id,"release",i,hand])
             if e.detached:
                 var old:Vector2=e.p
-                var delta:float=minf(float(g.speed),maxf(0.,float(g.range)-float(e.travel)))
+                var delta:float=0. if e.flight==0 else minf(float(g.speed),maxf(0.,float(g.range)-float(e.travel)))
                 var next:Vector2=old+Vector2(facing(i)*delta,0.)
-                distance=near_segment(old-Vector2(old_centers[j]),next-center(j))
+                distance=(old-center(j)).length() if e.flight==0 else near_segment(old-Vector2(old_centers[j]),next-center(j))
                 e.p=next
                 e.travel+=delta
                 e.flight+=1
@@ -131,7 +131,7 @@ func collect_contacts(pending:Array,old_centers:Array,old_tips:Array,blocking:Ar
         var hit:bool=distance<=RADIUS+float(g.radius)
         if hit or expired:
             pending.append(contact_event(e,at,distance if is_finite(distance) else 9999.,hit,blocking[j]))
-            lifecycle.append([tick,e.id,"contact" if hit else "expire",i])
+            lifecycle.append([tick,e.id,"contact" if hit else "expire",i,e.dash_travel,e.travel])
             # A struck attached effect can still be represented by the event;
             # it cannot hit again. Projectile dies on any resolved contact.
             continue
